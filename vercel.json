@@ -1,5 +1,9 @@
 {
   "routes": [
+    { "src": "/salesvision/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/salesvision/favicon.svg", "dest": "/favicon.svg" },
+    { "src": "/salesvision", "dest": "/index.html" },
+    { "src": "/salesvision/(.*)", "dest": "/index.html" },
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
   ]

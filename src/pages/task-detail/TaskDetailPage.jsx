@@ -176,7 +176,7 @@ function TaskDetailPage() {
 
       if (isMeta && key === 'l') {
         event.preventDefault();
-        const link = `${window.location.origin}/tasks/${taskId}`;
+        const link = new URL(`${import.meta.env.BASE_URL}tasks/${taskId}`, window.location.origin).toString();
         try {
           await navigator.clipboard.writeText(link);
           setActionMessage('Task link copied');

@@ -2,14 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (() => {
         const storageKey = 'sv_theme';
         const valid = new Set(['light', 'dark', 'system']);
         const stored = localStorage.getItem(storageKey);
-        const loginRoute = window.location.pathname.startsWith('/login');
+        const basePath = '/salesvision';
+        const pathname = window.location.pathname.startsWith(basePath)
+          ? (window.location.pathname.slice(basePath.length) || '/')
+          : window.location.pathname;
+        const loginRoute = pathname.startsWith('/login');
         const mode = loginRoute ? 'system' : (valid.has(stored) ? stored : 'system');
         const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         const effective = mode === 'system' ? (systemDark ? 'dark' : 'light') : mode;
@@ -43,6 +47,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>

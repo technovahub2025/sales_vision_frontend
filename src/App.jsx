@@ -14,7 +14,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/salesvision">
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>

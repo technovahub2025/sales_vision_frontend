@@ -190,7 +190,9 @@ const TaskCard = memo(function TaskCard({
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
-                  navigator.clipboard.writeText(`${window.location.origin}/tasks/${taskId}`);
+                  navigator.clipboard.writeText(
+                    new URL(`${import.meta.env.BASE_URL}tasks/${taskId}`, window.location.origin).toString(),
+                  );
                 }}
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
               >

@@ -267,7 +267,12 @@ export function WorkspaceProvider({ children }) {
         const code = String(err?.code || '');
         // Only clear projectId if not currently on a project board route (to prevent clearing valid route projectId on refresh)
         const currentPath = window.location.pathname;
-        const isProjectBoardRoute = /^\/projects\/[^/]+\/board/.test(currentPath);
+        const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+        const normalizedPath =
+          basePath && basePath !== '/' && currentPath.startsWith(basePath)
+            ? currentPath.slice(basePath.length) || '/'
+            : currentPath;
+        const isProjectBoardRoute = /^\/projects\/[^/]+\/board/.test(normalizedPath);
         
         if (status !== 404 && code !== 'NOT_FOUND') {
           return;

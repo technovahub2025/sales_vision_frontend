@@ -1,0 +1,517 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { analyticsApi } from '../../api';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useSocket } from '../../contexts/SocketContext';
+import { EVENTS } from '../../socket/events';
+import { ROUTES, projectRoute } from '../../routes/routePaths';
+import { AnalyticsTooltip, ChartPanel } from '../../components/analytics/ChartPrimitives';
+
+function toDateInputValue(date) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+function getPresetRange(preset) {
+  const today = new Date();
+  const to = toDateInputValue(today);
+  const days = preset === '7d' ? 6 : preset === '90d' ? 89 : 29;
+  const from = toDateInputValue(new Date(today.getTime() - days * 24 * 60 * 60 * 1000));
+  return { from, to };
+}
+
+function formatPct(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
+function formatInt(value) {
+  return new Intl.NumberFormat('en-IN').format(Number(value || 0));
+}
+
+function formatINR(value) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function shortLabel(value, max = 16) {
+  const text = String(value || '');
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}...`;
+}
+
+function readFileName(contentDisposition, fallback) {
+  const text = String(contentDisposition || '');
+  const match = text.match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+}
+
+function AnalyticsPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { workspaceId, activeWorkspace } = useWorkspace();
+  const { socket, joinWorkspace, leaveWorkspace } = useSocket();
+  const refreshTimerRef = useRef(null);
+
+  const [preset, setPreset] = useState('30d');
+  const [customFrom, setCustomFrom] = useState(() => getPresetRange('30d').from);
+  const [customTo, setCustomTo] = useState(() => getPresetRange('30d').to);
+  const [moduleFilter, setModuleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [channelFilter, setChannelFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [toast, setToast] = useState(null);
+  const [exporting, setExporting] = useState('');
+
+  const role = String(activeWorkspace?.role || '').toLowerCase();
+  const canExport = role === 'owner' || role === 'admin';
+
+  const params = useMemo(
+    () => ({
+      dateFrom: customFrom,
+      dateTo: customTo,
+      ...(moduleFilter && moduleFilter !== 'all' ? { module: moduleFilter } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(channelFilter ? { channel: channelFilter } : {}),
+      ...(priorityFilter ? { priority: priorityFilter } : {}),
+    }),
+    [customFrom, customTo, moduleFilter, statusFilter, channelFilter, priorityFilter],
+  );
+
+  const analyticsQuery = useQuery({
+    queryKey: ['analytics', 'overview', workspaceId, params],
+    enabled: Boolean(workspaceId),
+    queryFn: () => analyticsApi.overview(workspaceId, params).then((response) => response.data || {}),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!socket || !workspaceId) return undefined;
+    const joinPayload = {
+      workspaceId,
+      modules: ['tasks', 'projects', 'leads', 'campaigns', 'employees', 'clients', 'analytics'],
+    };
+    joinWorkspace(joinPayload);
+
+    const scheduleRefresh = () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['analytics', 'overview', workspaceId] });
+      }, 220);
+    };
+
+    const eventNames = [
+      EVENTS.REALTIME_EVENT,
+      EVENTS.TASK_CREATED,
+      EVENTS.TASK_UPDATED,
+      EVENTS.TASK_DELETED,
+      EVENTS.PROJECT_UPDATED,
+      EVENTS.LEAD_CREATED,
+      EVENTS.LEAD_UPDATED,
+      EVENTS.LEAD_MOVED,
+      EVENTS.LEAD_DELETED,
+      EVENTS.CLIENT_CREATED,
+      EVENTS.CLIENT_UPDATED,
+      EVENTS.EMPLOYEE_UPDATED,
+      EVENTS.DASHBOARD_UPDATED,
+    ];
+
+    eventNames.forEach((name) => socket.on(name, scheduleRefresh));
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      eventNames.forEach((name) => socket.off(name, scheduleRefresh));
+      leaveWorkspace(joinPayload);
+    };
+  }, [socket, workspaceId, joinWorkspace, leaveWorkspace, queryClient]);
+
+  const data = analyticsQuery.data || {};
+  const delivery = data.delivery || {};
+  const sales = data.sales || {};
+  const workforce = data.workforce || {};
+  const topEntities = data.topEntities || {};
+
+  const completionTrend = Array.isArray(delivery.completionTrend) ? delivery.completionTrend : [];
+  const overdueTrend = Array.isArray(delivery.overdueTrend) ? delivery.overdueTrend : [];
+  const leadFunnel = Array.isArray(sales.leadFunnel) ? sales.leadFunnel : [];
+  const topProjects = Array.isArray(topEntities.projects) ? topEntities.projects : [];
+  const topCampaigns = Array.isArray(topEntities.campaigns) ? topEntities.campaigns : [];
+  const assignmentLoad = Array.isArray(workforce.assignmentLoad) ? workforce.assignmentLoad : [];
+
+  const deliveryTrendData = useMemo(() => {
+    const rows = new Map();
+    completionTrend.forEach((row) => {
+      rows.set(row.date, {
+        date: row.date,
+        label: String(row.date || '').slice(5),
+        completionRate: Number(row.completionRate || 0),
+        overdue: 0,
+      });
+    });
+    overdueTrend.forEach((row) => {
+      const date = row.date;
+      if (!rows.has(date)) {
+        rows.set(date, { date, label: String(date || '').slice(5), completionRate: 0, overdue: Number(row.overdue || 0) });
+      } else {
+        rows.set(date, { ...rows.get(date), overdue: Number(row.overdue || 0) });
+      }
+    });
+    return Array.from(rows.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }, [completionTrend, overdueTrend]);
+
+  const leadFunnelChartData = useMemo(
+    () =>
+      leadFunnel.map((row) => ({
+        name: String(row.statusId || '').replaceAll('_', ' '),
+        value: Number(row.count || 0),
+      })),
+    [leadFunnel],
+  );
+
+  const topPerformanceData = useMemo(() => {
+    const projectRows = topProjects.slice(0, 4).map((item) => ({
+      label: shortLabel(item.name, 14),
+      fullName: item.name,
+      projectProgress: Number(item.progress || 0),
+      campaignConversion: 0,
+      type: 'project',
+    }));
+    const campaignRows = topCampaigns.slice(0, 4).map((item) => ({
+      label: shortLabel(item.name, 14),
+      fullName: item.name,
+      projectProgress: 0,
+      campaignConversion: Number(item.conversionRate || 0),
+      type: 'campaign',
+    }));
+    return [...projectRows, ...campaignRows];
+  }, [topProjects, topCampaigns]);
+
+  const workforceChartData = useMemo(
+    () =>
+      assignmentLoad.slice(0, 8).map((item) => ({
+        name: shortLabel(item.name, 12),
+        fullName: item.name,
+        utilizationPct: Number(item.utilizationPct || 0),
+        assignedTasks: Number(item.assignedTasks || 0),
+      })),
+    [assignmentLoad],
+  );
+
+  const leadFunnelColors = ['#004ac6', '#1f67dc', '#3b82f6', '#60a5fa', '#93c5fd', '#8b5cf6', '#f97316'];
+
+  const onPresetChange = (nextPreset) => {
+    setPreset(nextPreset);
+    if (nextPreset === 'custom') return;
+    const range = getPresetRange(nextPreset);
+    setCustomFrom(range.from);
+    setCustomTo(range.to);
+  };
+
+  const openRouteWithParams = (route, extraParams = {}) => {
+    const url = new URLSearchParams({
+      dateFrom: customFrom,
+      dateTo: customTo,
+      ...extraParams,
+    });
+    navigate(`${route}?${url.toString()}`);
+  };
+
+  const exportReport = async (format) => {
+    if (!workspaceId || !canExport) {
+      setToast({ tone: 'error', message: 'Only owner/admin can export detailed analytics.' });
+      return;
+    }
+    try {
+      setExporting(format);
+      const response = await analyticsApi.export(workspaceId, { ...params, format });
+      const fallbackName = `analytics-report-${customFrom}-${customTo}.${format}`;
+      const fileName = readFileName(response.headers?.['content-disposition'], fallbackName);
+      const blob = new Blob([response.data], { type: response.headers?.['content-type'] || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setToast({ tone: 'success', message: `${format.toUpperCase()} export ready.` });
+    } catch (error) {
+      setToast({ tone: 'error', message: error?.response?.status === 403 ? 'Export requires owner/admin role.' : 'Export failed. Try again.' });
+    } finally {
+      setExporting('');
+    }
+  };
+
+  return (
+    <main className="relative min-h-screen bg-surface">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-on-surface">Analytics Overview</h1>
+            <p className="mt-1 text-on-surface-variant">Workspace 360 for delivery, sales, workforce, and growth.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" disabled={!canExport || exporting === 'csv'} onClick={() => exportReport('csv')} className="rounded-lg bg-surface-container-low px-4 py-2 font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50">
+              {exporting === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
+            </button>
+            <button type="button" disabled={!canExport || exporting === 'json'} onClick={() => exportReport('json')} className="rounded-lg bg-primary px-4 py-2 font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">
+              {exporting === 'json' ? 'Exporting JSON...' : 'Export JSON'}
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {['7d', '30d', '90d', 'custom'].map((item) => (
+              <button key={item} type="button" onClick={() => onPresetChange(item)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${preset === item ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'}`}>
+                {item === 'custom' ? 'Custom' : item.toUpperCase()}
+              </button>
+            ))}
+            <input type="date" value={customFrom} onChange={(event) => { setPreset('custom'); setCustomFrom(event.target.value); }} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
+            <input type="date" value={customTo} onChange={(event) => { setPreset('custom'); setCustomTo(event.target.value); }} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
+            <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+              <option value="all">All modules</option>
+              <option value="delivery">Delivery</option>
+              <option value="sales">Sales</option>
+              <option value="workforce">Workforce</option>
+            </select>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+              <option value="">All status</option>
+              <option value="todo">Todo</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="won">Won</option>
+            </select>
+            <select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+              <option value="">All channels/sources</option>
+              <option value="organic">Organic</option>
+              <option value="referral">Referral</option>
+              <option value="paid">Paid</option>
+              <option value="event">Event</option>
+              <option value="cold">Cold</option>
+            </select>
+            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+              <option value="">All priority</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="cold">Cold</option>
+            </select>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="text-sm text-on-surface-variant">Task Completion</p>
+            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.completionRate)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.myTasks, { status: 'completed' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open My Tasks</button>
+          </article>
+          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="text-sm text-on-surface-variant">Lead Conversion</p>
+            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(sales.leadConversionRate)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.leads, { status: 'won' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Leads</button>
+          </article>
+          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="text-sm text-on-surface-variant">Campaign Avg ROI</p>
+            <h2 className="mt-1 text-3xl font-black text-on-surface">{Number(sales?.campaign?.averageRoi || 0).toFixed(2)}x</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns, { status: 'active' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Campaigns</button>
+          </article>
+          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="text-sm text-on-surface-variant">Team Utilization</p>
+            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.teamUtilizationPct)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.employees)} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Employees</button>
+          </article>
+        </section>
+
+        <section className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 lg:col-span-8">
+            <ChartPanel
+              title="Delivery Trend"
+              subtitle="Completion rate and overdue count over time"
+              loading={analyticsQuery.isLoading}
+              hasData={deliveryTrendData.length > 0}
+            >
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={deliveryTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                    <Tooltip content={<AnalyticsTooltip formatter={(value, key) => (String(key).includes('Rate') ? `${Number(value || 0).toFixed(1)}%` : formatInt(value))} />} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Area yAxisId="left" type="monotone" dataKey="completionRate" name="Completion Rate" stroke="#004ac6" fill="#004ac622" strokeWidth={2} />
+                    <Line yAxisId="right" type="monotone" dataKey="overdue" name="Overdue" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartPanel>
+          </div>
+
+          <div className="col-span-12 lg:col-span-4">
+            <ChartPanel title="Lead Funnel" subtitle="Stage-wise lead distribution" loading={analyticsQuery.isLoading} hasData={leadFunnelChartData.some((item) => item.value > 0)}>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={leadFunnelChartData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={94} paddingAngle={2}>
+                      {leadFunnelChartData.map((entry, index) => (
+                        <Cell key={`${entry.name}-${index}`} fill={leadFunnelColors[index % leadFunnelColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<AnalyticsTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartPanel>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 xl:col-span-8">
+            <ChartPanel
+              title="Top Performance"
+              subtitle="Projects progress and campaign conversion"
+              loading={analyticsQuery.isLoading}
+              hasData={topPerformanceData.length > 0}
+              actions={
+                <button type="button" onClick={() => openRouteWithParams(ROUTES.projects)} className="text-xs font-semibold text-primary hover:underline">
+                  View all projects
+                </button>
+              }
+            >
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topPerformanceData} margin={{ top: 8, right: 16, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip content={<AnalyticsTooltip formatter={(value) => `${Number(value || 0).toFixed(1)}%`} />} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar dataKey="projectProgress" name="Project Progress %" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="campaignConversion" name="Campaign Conversion %" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 overflow-x-auto rounded-md border border-outline-variant/10">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-container-low text-on-surface-variant">
+                    <tr>
+                      <th className="px-3 py-2">Project</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Progress</th>
+                      <th className="px-3 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topProjects.slice(0, 5).map((project) => (
+                      <tr key={project.projectId} className="border-t border-outline-variant/10">
+                        <td className="px-3 py-2">{project.name}</td>
+                        <td className="px-3 py-2 capitalize">{project.status}</td>
+                        <td className="px-3 py-2">{Number(project.progress || 0).toFixed(1)}%</td>
+                        <td className="px-3 py-2 text-right">
+                          <button type="button" onClick={() => navigate(projectRoute('overview', project.projectId))} className="rounded bg-surface-container px-2 py-1 font-semibold">
+                            Open
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!topProjects.length ? (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-3 text-center text-on-surface-variant">
+                          No project data in this range.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </ChartPanel>
+          </div>
+
+          <div className="col-span-12 xl:col-span-4">
+            <ChartPanel title="Workforce Capacity" subtitle="Availability and utilization view" loading={analyticsQuery.isLoading} hasData={workforceChartData.length > 0}>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={workforceChartData} margin={{ top: 8, right: 10, left: 0, bottom: 6 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                    <Tooltip content={<AnalyticsTooltip formatter={(value, key) => (String(key).includes('Utilization') ? `${Number(value || 0).toFixed(1)}%` : formatInt(value))} />} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar yAxisId="left" dataKey="utilizationPct" name="Utilization %" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="right" dataKey="assignedTasks" name="Assigned Tasks" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-md bg-surface-container-low px-2 py-2">Headcount: <span className="font-semibold">{formatInt(workforce.headcount)}</span></div>
+                <div className="rounded-md bg-surface-container-low px-2 py-2">Avg Capacity: <span className="font-semibold">{Number(workforce.avgCapacityHours || 0).toFixed(1)}h</span></div>
+              </div>
+            </ChartPanel>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-on-surface">Top Campaigns</h3>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns)} className="text-xs font-semibold text-primary hover:underline">Open campaigns</button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {topCampaigns.map((campaign) => (
+              <button key={campaign.campaignId} type="button" onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign.campaignId))} className="rounded-md border border-outline-variant/20 bg-surface p-3 text-left transition hover:bg-surface-container-low">
+                <p className="font-semibold">{campaign.name}</p>
+                <p className="mt-1 text-xs capitalize text-on-surface-variant">{campaign.status}</p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span>ROI: {Number(campaign.roi || 0).toFixed(2)}x</span>
+                  <span>Spend: {formatINR(campaign.spend || 0)}</span>
+                </div>
+              </button>
+            ))}
+            {!topCampaigns.length ? <p className="text-sm text-on-surface-variant">No campaign data in this range.</p> : null}
+          </div>
+        </section>
+
+        {analyticsQuery.isLoading ? <div className="rounded-md bg-surface-container-low p-3 text-sm text-on-surface-variant">Loading analytics...</div> : null}
+        {analyticsQuery.error ? <div className="rounded-md bg-error-container px-3 py-2 text-sm text-error">Failed to load analytics data.</div> : null}
+      </div>
+
+      {toast ? (
+        <div className={`fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error' : 'bg-green-600'}`}>
+          {toast.message}
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+export default AnalyticsPage;

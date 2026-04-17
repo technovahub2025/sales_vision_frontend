@@ -9,6 +9,9 @@ export default function AuthLayout({
   showThemeToggle = true,
   compact = false,
 }) {
+  const logoLight = `${import.meta.env.BASE_URL}assets/light_logo.jpeg`;
+  const logoDark = `${import.meta.env.BASE_URL}assets/dark_logo.jpeg`;
+
   return (
     <div className={`sv-auth-shell ${compact ? 'min-vh-100 d-flex align-items-center py-3' : 'py-4 py-lg-5'}`}>
       <div className="container-fluid px-3 px-md-4 px-xl-5 w-100">
@@ -22,8 +25,8 @@ export default function AuthLayout({
             <section className={compact ? 'col-12 col-lg-5 col-xl-5' : 'col-12 col-lg-6 col-xl-5'}>
             <article className="sv-auth-card p-4 p-lg-5 h-100 sv-reveal">
               <div className="mb-3">
-                <img src="/assets/light_logo.jpeg" alt="Sales Vision" className="sv-logo sv-logo-light" />
-                <img src="/assets/dark_logo.jpeg" alt="Sales Vision" className="sv-logo sv-logo-dark" />
+                <img src={logoLight} alt="Sales Vision" className="sv-logo sv-logo-light" />
+                <img src={logoDark} alt="Sales Vision" className="sv-logo sv-logo-dark" />
               </div>
               <h1 className="h2 fw-bold mb-2 sv-heading">{title}</h1>
               <p className="mb-4 text-secondary">{subtitle}</p>

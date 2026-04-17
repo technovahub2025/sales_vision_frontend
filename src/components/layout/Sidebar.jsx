@@ -49,6 +49,8 @@ function NavItem({ item, activeAware = true, collapsed = false }) {
 }
 
 function Sidebar({ collapsed = false, setCollapsed }) {
+  const logoLight = `${import.meta.env.BASE_URL}assets/light_logo.jpeg`;
+  const logoDark = `${import.meta.env.BASE_URL}assets/dark_logo.jpeg`;
   const { meta } = useMyTasks();
   const { workspaceId, activeWorkspace, workspacesLoading } = useWorkspace();
   const myOpenCount = Number(meta?.openCount || 0);
@@ -89,8 +91,8 @@ function Sidebar({ collapsed = false, setCollapsed }) {
       <div className={`mb-8 px-3 d-flex align-items-center ${collapsed ? 'justify-content-center' : 'justify-content-between'}`}>
         {!collapsed && (
           <div className="mb-2">
-            <img src="/assets/light_logo.jpeg" alt="Sales Vision" className="sv-logo sv-logo-light sv-logo-dashboard" />
-            <img src="/assets/dark_logo.jpeg" alt="Sales Vision" className="sv-logo sv-logo-dark sv-logo-dashboard" />
+            <img src={logoLight} alt="Sales Vision" className="sv-logo sv-logo-light sv-logo-dashboard" />
+            <img src={logoDark} alt="Sales Vision" className="sv-logo sv-logo-dark sv-logo-dashboard" />
           </div>
         )}
         <button

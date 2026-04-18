@@ -9,7 +9,7 @@
         const storageKey = 'sv_theme';
         const valid = new Set(['light', 'dark', 'system']);
         const stored = localStorage.getItem(storageKey);
-        const basePath = '/salesvision';
+        const basePath = '/test-salesvision';
         const pathname = window.location.pathname.startsWith(basePath)
           ? (window.location.pathname.slice(basePath.length) || '/')
           : window.location.pathname;

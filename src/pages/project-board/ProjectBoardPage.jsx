@@ -19,24 +19,6 @@ import { CSS } from '@dnd-kit/utilities';
 import Icon from '../../components/ui/Icon';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTimeTracker } from '../../hooks/useTimeTracker';
-
-// Custom debounce hook
-function useDebounce(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 function priorityDotClass(priority) {
   switch (String(priority || '').toLowerCase()) {
@@ -99,23 +81,23 @@ const TaskCard = memo(function TaskCard({
     <article
       ref={setNodeRef}
       style={{ ...dndStyle, ...animationStyle }}
-      className={`group overflow-hidden rounded-2xl border border-outline-variant/50 bg-gradient-to-br from-surface-container-low via-surface-container-low to-surface-container-low/50 p-3 shadow-lg backdrop-blur-sm transition-all hover:shadow-xl hover:border-primary/40 hover:-translate-y-1 ${isDragging ? 'opacity-60 scale-95' : ''}`}
+      className={`group sv-card sv-board-task-card overflow-hidden ${isDragging ? 'sv-board-task-card-dragging' : ''}`}
       {...attributes}
       {...listeners}
     >
-      <div className="mb-3 flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${statusBadgeClass(task.status)}`}>
+      <div className="sv-board-task-card-top">
+        <div className="sv-board-task-chips">
+          <span className={`sv-board-priority-chip ${statusBadgeClass(task.status)}`}>
             <span className={`h-2 w-2 rounded-full ${priorityDotClass(task.priority)}`} />
             {String(task.priority || 'medium')}
           </span>
-          <span className="inline-flex items-center rounded-full bg-surface-container/80 px-2 py-0.5 text-[10px] font-semibold uppercase text-on-surface-variant backdrop-blur-sm">
+          <span className="sv-board-type-chip">
             {String(task.issueType || 'task')}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="sv-board-task-actions">
           {onTimerToggle && (
-            <div className="flex items-center gap-1 mr-2">
+            <div className="sv-board-task-timer-actions">
               <button
                 type="button"
                 disabled={timerState?.starting || timerState?.pausing || timerState?.resuming}
@@ -123,12 +105,12 @@ const TaskCard = memo(function TaskCard({
                   e.stopPropagation();
                   onTimerToggle(task);
                 }}
-                className={`rounded-lg p-1.5 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`sv-board-icon-btn ${isTimerActive ? 'is-warning' : ''} ${isTimerPaused ? 'is-accent' : ''} ${
                   isTimerActive
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    ? ''
                     : isTimerPaused
-                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                    ? ''
+                    : 'is-primary'
                 }`}
                 title={isTimerActive ? 'Pause' : isTimerPaused ? 'Resume' : 'Start'}
               >
@@ -142,7 +124,7 @@ const TaskCard = memo(function TaskCard({
                     e.stopPropagation();
                     onTimerStop(task);
                   }}
-                  className="rounded-lg p-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="sv-board-icon-btn is-danger"
                   title="End"
                 >
                   <Icon name="stop" className="text-sm" />
@@ -150,29 +132,29 @@ const TaskCard = memo(function TaskCard({
               )}
             </div>
           )}
-          <div className="relative">
+          <div className="relative sv-board-task-menu-container">
           <button
             type="button"
             onClick={() => setMenuOpen((current) => !current)}
-            className="rounded p-1 text-slate-400 hover:bg-slate-100"
+            className="sv-board-menu-btn"
             title="Task actions"
           >
             <span className="text-sm font-black leading-none">...</span>
           </button>
           {menuOpen ? (
-            <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-outline-variant bg-white p-1 shadow-lg">
+            <div className="sv-board-menu-popover">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
                   onOpen(task);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
+                className="sv-board-menu-item"
               >
                 <Icon name="open_in_new" className="text-[14px]" />
                 Edit
               </button>
-              <div className="px-3 py-1 text-[10px] font-semibold uppercase text-slate-400">Move to</div>
+              <div className="sv-board-menu-label px-3 py-1 text-[10px] font-semibold uppercase text-slate-400">Move to</div>
               {(columns || []).map((column) => (
                 <button
                   key={column.key}
@@ -181,7 +163,7 @@ const TaskCard = memo(function TaskCard({
                     setMenuOpen(false);
                     onMove(taskId, column.key);
                   }}
-                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
+                  className="sv-board-menu-item"
                 >
                   {column.title}
                 </button>
@@ -194,7 +176,7 @@ const TaskCard = memo(function TaskCard({
                     new URL(`${import.meta.env.BASE_URL}tasks/${taskId}`, window.location.origin).toString(),
                   );
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
+                className="sv-board-menu-item"
               >
                 <Icon name="link" className="text-[14px]" />
                 Copy link
@@ -205,7 +187,7 @@ const TaskCard = memo(function TaskCard({
                   setMenuOpen(false);
                   onDuplicate(taskId);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
+                className="sv-board-menu-item"
               >
                 <Icon name="content_copy" className="text-[14px]" />
                 Duplicate
@@ -216,7 +198,7 @@ const TaskCard = memo(function TaskCard({
                   setMenuOpen(false);
                   onArchive(taskId);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-slate-100"
+                className="sv-board-menu-item"
               >
                 <Icon name="archive" className="text-[14px]" />
                 Archive
@@ -227,7 +209,7 @@ const TaskCard = memo(function TaskCard({
                   setMenuOpen(false);
                   onDelete(taskId);
                 }}
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50"
+                className="sv-board-menu-item is-danger"
               >
                 <Icon name="delete" className="text-[14px]" />
                 Delete
@@ -238,10 +220,10 @@ const TaskCard = memo(function TaskCard({
       </div>
       </div>
 
-      <h4 className="mb-2 text-sm font-semibold leading-relaxed text-on-surface">{task.title}</h4>
+      <h4 className="sv-board-task-title">{task.title}</h4>
 
       {Array.isArray(task.labels) && task.labels.length ? (
-        <div className="mb-2 flex flex-wrap gap-1">
+        <div className="sv-board-labels-row">
           {task.labels.map((label) => (
             <span
               key={label._id}
@@ -254,7 +236,7 @@ const TaskCard = memo(function TaskCard({
         </div>
       ) : null}
 
-      <div className="mb-3 flex items-center gap-2">
+      <div className="sv-board-task-meta-top">
         {(task.assignees || []).slice(0, 2).map((assignee) => (
           <span
             key={assignee._id}
@@ -269,26 +251,26 @@ const TaskCard = memo(function TaskCard({
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-slate-500">
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium">
+      <div className="sv-board-task-meta-bottom">
+        <span className="sv-board-meta-item">
           <Icon name="calendar_today" className="text-[12px]" />
           {formatDueDate(task.dueDate)}
         </span>
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium">
+        <span className="sv-board-meta-item">
           <Icon name="subdirectory_arrow_right" className="text-[12px]" />
           {task.subtaskCount || 0}
         </span>
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium">
+        <span className="sv-board-meta-item">
           <Icon name="chat_bubble_outline" className="text-[12px]" />
           {task.commentsCount || 0}
         </span>
       </div>
 
-      <div className="mt-3 flex justify-end">
+      <div className="sv-board-task-footer mt-3 flex justify-end">
         <button
           type="button"
           onClick={() => onOpen(task)}
-          className="rounded-xl bg-surface-container/80 px-3 py-1.5 text-[11px] font-semibold text-on-surface transition-all hover:bg-gradient-to-r hover:from-primary hover:to-primary/90 hover:text-on-primary hover:shadow-lg hover:shadow-primary/30 backdrop-blur-sm active:scale-95"
+          className="sv-board-open-btn"
         >
           Open
         </button>
@@ -305,38 +287,38 @@ const ColumnHeader = memo(function ColumnHeader({ column, collapsed, onToggleCol
   const warning = showWip && count >= wipLimit && !exceeded;
 
   return (
-    <div className="flex items-center justify-between px-2">
-      <button type="button" onClick={onToggleCollapse} className="flex flex-1 items-center justify-between rounded-xl hover:bg-surface-container-low/50 transition-all">
-        <div className="flex items-center gap-2">
-          <h3 className="font-bold tracking-tight text-on-surface">{column.title}</h3>
-          <span className="rounded-full bg-slate-100/80 px-2 py-0.5 text-[10px] font-bold backdrop-blur-sm">
+    <div className="sv-board-column-head">
+      <button type="button" onClick={onToggleCollapse} className="sv-board-column-collapse-btn">
+        <div className="sv-board-column-head-left">
+          <h3 className="sv-board-column-title">{column.title}</h3>
+          <span className="sv-board-column-count">
             {count}
           </span>
           {showWip ? (
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold backdrop-blur-sm ${exceeded ? 'bg-red-100 text-red-700' : warning ? 'bg-amber-100 text-amber-700' : 'bg-slate-100/80 text-slate-600'}`}
+              className={`sv-board-column-wip ${exceeded ? 'is-exceeded' : warning ? 'is-warning' : ''}`}
             >
               {count}/{wipLimit}
             </span>
           ) : null}
         </div>
-        <Icon name={collapsed ? 'expand_more' : 'expand_less'} className="text-slate-400 transition-transform" />
+        <Icon name={collapsed ? 'expand_more' : 'expand_less'} className="sv-board-column-collapse-icon" />
       </button>
-      <div className="relative column-menu-container">
+      <div className="relative column-menu-container sv-board-column-menu-container">
         <button
           type="button"
           onClick={() => onToggleMenu(column.key)}
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-surface-container-low hover:text-on-surface transition-all"
+          className="sv-board-menu-btn"
           title="Column options"
         >
           <Icon name="more_vert" className="text-lg" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-20 min-w-32 rounded-xl border border-outline-variant/50 bg-surface-container-low/80 p-1 shadow-lg backdrop-blur-sm animate-in slide-in-from-top-2 duration-200">
+          <div className="sv-board-menu-popover">
             <button
               type="button"
               onClick={() => onEdit(column.key, column)}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors"
+              className="sv-board-menu-item"
             >
               <Icon name="edit" className="text-sm" />
               Edit
@@ -345,7 +327,7 @@ const ColumnHeader = memo(function ColumnHeader({ column, collapsed, onToggleCol
               <button
                 type="button"
                 onClick={() => onDelete(column.key)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                className="sv-board-menu-item is-danger"
               >
                 <Icon name="delete" className="text-sm" />
                 Delete
@@ -398,9 +380,9 @@ const BoardColumn = memo(function BoardColumn({
   };
 
   return (
-    <div ref={setNodeRef} className="flex w-80 flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex min-h-[48px] items-center justify-between px-2">
-        <div className="flex w-full items-center justify-between" {...attributes} {...listeners}>
+    <div ref={setNodeRef} className="sv-board-column animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="sv-board-column-head-wrap">
+        <div className="sv-board-column-head-grab" {...attributes} {...listeners}>
           <ColumnHeader
             column={column}
             collapsed={collapsed}
@@ -415,7 +397,7 @@ const BoardColumn = memo(function BoardColumn({
       </div>
 
       {!collapsed ? (
-        <div className="flex flex-col gap-3">
+        <div className="sv-board-column-body">
           <SortableContext items={(column.tasks || []).map((task) => `task:${task._id || task.id}`)} strategy={verticalListSortingStrategy}>
             {(column.tasks || []).map((task, index) => (
               <TaskCard
@@ -439,16 +421,16 @@ const BoardColumn = memo(function BoardColumn({
             ))}
           </SortableContext>
 
-          <div className="rounded-2xl border border-dashed border-outline-variant/50 bg-surface-container-low/80 p-3 backdrop-blur-sm transition-all hover:border-primary/30">
-            <div className="mb-2 flex items-center justify-center">
-              <span className="text-xs font-semibold text-on-surface-variant">
+          <div className="sv-board-add-task-box">
+            <div className="sv-board-add-task-label-wrap">
+              <span className="sv-board-add-task-label">
                 Create a New Task
               </span>
             </div>
             <button
               type="button"
               onClick={() => navigate('/tasks/new')}
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-primary/90 px-3 py-1.5 text-xs font-semibold text-on-primary shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-95"
+              className="sv-board-add-task-btn"
             >
               Add Task
             </button>
@@ -494,8 +476,7 @@ function ProjectBoardPage() {
   const [deletingColumnKey, setDeletingColumnKey] = useState(null);
   const [isDeletingColumn, setIsDeletingColumn] = useState(false);
   const [deleteColumnError, setDeleteColumnError] = useState('');
-  const [activeTimers, setActiveTimers] = useState(() => new Set());
-  const [pausedTimers, setPausedTimers] = useState(() => new Set());
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState({
     myTasks: false,
     overdue: false,
@@ -772,15 +753,15 @@ function ProjectBoardPage() {
 
   if (boardLoading) {
     return (
-      <section className="animate-in fade-in duration-500">
-        <div className="mb-6 h-12 w-64 animate-pulse rounded-2xl bg-surface-container" />
-        <div className="mb-4 flex gap-3">
-          <div className="h-8 w-32 animate-pulse rounded-lg bg-surface-container" />
-          <div className="h-8 w-24 animate-pulse rounded-lg bg-surface-container" />
+      <section className="sv-board-page sv-board-skeleton animate-in fade-in duration-500">
+        <div className="sv-board-skeleton-head" />
+        <div className="sv-board-skeleton-filters">
+          <div className="sv-board-skeleton-pill" />
+          <div className="sv-board-skeleton-pill is-sm" />
         </div>
-        <div className="flex gap-6">
+        <div className="sv-board-skeleton-columns">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-96 w-80 animate-pulse rounded-2xl bg-surface-container-low" />
+            <div key={i} className="sv-board-skeleton-column" />
           ))}
         </div>
       </section>
@@ -789,99 +770,110 @@ function ProjectBoardPage() {
 
   return (
     <>
-      <section className="pb-4 pt-8 animate-in fade-in duration-500">
-        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end rounded-2xl bg-gradient-to-br from-surface via-surface to-surface-container-low/50 p-6 shadow-lg backdrop-blur-sm border border-outline-variant/20">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Project Board</p>
-            <h1 className="text-3xl font-extrabold tracking-tight text-on-surface">
+      <section className="sv-board-page">
+      <section className="sv-card sv-board-hero animate-in fade-in duration-500">
+        <div className="sv-board-hero-main">
+            <p className="sv-board-eyebrow">Project Board</p>
+            <h1 className="sv-board-title">
               {board.project?.name || 'Project Board'}
             </h1>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="sv-board-hero-actions">
             <select
               value={boardGroupBy}
               onChange={(event) => setBoardGroupBy(event.target.value)}
-              className="appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm font-semibold text-on-surface outline-none transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+              className="form-select sv-ctl-select sv-board-group-select"
             >
               <option value="none">No swimlanes</option>
               <option value="assignee">Swimlane: Assignee</option>
               <option value="epic">Swimlane: Epic</option>
             </select>
           </div>
-        </div>
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="sv-board-error">{error}</p> : null}
       </section>
 
-      <section className="mb-6 flex flex-wrap gap-2 animate-in slide-in-from-top-4 duration-300">
+      <section className="sv-board-filters animate-in slide-in-from-top-4 duration-300">
         <button
           type="button"
           onClick={() => handleToggleFilter('myTasks')}
-          className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${filters.myTasks ? 'bg-gradient-to-r from-primary to-primary/90 text-on-primary shadow-lg shadow-primary/30' : 'bg-surface-container-low/80 text-on-surface-variant hover:bg-surface-container backdrop-blur-sm'}`}
+          className={`sv-ctl-btn sv-board-filter-btn btn ${filters.myTasks ? 'btn-primary is-active' : 'btn-light'}`}
         >
           My tasks
         </button>
         <button
           type="button"
           onClick={() => handleToggleFilter('overdue')}
-          className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${filters.overdue ? 'bg-gradient-to-r from-primary to-primary/90 text-on-primary shadow-lg shadow-primary/30' : 'bg-surface-container-low/80 text-on-surface-variant hover:bg-surface-container backdrop-blur-sm'}`}
+          className={`sv-ctl-btn sv-board-filter-btn btn ${filters.overdue ? 'btn-primary is-active' : 'btn-light'}`}
         >
           Overdue
         </button>
         <button
           type="button"
           onClick={() => handleToggleFilter('unassigned')}
-          className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${filters.unassigned ? 'bg-gradient-to-r from-primary to-primary/90 text-on-primary shadow-lg shadow-primary/30' : 'bg-surface-container-low/80 text-on-surface-variant hover:bg-surface-container backdrop-blur-sm'}`}
+          className={`sv-ctl-btn sv-board-filter-btn btn ${filters.unassigned ? 'btn-primary is-active' : 'btn-light'}`}
         >
           Unassigned
         </button>
-        <select
-          value={filters.priority}
-          onChange={(event) => handleFilterChange('priority', event.target.value)}
-          className="appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2 text-xs font-semibold transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+        <button
+          type="button"
+          onClick={() => setShowAdvancedFilters((current) => !current)}
+          className={`sv-ctl-btn sv-board-filter-btn btn ${showAdvancedFilters ? 'btn-primary is-active' : 'btn-light'}`}
         >
-          <option value="all">Priority</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-        <select
-          value={filters.label}
-          onChange={(event) => handleFilterChange('label', event.target.value)}
-          className="appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2 text-xs font-semibold transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
-        >
-          <option value="all">Label</option>
-          {labelOptions.map((label) => (
-            <option key={label._id} value={label._id}>{label.name}</option>
-          ))}
-        </select>
-        <select
-          value={filters.issueType}
-          onChange={(event) => handleFilterChange('issueType', event.target.value)}
-          className="appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2 text-xs font-semibold transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
-        >
-          <option value="all">Issue Type</option>
-          <option value="epic">Epic</option>
-          <option value="task">Task</option>
-          <option value="subtask">Subtask</option>
-        </select>
-        <select
-          value={filters.epic}
-          onChange={(event) => handleFilterChange('epic', event.target.value)}
-          className="appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2 text-xs font-semibold transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
-        >
-          <option value="all">Epic</option>
-          {epicOptions.map((epic) => (
-            <option key={epic._id || epic.id} value={epic._id || epic.id}>
-              {epic.title}
-            </option>
-          ))}
-        </select>
+          <Icon name="filter_list" className="me-1 text-[14px]" />
+          Filters
+        </button>
+        {showAdvancedFilters ? (
+          <div className="sv-board-filter-panel">
+            <select
+              value={filters.priority}
+              onChange={(event) => handleFilterChange('priority', event.target.value)}
+              className="form-select sv-ctl-select sv-board-filter-select"
+            >
+              <option value="all">Priority</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select
+              value={filters.label}
+              onChange={(event) => handleFilterChange('label', event.target.value)}
+              className="form-select sv-ctl-select sv-board-filter-select"
+            >
+              <option value="all">Label</option>
+              {labelOptions.map((label) => (
+                <option key={label._id} value={label._id}>{label.name}</option>
+              ))}
+            </select>
+            <select
+              value={filters.issueType}
+              onChange={(event) => handleFilterChange('issueType', event.target.value)}
+              className="form-select sv-ctl-select sv-board-filter-select"
+            >
+              <option value="all">Issue Type</option>
+              <option value="epic">Epic</option>
+              <option value="task">Task</option>
+              <option value="subtask">Subtask</option>
+            </select>
+            <select
+              value={filters.epic}
+              onChange={(event) => handleFilterChange('epic', event.target.value)}
+              className="form-select sv-ctl-select sv-board-filter-select"
+            >
+              <option value="all">Epic</option>
+              {epicOptions.map((epic) => (
+                <option key={epic._id || epic.id} value={epic._id || epic.id}>
+                  {epic.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </section>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <section className="custom-scrollbar flex-1 overflow-x-auto pb-8">
-          <div className="flex h-full min-w-max gap-6 py-4">
+        <section className="sv-board-canvas custom-scrollbar">
+          <div className="sv-board-columns-row">
             {boardGroupBy === 'none'
               ? (
                 <>
@@ -909,18 +901,18 @@ function ProjectBoardPage() {
                       />
                     ))}
                   </SortableContext>
-                  <div className="flex w-80 flex-col gap-4 animate-in fade-in duration-300">
+                  <div className="sv-board-add-column-wrap animate-in fade-in duration-300">
                     {!showAddColumn ? (
                       <button
                         type="button"
                         onClick={() => setShowAddColumn(true)}
-                        className="flex min-h-[48px] w-full items-center justify-center rounded-2xl border-2 border-dashed border-outline-variant/50 bg-surface-container-low/50 px-4 py-3 text-sm font-semibold text-on-surface-variant transition-all hover:border-primary/50 hover:bg-surface-container-low hover:text-primary backdrop-blur-sm"
+                        className="sv-board-add-column-btn"
                       >
                         <Icon name="add" className="mr-2 text-lg" />
                         Add column
                       </button>
                     ) : (
-                      <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-low/80 p-4 shadow-lg backdrop-blur-sm animate-in slide-in-from-right-2 duration-200">
+                      <div className="sv-card sv-board-add-column-card animate-in slide-in-from-right-2 duration-200">
                         <input
                           ref={addColumnInputRef}
                           type="text"
@@ -934,17 +926,17 @@ function ProjectBoardPage() {
                             }
                           }}
                           placeholder="New column name..."
-                          className="mb-3 w-full rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm outline-none transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+                          className="form-control sv-ctl-input sv-board-add-column-input"
                         />
                         {addColumnError && (
-                          <p className="mb-3 text-xs text-error">{addColumnError}</p>
+                          <p className="sv-board-add-column-error">{addColumnError}</p>
                         )}
-                        <div className="flex gap-2">
+                        <div className="sv-board-add-column-actions">
                           <button
                             type="button"
                             onClick={handleAddColumn}
                             disabled={isAddingColumn || !newColumnName.trim()}
-                            className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 py-2 text-sm font-semibold text-on-primary shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-95 disabled:opacity-60 disabled:shadow-none"
+                            className="btn btn-primary sv-ctl-btn sv-board-add-column-action"
                           >
                             {isAddingColumn ? 'Adding...' : 'Add'}
                           </button>
@@ -952,7 +944,7 @@ function ProjectBoardPage() {
                             type="button"
                             onClick={handleCancelAddColumn}
                             disabled={isAddingColumn}
-                            className="flex-1 rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container backdrop-blur-sm disabled:opacity-60"
+                            className="btn btn-light sv-ctl-btn sv-board-add-column-action"
                           >
                             Cancel
                           </button>
@@ -963,9 +955,9 @@ function ProjectBoardPage() {
                 </>
               )
               : filteredSwimlanes.map((lane, laneIndex) => (
-                <div key={lane.key} className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300" style={{ animationDelay: `${laneIndex * 100}ms` }}>
-                  <div className="px-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">{lane.label}</div>
-                  <div className="flex gap-6">
+                <div key={lane.key} className="sv-board-lane animate-in fade-in slide-in-from-bottom-4 duration-300" style={{ animationDelay: `${laneIndex * 100}ms` }}>
+                  <div className="sv-board-lane-label">{lane.label}</div>
+                  <div className="sv-board-lane-columns">
                     {lane.columns.map((column) => (
                       <BoardColumn
                         key={`${lane.key}-${column.key}`}
@@ -994,15 +986,18 @@ function ProjectBoardPage() {
           </div>
         </section>
       </DndContext>
+      </section>
 
       {/* Edit Column Modal */}
       {editColumnModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl backdrop-blur-sm animate-in slide-in-from-bottom-8 duration-300">
-            <h2 className="mb-4 text-xl font-bold text-on-surface">Edit Column</h2>
-            <div className="space-y-4">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 d-flex align-items-center justify-content-center animate-in fade-in duration-200">
+          <div className="sv-card sv-board-modal animate-in slide-in-from-bottom-8 duration-300">
+            <div className="sv-board-modal-head">
+              <h2 className="sv-board-modal-title">Edit Column</h2>
+            </div>
+            <div className="sv-board-modal-body">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-on-surface">
+                <label className="sv-board-form-label">
                   Column Name <span className="text-error">*</span>
                 </label>
                 <input
@@ -1010,15 +1005,15 @@ function ProjectBoardPage() {
                   value={editColumnData.title}
                   onChange={(e) => setEditColumnData((current) => ({ ...current, title: e.target.value }))}
                   placeholder="Enter column name"
-                  className="w-full rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm outline-none transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+                  className="form-control sv-ctl-input sv-board-form-control"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-on-surface">Color</label>
+                <label className="sv-board-form-label">Color</label>
                 <select
                   value={editColumnData.colorMeta}
                   onChange={(e) => setEditColumnData((current) => ({ ...current, colorMeta: e.target.value }))}
-                  className="w-full appearance-none rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm font-semibold outline-none transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+                  className="form-select sv-ctl-select sv-board-form-control"
                 >
                   <option value="">Default</option>
                   <option value="slate">Slate (Gray)</option>
@@ -1032,38 +1027,38 @@ function ProjectBoardPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-on-surface">WIP Limit (Optional)</label>
+                <label className="sv-board-form-label">WIP Limit (Optional)</label>
                 <input
                   type="number"
                   min="0"
                   value={editColumnData.wipLimit}
                   onChange={(e) => setEditColumnData((current) => ({ ...current, wipLimit: e.target.value }))}
                   placeholder="No limit"
-                  className="w-full rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm outline-none transition-all backdrop-blur-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest"
+                  className="form-control sv-ctl-input sv-board-form-control"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="sv-board-checkbox-row">
                 <input
                   type="checkbox"
                   id="isDoneColumn"
                   checked={editColumnData.isDoneColumn}
                   onChange={(e) => setEditColumnData((current) => ({ ...current, isDoneColumn: e.target.checked }))}
-                  className="h-4 w-4 rounded border-outline-variant bg-surface-container-low text-primary focus:ring-2 focus:ring-primary/20"
+                  className="form-check-input sv-board-checkbox"
                 />
-                <label htmlFor="isDoneColumn" className="text-sm font-semibold text-on-surface">
+                <label htmlFor="isDoneColumn" className="sv-board-checkbox-label">
                   Mark as "Done" column
                 </label>
               </div>
               {editColumnError && (
-                <p className="text-sm text-error">{editColumnError}</p>
+                <p className="sv-board-modal-error">{editColumnError}</p>
               )}
             </div>
-            <div className="mt-6 flex gap-3">
+            <div className="sv-board-modal-actions">
               <button
                 type="button"
                 onClick={handleCloseEditColumn}
                 disabled={isUpdatingColumn}
-                className="flex-1 rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container backdrop-blur-sm disabled:opacity-60"
+                className="btn btn-light sv-ctl-btn sv-board-modal-btn"
               >
                 Cancel
               </button>
@@ -1071,7 +1066,7 @@ function ProjectBoardPage() {
                 type="button"
                 onClick={handleSaveColumn}
                 disabled={isUpdatingColumn || !editColumnData.title.trim()}
-                className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/90 px-4 py-2.5 text-sm font-semibold text-on-primary shadow-lg shadow-primary/30 transition-all hover:shadow-primary/40 active:scale-95 disabled:opacity-60 disabled:shadow-none"
+                className="btn btn-primary sv-ctl-btn sv-board-modal-btn"
               >
                 {isUpdatingColumn ? 'Saving...' : 'Save'}
               </button>
@@ -1082,24 +1077,24 @@ function ProjectBoardPage() {
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl backdrop-blur-sm animate-in slide-in-from-bottom-8 duration-300">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 d-flex align-items-center justify-content-center animate-in fade-in duration-200">
+          <div className="sv-card sv-board-delete-modal animate-in slide-in-from-bottom-8 duration-300">
+            <div className="sv-board-delete-icon">
               <Icon name="warning" className="text-2xl" />
             </div>
-            <h2 className="mb-2 text-xl font-bold text-on-surface">Delete Column?</h2>
-            <p className="mb-4 text-sm text-on-surface-variant">
+            <h2 className="sv-board-delete-title">Delete Column?</h2>
+            <p className="sv-board-delete-text">
               This action cannot be undone. All tasks in this column will be moved to the first available column.
             </p>
             {deleteColumnError && (
-              <p className="mb-4 text-sm text-error">{deleteColumnError}</p>
+              <p className="sv-board-delete-error">{deleteColumnError}</p>
             )}
-            <div className="flex gap-3">
+            <div className="sv-board-modal-actions">
               <button
                 type="button"
                 onClick={handleCloseDeleteConfirm}
                 disabled={isDeletingColumn}
-                className="flex-1 rounded-xl border border-outline-variant/50 bg-surface-container-low/80 px-4 py-2.5 text-sm font-semibold text-on-surface transition-all hover:bg-surface-container backdrop-blur-sm disabled:opacity-60"
+                className="btn btn-light sv-ctl-btn sv-board-modal-btn"
               >
                 Cancel
               </button>
@@ -1107,7 +1102,7 @@ function ProjectBoardPage() {
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeletingColumn}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:shadow-red-700/40 active:scale-95 disabled:opacity-60 disabled:shadow-none"
+                className="btn sv-ctl-btn sv-board-modal-btn sv-board-delete-btn"
               >
                 {isDeletingColumn ? 'Deleting...' : 'Delete'}
               </button>

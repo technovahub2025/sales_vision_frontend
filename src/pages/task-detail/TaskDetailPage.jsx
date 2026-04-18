@@ -28,10 +28,10 @@ function ActivityRow({ item }) {
   const payload = item?.newValue || {};
 
   return (
-    <div className="rounded-lg border border-outline-variant/10 bg-surface-container-low px-3 py-2">
-      <p className="text-xs font-semibold uppercase text-on-surface-variant">{String(item?.field || 'updated').replace('_', ' ')}</p>
-      <p className="mt-1 text-xs text-on-surface-variant">{relative}</p>
-      <p className="mt-2 truncate text-sm text-on-surface">{payload?.title || payload?.message || payload?.status || 'Task updated'}</p>
+    <div className="sv-taskdetail-activity-row">
+      <p className="sv-taskdetail-meta-label">{String(item?.field || 'updated').replace('_', ' ')}</p>
+      <p className="sv-taskdetail-activity-time">{relative}</p>
+      <p className="sv-taskdetail-activity-text">{payload?.title || payload?.message || payload?.status || 'Task updated'}</p>
     </div>
   );
 }
@@ -266,19 +266,21 @@ function TaskDetailPage() {
 
   if (loading || routeTaskLoading) {
     return (
-      <main className="min-h-screen space-y-4">
-        <div className="h-32 animate-pulse rounded-xl bg-surface-container" />
-        <div className="h-56 animate-pulse rounded-xl bg-surface-container" />
+      <main className="sv-taskdetail-page min-h-screen">
+        <div className="sv-taskdetail-stack">
+          <div className="sv-taskdetail-skeleton sv-taskdetail-skeleton-header" />
+          <div className="sv-taskdetail-skeleton sv-taskdetail-skeleton-body" />
+        </div>
       </main>
     );
   }
 
   if (error || routeTaskError) {
-    return <p className="text-sm text-error">{routeTaskError || error}</p>;
+    return <p className="sv-taskdetail-feedback is-error">{routeTaskError || error}</p>;
   }
 
   if (!activeTask) {
-    return <p className="text-sm text-on-surface-variant">No task available.</p>;
+    return <p className="sv-taskdetail-feedback">No task available.</p>;
   }
 
   const active = isTimerActive(taskId);
@@ -287,85 +289,79 @@ function TaskDetailPage() {
   const totalTrackedSeconds = Math.max(0, Number(trackedSecondsFromLogs || 0), Number(elapsed || 0));
 
   return (
-    <main className="min-h-screen">
-      <div className="space-y-6">
-        <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold text-gray-900">{activeTask.title}</h1>
-                <div className="inline-flex items-center gap-1 rounded-md border border-outline-variant px-2 py-1 text-xs font-semibold text-on-surface">
-                  <span className="rounded bg-surface-container px-2 py-1 font-mono">{formatClock(elapsed)}</span>
-                  <span
-                    className={`rounded px-2 py-1 ${
-                      active ? 'bg-amber-100 text-amber-700' : paused ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
+    <main className="sv-taskdetail-page min-h-screen">
+      <div className="sv-taskdetail-stack">
+        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+          <div className="sv-taskdetail-head">
+            <div className="sv-taskdetail-head-main">
+              <div className="sv-taskdetail-title-row">
+                <h1 className="sv-taskdetail-title sv-heading">{activeTask.title}</h1>
+                <div className="sv-taskdetail-pill-group">
+                  <span className="sv-taskdetail-pill-code">{formatClock(elapsed)}</span>
+                  <span className={`sv-taskdetail-pill ${active ? 'is-running' : paused ? 'is-paused' : 'is-stopped'}`}>
                     {active ? 'Running' : paused ? 'Paused' : 'Stopped'}
                   </span>
                 </div>
-                <div className="inline-flex items-center gap-1 rounded-md border border-outline-variant px-2 py-1 text-xs font-semibold text-on-surface">
-                  <span className="text-on-surface-variant">Total</span>
-                  <span className="rounded bg-surface-container px-2 py-1 font-mono">{formatClock(totalTrackedSeconds)}</span>
+                <div className="sv-taskdetail-pill-group">
+                  <span className="sv-taskdetail-pill-label">Total</span>
+                  <span className="sv-taskdetail-pill-code">{formatClock(totalTrackedSeconds)}</span>
                 </div>
               </div>
-              <p className="mt-2 text-sm text-on-surface-variant">{activeTask.description || 'No description'}</p>
+              <p className="sv-taskdetail-description">{activeTask.description || 'No description'}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={exportProjectTasks} className="rounded-md bg-surface-container px-3 py-1.5 text-xs font-semibold text-on-surface">
+            <div className="sv-taskdetail-head-actions">
+              <button type="button" onClick={exportProjectTasks} className="btn btn-sm btn-outline-secondary sv-ctl-btn sv-taskdetail-btn">
                 Export CSV
               </button>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="sv-taskdetail-status-row">
             {statusKeys.map((status) => (
               <button
                 key={status}
                 type="button"
                 onClick={() => updateStatus(taskId, status)}
-                className={`rounded px-3 py-1 text-xs font-semibold uppercase ${
-                  activeTask.status === status ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant'
-                }`}
+                className={`sv-taskdetail-status-btn ${activeTask.status === status ? 'is-active' : ''}`}
               >
                 {String(status).replace('_', ' ')}
               </button>
             ))}
           </div>
 
-          <div className="mt-5 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col text-xs font-medium text-on-surface-variant">
+          <div className="sv-taskdetail-estimate-row">
+            <label className="sv-taskdetail-label">
               Estimate (minutes)
               <input
                 type="number"
                 min={0}
                 value={estimateMinutes}
                 onChange={(event) => setEstimateMinutes(event.target.value)}
-                className="mt-1 w-40 rounded-md border border-outline-variant/20 bg-surface px-3 py-2 text-sm text-on-surface"
+                className="form-control form-control-sm sv-ctl-input sv-taskdetail-estimate-input"
               />
             </label>
             <button
               type="button"
               onClick={saveEstimate}
               disabled={estimateSaving}
-              className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+              className="btn btn-sm btn-primary sv-ctl-btn sv-taskdetail-btn"
             >
               {estimateSaving ? 'Saving...' : 'Save estimate'}
             </button>
-            <p className="text-xs text-on-surface-variant">Shortcuts: Cmd/Ctrl+L copy link, Cmd/Ctrl+D duplicate</p>
+            <p className="sv-taskdetail-shortcuts">Shortcuts: Cmd/Ctrl+L copy link, Cmd/Ctrl+D duplicate</p>
           </div>
-          {actionMessage ? <p className="mt-3 text-xs text-primary">{actionMessage}</p> : null}
-        </div>
+          {actionMessage ? <p className="sv-taskdetail-message">{actionMessage}</p> : null}
+        </section>
 
-        <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <h2 className="mb-3 text-sm font-semibold text-on-surface">Comments</h2>
+        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+          <h2 className="sv-taskdetail-section-title sv-heading">Comments</h2>
           <CommentThread entityType="task" entityId={taskId} />
-        </div>
+        </section>
 
-        <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <h2 className="mb-4 text-sm font-semibold text-on-surface">Issue + Assignment</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="text-xs font-medium text-on-surface-variant">
+        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+          <h2 className="sv-taskdetail-section-title sv-heading">Issue + Assignment</h2>
+          <div className="sv-taskdetail-grid">
+            <label className="sv-taskdetail-label">
               Issue Type
               <select
                 value={editDraft.issueType}
@@ -377,7 +373,7 @@ function TaskDetailPage() {
                     parentTaskId: nextType === 'epic' ? '' : current.parentTaskId,
                   }));
                 }}
-                className="mt-1 w-full rounded-md border border-outline-variant/20 bg-surface px-3 py-2 text-sm text-on-surface"
+                className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
               >
                 <option value="epic">Epic</option>
                 <option value="task">Task</option>
@@ -385,13 +381,13 @@ function TaskDetailPage() {
               </select>
             </label>
 
-            <label className="text-xs font-medium text-on-surface-variant">
+            <label className="sv-taskdetail-label">
               Parent
               <select
                 value={editDraft.parentTaskId}
                 onChange={(event) => setEditDraft((current) => ({ ...current, parentTaskId: event.target.value }))}
                 disabled={editDraft.issueType === 'epic'}
-                className="mt-1 w-full rounded-md border border-outline-variant/20 bg-surface px-3 py-2 text-sm text-on-surface disabled:opacity-60"
+                className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
               >
                 <option value="">No parent</option>
                 {parentTasks
@@ -410,12 +406,12 @@ function TaskDetailPage() {
             </label>
           </div>
 
-          <div className="mt-4">
-            <p className="text-xs font-medium text-on-surface-variant">Primary Assignee</p>
+          <div className="sv-taskdetail-block">
+            <p className="sv-taskdetail-label">Primary Assignee</p>
             <select
               value={editDraft.primaryAssigneeId}
               onChange={(event) => setEditDraft((current) => ({ ...current, primaryAssigneeId: event.target.value }))}
-              className="mt-1 w-full rounded-md border border-outline-variant/20 bg-surface px-3 py-2 text-sm text-on-surface"
+              className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
             >
               <option value="">Unassigned</option>
               {users.map((user) => (
@@ -426,9 +422,9 @@ function TaskDetailPage() {
             </select>
           </div>
 
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-medium text-on-surface-variant">Contributors</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="sv-taskdetail-block">
+            <p className="sv-taskdetail-label">Contributors</p>
+            <div className="sv-taskdetail-chip-list">
               {users.map((user) => {
                 const active = (editDraft.assigneeIds || []).includes(String(user._id));
                 return (
@@ -444,7 +440,7 @@ function TaskDetailPage() {
                         return { ...current, assigneeIds: next };
                       })
                     }
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'}`}
+                    className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
                   >
                     {user.displayName}
                   </button>
@@ -453,10 +449,10 @@ function TaskDetailPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="sv-taskdetail-block sv-taskdetail-grid">
             <div>
-              <p className="mb-2 text-xs font-medium text-on-surface-variant">External Contacts</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="sv-taskdetail-label">External Contacts</p>
+              <div className="sv-taskdetail-chip-list">
                 {contacts.map((contact) => {
                   const active = (editDraft.externalCollaborators || []).some(
                     (item) => item.entityType === 'contact' && String(item.entityId) === String(contact._id),
@@ -474,7 +470,7 @@ function TaskDetailPage() {
                           return { ...current, externalCollaborators: next };
                         })
                       }
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'}`}
+                      className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
                     >
                       {contact.name || 'Contact'}
                     </button>
@@ -483,8 +479,8 @@ function TaskDetailPage() {
               </div>
             </div>
             <div>
-              <p className="mb-2 text-xs font-medium text-on-surface-variant">External Employees</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="sv-taskdetail-label">External Employees</p>
+              <div className="sv-taskdetail-chip-list">
                 {employees.map((employee) => {
                   const active = (editDraft.externalCollaborators || []).some(
                     (item) => item.entityType === 'employee' && String(item.entityId) === String(employee._id),
@@ -502,7 +498,7 @@ function TaskDetailPage() {
                           return { ...current, externalCollaborators: next };
                         })
                       }
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${active ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'}`}
+                      className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
                     >
                       {employee.name || 'Employee'}
                     </button>
@@ -512,31 +508,31 @@ function TaskDetailPage() {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="sv-taskdetail-block">
             <button
               type="button"
               onClick={saveCollaborators}
               disabled={savingCollaborators}
-              className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+              className="btn btn-sm btn-primary sv-ctl-btn sv-taskdetail-btn"
             >
               {savingCollaborators ? 'Saving...' : 'Save Assignment Details'}
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-on-surface">Activity</h2>
-            <span className="text-xs text-on-surface-variant">Showing latest {ACTIVITY_PAGE_SIZE}</span>
+        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+          <div className="sv-taskdetail-section-head">
+            <h2 className="sv-taskdetail-section-title sv-heading">Activity</h2>
+            <span className="sv-taskdetail-subtle">Showing latest {ACTIVITY_PAGE_SIZE}</span>
           </div>
-          {activityError ? <p className="mb-2 text-xs text-error">{activityError}</p> : null}
-          <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+          {activityError ? <p className="sv-taskdetail-feedback is-error">{activityError}</p> : null}
+          <div className="sv-taskdetail-activity-list">
             {activity.map((item, index) => (
               <ActivityRow key={`${item.timestamp || 'ts'}-${index}`} item={item} />
             ))}
-            {!activity.length && !activityLoading ? <p className="text-sm text-on-surface-variant">No activity yet.</p> : null}
+            {!activity.length && !activityLoading ? <p className="sv-taskdetail-feedback">No activity yet.</p> : null}
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );

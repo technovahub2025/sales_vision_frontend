@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   DndContext,
   PointerSensor,
@@ -12,7 +12,9 @@ import {
   useSortable,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
 import { tasksApi } from '../../api';
@@ -30,6 +32,20 @@ const GROUP_MODES = [
 
 const STATUS_OPTIONS = ['todo', 'in_progress', 'in_review', 'completed'];
 const PRIORITY_OPTIONS = ['critical', 'high', 'medium', 'low'];
+const KANBAN_COLUMN_PREFIX = 'kanban-column-';
+const DEFAULT_VISIBLE_COLUMNS = ['priority', 'title', 'project', 'priorityDropdown', 'dueDate', 'status', 'timer', 'open'];
+const ALLOWED_VISIBLE_COLUMNS = new Set(['checkbox', ...DEFAULT_VISIBLE_COLUMNS]);
+
+function sanitizeVisibleColumns(columns) {
+  const list = Array.isArray(columns) ? columns : [];
+  const filtered = list.filter((key) => ALLOWED_VISIBLE_COLUMNS.has(String(key)));
+  return filtered.length ? filtered : DEFAULT_VISIBLE_COLUMNS;
+}
+
+function isRenderableKanbanTask(task) {
+  if (!task || !task._id) return false;
+  return String(task.title || '').trim().length > 0;
+}
 
 function priorityDotClass(priority) {
   switch (String(priority || '').toLowerCase()) {
@@ -324,19 +340,21 @@ function TaskCard({
 
   return (
     <article
-      className="sv-card sv-task-card group overflow-hidden p-2"
-      style={{ borderRadius: '0.5rem', borderColor: 'var(--color-border)', background: 'var(--color-surface-muted)', transition: 'border-color 200ms ease, transform 200ms ease' }}
+      className={`sv-card sv-task-card group overflow-hidden ${isSelected ? 'sv-task-card-selected' : ''}`}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${priorityDotClass(task.priority)} shadow-sm`} />
-          <span className="rounded-lg bg-gradient-to-r from-surface-container to-surface-container-low px-1.5 py-0.25 text-[9px] font-semibold uppercase text-on-surface-variant shadow-sm">
+      <div className="sv-task-card-top">
+        <div className="sv-task-card-type-wrap">
+          <span className={`h-1.5 w-1.5 rounded-full ${priorityDotClass(task.priority)} shadow-sm flex-shrink-0`} />
+          <span className="sv-task-card-type-chip">
             {task.issueType || 'task'}
           </span>
+          {task?.archived ? (
+            <span className="sv-task-card-archived-chip">Archived</span>
+          ) : null}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="sv-task-card-actions">
           {Number(timerElapsedSeconds || 0) > 0 ? (
-            <span className="rounded-lg bg-slate-100 px-1.5 py-0.5 text-sm font-semibold text-slate-700">
+            <span className="sv-task-card-timer">
               {formatDuration(timerElapsedSeconds)}
             </span>
           ) : null}
@@ -344,7 +362,7 @@ function TaskCard({
             type="button"
             disabled={timerState?.starting || timerState?.pausing || timerState?.resuming}
             onClick={() => onTimerToggle(task)}
-            className={`rounded-lg p-1 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`sv-task-action-btn sv-task-icon-btn inline-flex items-center justify-content-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               isTimerActive
                 ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                 : isTimerPaused
@@ -352,62 +370,58 @@ function TaskCard({
                 : 'bg-primary/10 text-primary hover:bg-primary/20'
             }`}
           >
-            <Icon name={isTimerActive ? 'pause' : isTimerPaused ? 'play_arrow' : 'play_arrow'} className="text-xs" />
+            <Icon name={isTimerActive ? 'pause' : isTimerPaused ? 'play_arrow' : 'play_arrow'} className="sv-row-icon" />
           </button>
           {(isTimerActive || isTimerPaused) && (
             <button
               type="button"
               disabled={timerState?.stopping}
               onClick={() => onTimerStop(task)}
-              className="rounded-lg p-1 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="sv-task-action-btn sv-task-icon-btn inline-flex items-center justify-content-center text-red-600 bg-red-50 hover:bg-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Icon name="stop" className="text-xs" />
+              <Icon name="stop" className="sv-row-icon" />
             </button>
           )}
           <button
             type="button"
             onClick={() => onOpenTask(task)}
-            className="rounded-lg p-1 text-[10px] font-semibold text-on-surface-variant transition-all hover:bg-surface-container-low hover:text-primary"
+            className="sv-task-action-btn sv-task-icon-btn inline-flex items-center justify-content-center text-on-surface-variant transition-all hover:bg-surface-container-low hover:text-primary"
+            title="Open"
           >
-            <Icon name="open_in_new" className="text-xs" />
+            <Icon name="open_in_new" className="sv-row-icon" />
           </button>
           {task?.archived ? (
             <button
               type="button"
               onClick={() => onUnarchiveTask(task)}
-              className="rounded-lg p-1 text-[10px] font-semibold text-green-700 transition-all hover:bg-green-50"
+              className="sv-task-action-btn sv-task-icon-btn inline-flex items-center justify-content-center text-green-700 transition-all hover:bg-green-50"
               title="Unarchive"
             >
-              <Icon name="unarchive" className="text-xs" />
+              <Icon name="unarchive" className="sv-row-icon" />
             </button>
           ) : null}
         </div>
       </div>
 
-      <h3 className="mb-2 text-sm font-semibold text-on-surface line-clamp-2">{task.title}</h3>
-      {task?.archived ? (
-        <div className="mb-1.5">
-          <span className="rounded-lg bg-slate-200 px-1.5 py-0.25 text-[9px] font-semibold uppercase text-slate-700">Archived</span>
-        </div>
-      ) : null}
+      <h3 className="sv-task-card-title">{task.title}</h3>
 
-      <div className="flex flex-wrap items-center gap-1.5 mb-2">
-        <span className={`inline-flex rounded-full px-2 py-0.25 text-sm font-bold uppercase border border-outline-variant/10 ${statusClass(task.status)}`}>
-          {String(task.status || 'todo').replace('_', ' ')}
-        </span>
-        {task.projectName && (
-          <span className="rounded-full bg-surface-container-low/80 px-2 py-0.25 text-sm font-semibold text-on-surface-variant backdrop-blur-sm border border-outline-variant/10">
-            {task.projectName}
+      <div className="sv-task-card-bottom">
+        <div className="sv-task-card-tags">
+          <span className={`inline-flex rounded-full px-2 py-0.25 text-xs font-bold uppercase border border-outline-variant/10 ${statusClass(task.status)}`}>
+            {String(task.status || 'todo').replace('_', ' ')}
           </span>
-        )}
-      </div>
+          {task.projectName && (
+            <span className="sv-task-project-pill">
+              {task.projectName}
+            </span>
+          )}
+        </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+        <div className="sv-task-card-controls">
           <select
             value={task.priority || 'medium'}
             onChange={(event) => onInlinePatch(task._id, { priority: event.target.value })}
-            className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest/80 px-1.5 py-0.5 text-sm font-semibold text-on-surface backdrop-blur-sm outline-none focus:border-primary/50"
+            className="sv-task-mini-control sv-task-card-control rounded-lg border border-outline-variant/30 bg-surface-container-lowest/80 px-1.5 py-0.5 text-xs font-semibold text-on-surface backdrop-blur-sm outline-none focus:border-primary/50"
           >
             {PRIORITY_OPTIONS.map((value) => (
               <option key={value} value={value}>{value}</option>
@@ -417,20 +431,88 @@ function TaskCard({
             type="date"
             defaultValue={toDateInputValue(task.dueDate)}
             onBlur={(event) => onInlinePatch(task._id, { dueDate: event.target.value || null })}
-            className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest/80 px-1.5 py-0.5 text-sm font-semibold text-on-surface backdrop-blur-sm outline-none focus:border-primary/50"
+            className="sv-task-mini-control sv-task-card-control sv-task-date rounded-lg border border-outline-variant/30 bg-surface-container-lowest/80 px-1.5 py-0.5 text-xs font-semibold text-on-surface backdrop-blur-sm outline-none focus:border-primary/50"
           />
+          <select
+            value={task.status || 'todo'}
+            onChange={(event) => onInlinePatch(task._id, { status: event.target.value })}
+            className={`sv-task-mini-control sv-task-card-control rounded-lg border border-outline-variant/30 backdrop-blur-sm outline-none focus:ring-2 transition-all px-1.5 py-0.5 text-xs font-semibold ${
+              task.status === 'completed'
+                ? 'bg-green-100 text-green-700 border-green-200 focus:ring-green-200'
+                : task.status === 'in_progress'
+                ? 'bg-blue-100 text-blue-700 border-blue-200 focus:ring-blue-200'
+                : task.status === 'in_review'
+                ? 'bg-amber-100 text-amber-700 border-amber-200 focus:ring-amber-200'
+                : 'bg-slate-100 text-slate-700 border-slate-200 focus:ring-slate-200'
+            }`}
+          >
+            {STATUS_OPTIONS.map((value) => (
+              <option key={value} value={value}>{value.replace('_', ' ')}</option>
+            ))}
+          </select>
         </div>
-        <select
-          value={task.status || 'todo'}
-          onChange={(event) => onInlinePatch(task._id, { status: event.target.value })}
-          className="rounded-lg border border-outline-variant/30 bg-surface-container-lowest/80 px-1.5 py-0.5 text-sm font-semibold text-on-surface backdrop-blur-sm outline-none focus:border-primary/50"
-        >
-          {STATUS_OPTIONS.map((value) => (
-            <option key={value} value={value}>{value.replace('_', ' ')}</option>
-          ))}
-        </select>
       </div>
     </article>
+  );
+}
+
+function SortableKanbanTaskCard({
+  status,
+  task,
+  selected,
+  onToggleSelected,
+  onInlinePatch,
+  onTimerToggle,
+  onTimerStop,
+  isTimerActive,
+  isTimerPaused,
+  timerElapsedSeconds,
+  timerState,
+  onOpenTask,
+  onUnarchiveTask,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(task._id),
+    data: { type: 'task', status },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`sv-task-card-sortable ${isDragging ? 'sv-task-card-dragging' : ''}`}
+    >
+      <TaskCard
+        task={task}
+        selected={selected}
+        onToggleSelected={onToggleSelected}
+        onInlinePatch={onInlinePatch}
+        onTimerToggle={onTimerToggle}
+        onTimerStop={onTimerStop}
+        isTimerActive={isTimerActive}
+        isTimerPaused={isTimerPaused}
+        timerElapsedSeconds={timerElapsedSeconds}
+        timerState={timerState}
+        onOpenTask={onOpenTask}
+        onUnarchiveTask={onUnarchiveTask}
+      />
+    </div>
+  );
+}
+
+function KanbanDropZone({ status, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `${KANBAN_COLUMN_PREFIX}${status}`, data: { type: 'column', status } });
+  return (
+    <div ref={setNodeRef} className={`p-3 d-flex flex-column gap-2 sv-kanban-scroll ${isOver ? 'sv-kanban-dropzone-over' : ''}`}>
+      {children}
+    </div>
   );
 }
 
@@ -571,16 +653,20 @@ function MyTasksPage() {
   const [collapsed, setCollapsed] = useState({});
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
   const [focusedTaskId, setFocusedTaskId] = useState(null);
-  const [bulkStatus, setBulkStatus] = useState('in_progress');
   const [timerMessage, setTimerMessage] = useState('');
   const [toast, setToast] = useState(null);
   const [draft, setDraft] = useState({ title: '', dueDate: '', priority: 'medium' });
   const [viewMode, setViewMode] = useState('list');
-  const [visibleColumns, setVisibleColumns] = useState(new Set(['priority', 'title', 'project', 'priorityDropdown', 'dueDate', 'status', 'timer', 'open']));
+  const [visibleColumns, setVisibleColumns] = useState(new Set(DEFAULT_VISIBLE_COLUMNS));
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [savedViews, setSavedViews] = useState([]);
   const [activeViewId, setActiveViewId] = useState(null);
+  const [showSavedViewsMenu, setShowSavedViewsMenu] = useState(false);
+  const [kanbanOrder, setKanbanOrder] = useState(() =>
+    STATUS_OPTIONS.reduce((acc, status) => ({ ...acc, [status]: [] }), {}),
+  );
+  const savedViewsMenuRef = useRef(null);
 
   // Auto-dismiss toast after 3 seconds
   useEffect(() => {
@@ -592,6 +678,72 @@ function MyTasksPage() {
 
   const totalOpen = Number(meta?.openCount || 0);
   const grouped = useMemo(() => groups || [], [groups]);
+  const kanbanSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const taskById = useMemo(
+    () => new Map((tasks || []).map((task) => [String(task._id), task])),
+    [tasks],
+  );
+
+  const buildKanbanOrderFromTasks = useCallback(
+    (sourceTasks) =>
+      STATUS_OPTIONS.reduce((acc, status) => {
+        acc[status] = (sourceTasks || [])
+          .filter((task) => String(task.status || 'todo') === status)
+          .map((task) => String(task._id));
+        return acc;
+      }, {}),
+    [],
+  );
+
+  const reconcileKanbanOrder = useCallback((current, sourceTasks) => {
+    const fromTasks = buildKanbanOrderFromTasks(sourceTasks);
+    const next = {};
+    let changed = false;
+
+    for (const status of STATUS_OPTIONS) {
+      const currentIds = (current?.[status] || []).map(String);
+      const sourceIds = (fromTasks?.[status] || []).map(String);
+      const sourceSet = new Set(sourceIds);
+
+      const kept = currentIds.filter((id) => sourceSet.has(id));
+      const missing = sourceIds.filter((id) => !kept.includes(id));
+      const merged = [...kept, ...missing];
+      next[status] = merged;
+
+      if (!changed) {
+        if (merged.length !== currentIds.length) {
+          changed = true;
+        } else {
+          for (let i = 0; i < merged.length; i += 1) {
+            if (merged[i] !== currentIds[i]) {
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return changed ? next : current;
+  }, [buildKanbanOrderFromTasks]);
+
+  useEffect(() => {
+    setKanbanOrder((current) => reconcileKanbanOrder(current, tasks || []));
+  }, [tasks, reconcileKanbanOrder]);
+
+  useEffect(() => {
+    if (!showSavedViewsMenu) return;
+    const onPointerDown = (event) => {
+      if (!savedViewsMenuRef.current?.contains(event.target)) {
+        setShowSavedViewsMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [showSavedViewsMenu]);
 
   // Load preferences from localStorage
   useEffect(() => {
@@ -601,11 +753,16 @@ function MyTasksPage() {
         const prefs = JSON.parse(saved);
         if (['list', 'kanban'].includes(prefs.viewMode)) setViewMode(prefs.viewMode);
         else if (prefs.viewMode === 'card') setViewMode('list');
-        if (prefs.visibleColumns) setVisibleColumns(new Set(prefs.visibleColumns));
+        if (prefs.visibleColumns) setVisibleColumns(new Set(sanitizeVisibleColumns(prefs.visibleColumns)));
       }
       const savedViewsData = localStorage.getItem('myTasks:savedViews');
       if (savedViewsData) {
-        setSavedViews(JSON.parse(savedViewsData));
+        const parsed = JSON.parse(savedViewsData);
+        const normalized = (Array.isArray(parsed) ? parsed : []).map((view) => ({
+          ...view,
+          visibleColumns: sanitizeVisibleColumns(view?.visibleColumns),
+        }));
+        setSavedViews(normalized);
       }
     } catch (e) {
       console.error('Failed to load preferences:', e);
@@ -617,7 +774,7 @@ function MyTasksPage() {
     try {
       localStorage.setItem('myTasks:preferences', JSON.stringify({
         viewMode,
-        visibleColumns: Array.from(visibleColumns),
+        visibleColumns: sanitizeVisibleColumns(Array.from(visibleColumns)),
       }));
     } catch (e) {
       console.error('Failed to save preferences:', e);
@@ -788,11 +945,60 @@ function MyTasksPage() {
     }
   };
 
-  const onBulkUpdate = async () => {
+  const selectAllTasks = () => {
+    const ids = (tasks || []).map((task) => String(task?._id || '')).filter(Boolean);
+    setSelectedTaskIds(new Set(ids));
+  };
+
+  const clearAllSelectedTasks = () => {
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleBulkArchive = async () => {
     const ids = Array.from(selectedTaskIds);
     if (!ids.length) return;
-    await updateManyTasks(ids, { status: bulkStatus });
-    setSelectedTaskIds(new Set());
+    try {
+      await updateManyTasks(ids, { archived: true });
+      setToast({ type: 'success', message: `${ids.length} task${ids.length !== 1 ? 's' : ''} archived` });
+      setSelectedTaskIds(new Set());
+      const archiveQuery =
+        archiveScope === 'archived'
+          ? { includeArchived: 'true', onlyArchived: 'true' }
+          : { includeArchived: 'false', onlyArchived: 'false' };
+      await fetchTasks({
+        filter,
+        sort,
+        groupBy,
+        issueType: issueTypeFilter === 'all' ? undefined : issueTypeFilter,
+        ...archiveQuery,
+      });
+    } catch (error) {
+      setToast({ type: 'error', message: error.message || 'Failed to archive selected tasks' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedTaskIds);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} selected task${ids.length !== 1 ? 's' : ''}?`)) return;
+    try {
+      await updateManyTasks(ids, {}, 'delete');
+      setToast({ type: 'success', message: `${ids.length} task${ids.length !== 1 ? 's' : ''} deleted` });
+      setSelectedTaskIds(new Set());
+      const archiveQuery =
+        archiveScope === 'archived'
+          ? { includeArchived: 'true', onlyArchived: 'true' }
+          : { includeArchived: 'false', onlyArchived: 'false' };
+      await fetchTasks({
+        filter,
+        sort,
+        groupBy,
+        issueType: issueTypeFilter === 'all' ? undefined : issueTypeFilter,
+        ...archiveQuery,
+      });
+    } catch (error) {
+      setToast({ type: 'error', message: error.message || 'Failed to delete selected tasks' });
+    }
   };
 
   const toggleSelected = (taskId) => {
@@ -808,6 +1014,68 @@ function MyTasksPage() {
     await reorderTask({ taskId, newPosition, groupKey });
   };
 
+  const resolveKanbanStatusById = useCallback((id, orderMap) => {
+    const key = String(id || '');
+    if (!key) return null;
+    if (key.startsWith(KANBAN_COLUMN_PREFIX)) return key.slice(KANBAN_COLUMN_PREFIX.length);
+    return STATUS_OPTIONS.find((status) => (orderMap?.[status] || []).includes(key)) || null;
+  }, []);
+
+  const handleKanbanDragEnd = async ({ active, over }) => {
+    if (!active?.id || !over?.id) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const sourceStatus = resolveKanbanStatusById(activeId, kanbanOrder);
+    const targetStatus = resolveKanbanStatusById(overId, kanbanOrder);
+
+    if (!sourceStatus || !targetStatus) return;
+    if (!taskById.has(activeId)) return;
+
+    const sourceItems = [...(kanbanOrder[sourceStatus] || [])];
+    const targetItems = [...(kanbanOrder[targetStatus] || [])];
+    const oldIndex = sourceItems.indexOf(activeId);
+    if (oldIndex < 0) return;
+
+    let newIndex = overId.startsWith(KANBAN_COLUMN_PREFIX)
+      ? targetItems.length
+      : targetItems.indexOf(overId);
+    if (newIndex < 0) newIndex = targetItems.length;
+
+    const previousOrder = kanbanOrder;
+
+    if (sourceStatus === targetStatus) {
+      if (oldIndex === newIndex) return;
+      const moved = arrayMove(sourceItems, oldIndex, newIndex);
+      setKanbanOrder((current) => ({ ...current, [sourceStatus]: moved }));
+      try {
+        await reorderTask({ taskId: activeId, newPosition: newIndex, groupKey: sourceStatus });
+      } catch (error) {
+        setKanbanOrder(previousOrder);
+        setToast({ type: 'error', message: error.message || 'Failed to reorder task' });
+      }
+      return;
+    }
+
+    sourceItems.splice(oldIndex, 1);
+    const clampedIndex = Math.max(0, Math.min(newIndex, targetItems.length));
+    targetItems.splice(clampedIndex, 0, activeId);
+    setKanbanOrder((current) => ({
+      ...current,
+      [sourceStatus]: sourceItems,
+      [targetStatus]: targetItems,
+    }));
+
+    try {
+      await updateMyTask(activeId, { status: targetStatus });
+      await reorderTask({ taskId: activeId, newPosition: clampedIndex, groupKey: targetStatus });
+      setToast({ type: 'success', message: `Moved to ${targetStatus.replace('_', ' ')}` });
+    } catch (error) {
+      setKanbanOrder(previousOrder);
+      setToast({ type: 'error', message: error.message || 'Failed to move task' });
+    }
+  };
+
   const handleSaveView = () => {
     const viewName = prompt('Enter a name for this view:');
     if (!viewName?.trim()) return;
@@ -821,7 +1089,7 @@ function MyTasksPage() {
       groupBy,
       issueTypeFilter,
       archiveScope,
-      visibleColumns: Array.from(visibleColumns),
+      visibleColumns: sanitizeVisibleColumns(Array.from(visibleColumns)),
       createdAt: new Date().toISOString(),
     };
 
@@ -842,7 +1110,7 @@ function MyTasksPage() {
     setGroupBy(view.groupBy);
     setIssueTypeFilter(view.issueTypeFilter);
     setArchiveScope(view.archiveScope || 'all');
-    setVisibleColumns(new Set(view.visibleColumns));
+    setVisibleColumns(new Set(sanitizeVisibleColumns(view.visibleColumns)));
     setActiveViewId(view.id);
     const archiveQuery =
       (view.archiveScope || 'all') === 'archived'
@@ -867,7 +1135,10 @@ function MyTasksPage() {
     } catch (e) {
       console.error('Failed to delete view:', e);
     }
+    setShowSavedViewsMenu(false);
   };
+
+  const activeViewName = savedViews.find((view) => view.id === activeViewId)?.name || 'Saved Views';
 
   return (
     <main className="container-fluid px-0 py-3 py-lg-4 sv-mytasks-page">
@@ -889,24 +1160,54 @@ function MyTasksPage() {
             <div className="d-flex flex-wrap align-items-center gap-2 sv-mytasks-toolbar">
               {/* Saved Views Dropdown */}
               {savedViews.length > 0 && (
-                <div>
-                  <select
-                    value={activeViewId || ''}
-                    onChange={(event) => {
-                      if (event.target.value) {
-                        const view = savedViews.find((v) => v.id === event.target.value);
-                        if (view) handleLoadView(view);
-                      } else {
-                        setActiveViewId(null);
-                      }
-                    }}
-                    className="form-select form-select-sm sv-ctl-select"
+                <div className="sv-savedviews-menu" ref={savedViewsMenuRef}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary sv-ctl-btn sv-savedviews-trigger"
+                    onClick={() => setShowSavedViewsMenu((current) => !current)}
                   >
-                    <option value="">Saved Views</option>
-                    {savedViews.map((view) => (
-                      <option key={view.id} value={view.id}>{view.name}</option>
-                    ))}
-                  </select>
+                    {activeViewName}
+                    <Icon name={showSavedViewsMenu ? 'expand_less' : 'expand_more'} />
+                  </button>
+                  {showSavedViewsMenu ? (
+                    <div className="sv-savedviews-popover">
+                      <button
+                        type="button"
+                        className={`sv-savedviews-item ${!activeViewId ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setActiveViewId(null);
+                          setShowSavedViewsMenu(false);
+                        }}
+                      >
+                        <span>Saved Views</span>
+                      </button>
+                      {savedViews.map((view) => (
+                        <div key={view.id} className={`sv-savedviews-item ${activeViewId === view.id ? 'is-active' : ''}`}>
+                          <button
+                            type="button"
+                            className="sv-savedviews-name"
+                            onClick={() => {
+                              handleLoadView(view);
+                              setShowSavedViewsMenu(false);
+                            }}
+                          >
+                            {view.name}
+                          </button>
+                          <button
+                            type="button"
+                            className="sv-savedviews-remove"
+                            title={`Delete ${view.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteView(view.id);
+                            }}
+                          >
+                            <Icon name="close" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -993,28 +1294,33 @@ function MyTasksPage() {
               <Icon name="check" />
             </div>
             <span className="small fw-semibold">{selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''} selected</span>
-            <select
-              value={bulkStatus}
-              onChange={(event) => setBulkStatus(event.target.value)}
-              className="form-select form-select-sm sv-ctl-select"
-            >
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>{status.replace('_', ' ')}</option>
-              ))}
-            </select>
             <button
               type="button"
-              onClick={onBulkUpdate}
-              className="btn btn-sm btn-primary"
+              onClick={selectAllTasks}
+              className="btn btn-sm btn-outline-secondary"
             >
-              Apply Status
+              Select All
             </button>
             <button
               type="button"
-              onClick={() => setSelectedTaskIds(new Set())}
+              onClick={clearAllSelectedTasks}
               className="btn btn-sm btn-outline-secondary"
             >
-              Clear
+              Clear All
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkArchive}
+              className="btn btn-sm btn-outline-secondary"
+            >
+              Archive
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              className="btn btn-sm btn-danger"
+            >
+              Delete
             </button>
           </div>
         ) : null}
@@ -1047,7 +1353,7 @@ function MyTasksPage() {
             <button
               type="button"
               onClick={onQuickCreate}
-              className="btn btn-sm btn-primary"
+              className="btn btn-sm btn-primary sv-add-task-btn"
             >
               Add Task
             </button>
@@ -1131,48 +1437,57 @@ function MyTasksPage() {
           ))}
 
           {viewMode === 'kanban' && (
-            <div className="d-flex gap-3 overflow-x-auto pb-2">
-              {STATUS_OPTIONS.map((status) => {
-                const statusTasks = tasks.filter((task) => String(task.status || 'todo') === status);
-                return (
-                  <div key={status} className="sv-card rounded-4 overflow-hidden sv-kanban-column">
-                    <div className="px-3 py-3 border-bottom">
-                      <div className="d-flex align-items-center justify-content-between">
-                        <h3 className="text-sm font-bold text-on-surface capitalize">{status.replace('_', ' ')}</h3>
-                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary border border-primary/20">
-                          {statusTasks.length}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-3 d-flex flex-column gap-3 sv-kanban-scroll">
-                      {statusTasks.length ? (
-                        statusTasks.map((task) => (
-                          <TaskCard
-                            key={task._id}
-                            task={task}
-                            selected={selectedTaskIds}
-                            onToggleSelected={toggleSelected}
-                            onInlinePatch={updateMyTask}
-                            onTimerToggle={handleTimerToggle}
-                            onTimerStop={handleTimerStop}
-                            isTimerActive={isTimerActive(String(task._id))}
-                            isTimerPaused={isTimerPaused(String(task._id))}
-                            timerElapsedSeconds={getTaskElapsedSeconds(String(task._id))}
-                            timerState={timerState}
-                            onOpenTask={(taskRow) => navigate(`/tasks/${taskRow._id || taskRow.id}`)}
-                            onUnarchiveTask={handleUnarchiveTask}
-                          />
-                        ))
-                      ) : (
-                        <div className="px-6 py-8 text-center">
-                          <p className="text-sm text-on-surface-variant">No tasks</p>
+            <DndContext sensors={kanbanSensors} collisionDetection={closestCenter} onDragEnd={handleKanbanDragEnd}>
+              <div className="sv-kanban-board d-flex gap-3 pb-2">
+                {STATUS_OPTIONS.map((status) => {
+                  const statusTaskIds = kanbanOrder[status] || [];
+                  const statusTasks = statusTaskIds
+                    .map((id) => taskById.get(String(id)))
+                    .filter(isRenderableKanbanTask);
+
+                  return (
+                    <div key={status} className="sv-card rounded-4 overflow-hidden sv-kanban-column">
+                      <div className="sv-kanban-column-header px-3 py-3 border-bottom">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <h3 className="sv-kanban-column-title text-sm font-bold text-on-surface capitalize">{status.replace('_', ' ')}</h3>
+                          <span className="sv-kanban-column-count rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary border border-primary/20">
+                            {statusTasks.length}
+                          </span>
                         </div>
-                      )}
+                      </div>
+                      <KanbanDropZone status={status}>
+                        <SortableContext items={statusTaskIds} strategy={verticalListSortingStrategy}>
+                          {statusTasks.length ? (
+                            statusTasks.map((task) => (
+                              <SortableKanbanTaskCard
+                                key={task._id}
+                                status={status}
+                                task={task}
+                                selected={selectedTaskIds}
+                                onToggleSelected={toggleSelected}
+                                onInlinePatch={updateMyTask}
+                                onTimerToggle={handleTimerToggle}
+                                onTimerStop={handleTimerStop}
+                                isTimerActive={isTimerActive(String(task._id))}
+                                isTimerPaused={isTimerPaused(String(task._id))}
+                                timerElapsedSeconds={getTaskElapsedSeconds(String(task._id))}
+                                timerState={timerState}
+                                onOpenTask={(taskRow) => navigate(`/tasks/${taskRow._id || taskRow.id}`)}
+                                onUnarchiveTask={handleUnarchiveTask}
+                              />
+                            ))
+                          ) : (
+                            <div className="px-6 py-8 text-center">
+                              <p className="text-sm text-on-surface-variant">No tasks</p>
+                            </div>
+                          )}
+                        </SortableContext>
+                      </KanbanDropZone>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </DndContext>
           )}
 
           {!grouped.length && !loading && viewMode === 'list' ? (
@@ -1198,14 +1513,13 @@ function MyTasksPage() {
               <button
                 type="button"
                 onClick={() => setShowColumnCustomizer(false)}
-                className="btn btn-sm btn-outline-secondary"
+                className="sv-modal-close-btn"
               >
                 <Icon name="close" />
               </button>
             </div>
             <div className="d-flex flex-column gap-2">
               {[
-                { key: 'drag', label: 'Drag Handle' },
                 { key: 'checkbox', label: 'Checkbox' },
                 { key: 'priority', label: 'Priority Dot' },
                 { key: 'title', label: 'Title' },
@@ -1237,7 +1551,7 @@ function MyTasksPage() {
             <div className="mt-3 d-flex gap-2">
               <button
                 type="button"
-                onClick={() => setVisibleColumns(new Set(['priority', 'title', 'project', 'priorityDropdown', 'dueDate', 'status', 'timer', 'open']))}
+                onClick={() => setVisibleColumns(new Set(DEFAULT_VISIBLE_COLUMNS))}
                 className="btn btn-sm btn-outline-secondary flex-fill"
               >
                 Reset to Default
@@ -1263,81 +1577,7 @@ function MyTasksPage() {
               <button
                 type="button"
                 onClick={() => setShowFilterPanel(false)}
-                className="btn btn-sm btn-outline-secondary"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-            <div className="row g-3">
-              <div className="col-sm-6">
-                <label className="form-label small fw-semibold mb-1">Sort By</label>
-                <select value={sort} onChange={(event) => onSortChange(event.target.value)} className="form-select form-select-sm sv-ctl-select">
-                  <option value="dueDate">Due Date</option>
-                  <option value="priority">Priority</option>
-                  <option value="updatedAt">Updated</option>
-                </select>
-              </div>
-              <div className="col-sm-6">
-                <label className="form-label small fw-semibold mb-1">Group By</label>
-                <select value={groupBy} onChange={(event) => onGroupByChange(event.target.value)} className="form-select form-select-sm sv-ctl-select">
-                  {GROUP_MODES.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-sm-6">
-                <label className="form-label small fw-semibold mb-1">Archive Scope</label>
-                <select value={archiveScope} onChange={(event) => onArchiveScopeChange(event.target.value)} className="form-select form-select-sm sv-ctl-select">
-                  <option value="all">All (Active)</option>
-                  <option value="archived">Archived only</option>
-                </select>
-              </div>
-              <div className="col-sm-6">
-                <label className="form-label small fw-semibold mb-1">Issue Type</label>
-                <select value={issueTypeFilter} onChange={(event) => onIssueTypeChange(event.target.value)} className="form-select form-select-sm sv-ctl-select">
-                  <option value="all">All types</option>
-                  <option value="epic">Epic</option>
-                  <option value="task">Task</option>
-                  <option value="subtask">Subtask</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-3 d-flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onSortChange('dueDate');
-                  onGroupByChange('dueDate');
-                  onArchiveScopeChange('all');
-                  onIssueTypeChange('all');
-                  setShowFilterPanel(false);
-                }}
-                className="btn btn-sm btn-outline-secondary flex-fill"
-              >
-                Clear All
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowFilterPanel(false)}
-                className="btn btn-sm btn-primary flex-fill"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Panel Modal */}
-      {showFilterPanel && (
-        <div className="position-fixed top-0 start-0 end-0 bottom-0 z-50 d-flex align-items-center justify-content-center sv-modal-backdrop">
-          <div className="sv-card w-100 sv-modal-panel-lg p-4">
-            <div className="mb-3 d-flex align-items-center justify-content-between">
-              <h2 className="h5 mb-0 fw-bold sv-heading">Advanced Filters</h2>
-              <button
-                type="button"
-                onClick={() => setShowFilterPanel(false)}
-                className="btn btn-sm btn-outline-secondary"
+                className="sv-modal-close-btn"
               >
                 <Icon name="close" />
               </button>

@@ -20,6 +20,7 @@ function SprintsPage() {
   const projectId = useProjectRouteSync();
   const { workspaceId } = useWorkspace();
   const { sprints, loading, error, createSprint, startSprint, completeSprint, getBurndown } = useSprints(projectId);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [form, setForm] = useState({
     name: '',
     goal: '',
@@ -52,6 +53,19 @@ function SprintsPage() {
   );
   const hasSprints = (sprints || []).length > 0;
 
+  const openCreateModal = () => {
+    setCreateError('');
+    setCreateSuccess('');
+    setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    if (isCreating) return;
+    setCreateError('');
+    setCreateSuccess('');
+    setIsCreateModalOpen(false);
+  };
+
   const onCreateSprint = async (event) => {
     event.preventDefault();
     const payload = {
@@ -72,6 +86,7 @@ function SprintsPage() {
       await createSprint(payload);
       setCreateSuccess('Sprint created successfully.');
       setForm({ name: '', goal: '', startDate: '', endDate: '' });
+      setIsCreateModalOpen(false);
     } catch (err) {
       setCreateError(err?.message || 'Failed to create sprint.');
     } finally {
@@ -80,58 +95,32 @@ function SprintsPage() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="sv-sprints-page">
       <ProjectTabs projectId={projectId} />
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-gray-900">Sprints</h1>
-          <form onSubmit={onCreateSprint} className="grid w-full max-w-2xl grid-cols-1 gap-2 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-3 md:grid-cols-2">
-            <input
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Sprint name"
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
-            />
-            <input
-              value={form.goal}
-              onChange={(event) => setForm((current) => ({ ...current, goal: event.target.value }))}
-              placeholder="Sprint goal (optional)"
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
-            />
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
-            />
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
-            />
+      <div className="sv-sprints-stack">
+        <div className="sv-card sv-sprints-toolbar">
+          <div className="sv-sprints-toolbar-head">
+            <h1 className="sv-sprints-title">Sprints</h1>
             <button
-              type="submit"
-              disabled={isCreating}
-              className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white md:col-span-2"
+              type="button"
+              onClick={openCreateModal}
+              className="btn btn-primary sv-ctl-btn sv-sprints-create-toggle"
             >
-              {isCreating ? 'Creating Sprint...' : 'Create Sprint'}
+              + Create Sprint
             </button>
-          </form>
+          </div>
         </div>
-        {loading ? <p className="text-sm text-on-surface-variant">Loading sprints...</p> : null}
-        {error ? <p className="text-sm text-error">{error}</p> : null}
-        {createError ? <p className="text-sm text-error">{createError}</p> : null}
-        {createSuccess ? <p className="text-sm text-emerald-600">{createSuccess}</p> : null}
+        {loading ? <p className="sv-sprints-message text-sm text-on-surface-variant">Loading sprints...</p> : null}
+        {error ? <p className="sv-sprints-message is-error text-sm text-error">{error}</p> : null}
 
         {!loading && !error && !hasSprints ? (
-          <div className="rounded-xl border border-dashed border-outline-variant/40 bg-surface-container-lowest p-8 text-center">
-            <h2 className="text-base font-semibold text-on-surface">No sprints yet</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">Create your first sprint using the form above, then move backlog tasks into it.</p>
+          <div className="sv-card sv-sprints-empty">
+            <h2 className="sv-sprints-empty-title text-base font-semibold text-on-surface">No sprints yet</h2>
+            <p className="sv-sprints-empty-text mt-1 text-sm text-on-surface-variant">Create your first sprint, then move backlog tasks into it.</p>
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="sv-sprints-grid">
           {(sprints || []).map((sprint) => {
             const points = burndown[sprint._id] || [];
             const maxValue = Math.max(...points.map((point) => Number(point.remaining || 0)), 1);
@@ -143,28 +132,28 @@ function SprintsPage() {
             return (
               <article
                 key={sprint._id}
-                className={`rounded-xl border bg-surface-container-lowest p-4 ${isActive ? 'border-primary' : 'border-outline-variant/20'}`}
+                className={`sv-card sv-sprint-card ${isActive ? 'is-active' : ''}`}
               >
-                <div className="mb-3 flex items-start justify-between">
+                <div className="sv-sprint-card-head">
                   <div>
-                    <h3 className="text-base font-semibold text-on-surface">{sprint.name}</h3>
-                    <p className="text-xs text-on-surface-variant">{sprint.goal || 'No goal set'}</p>
+                    <h3 className="sv-sprint-card-title">{sprint.name}</h3>
+                    <p className="sv-sprint-card-goal text-xs text-on-surface-variant">{sprint.goal || 'No goal set'}</p>
                   </div>
-                  <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-bold uppercase text-on-surface-variant">
+                  <span className="sv-sprint-status-chip rounded-full bg-surface-container px-2 py-0.5 text-xs font-bold uppercase text-on-surface-variant">
                     {sprint.status}
                   </span>
                 </div>
-                <div className="mb-4 h-28 rounded-lg bg-surface-container-low p-2">
+                <div className="sv-sprint-chart-wrap">
                   <svg viewBox="0 0 240 80" className="h-full w-full">
                     <path d={svgPath(points, 240, 80, maxValue)} fill="none" stroke="currentColor" className="text-primary" strokeWidth="2" />
                   </svg>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="sv-sprint-actions">
                   <button
                     type="button"
                     onClick={() => startSprint(sprint._id)}
                     disabled={!canStart}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-primary sv-ctl-btn sv-sprint-action-btn disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Start Sprint
                   </button>
@@ -172,7 +161,7 @@ function SprintsPage() {
                     type="button"
                     onClick={() => completeSprint(sprint._id)}
                     disabled={!canComplete}
-                    className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn btn-light sv-ctl-btn sv-sprint-action-btn disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Complete Sprint
                   </button>
@@ -182,6 +171,74 @@ function SprintsPage() {
           })}
         </div>
       </div>
+
+      {isCreateModalOpen ? (
+        <div
+          className="sv-modal-backdrop sv-sprints-create-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeCreateModal();
+          }}
+        >
+          <div className="sv-modal-panel sv-sprints-create-modal" role="dialog" aria-modal="true" aria-label="Create Sprint">
+            <div className="sv-sprints-create-modal-head">
+              <h2 className="sv-sprints-create-modal-title">Create Sprint</h2>
+              <button
+                type="button"
+                className="sv-modal-close-btn"
+                onClick={closeCreateModal}
+                aria-label="Close create sprint modal"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={onCreateSprint} className="sv-sprints-create-modal-form">
+              <input
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Sprint name"
+                className="form-control sv-ctl-input sv-sprints-input"
+              />
+              <input
+                value={form.goal}
+                onChange={(event) => setForm((current) => ({ ...current, goal: event.target.value }))}
+                placeholder="Sprint goal (optional)"
+                className="form-control sv-ctl-input sv-sprints-input"
+              />
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
+                className="form-control sv-ctl-input sv-sprints-input"
+              />
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
+                className="form-control sv-ctl-input sv-sprints-input"
+              />
+              {createError ? <p className="sv-sprints-message is-error text-sm text-error">{createError}</p> : null}
+              {createSuccess ? <p className="sv-sprints-message is-success text-sm text-emerald-600">{createSuccess}</p> : null}
+              <div className="sv-sprints-create-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-light sv-ctl-btn"
+                  onClick={closeCreateModal}
+                  disabled={isCreating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="btn btn-primary sv-ctl-btn"
+                >
+                  {isCreating ? 'Creating Sprint...' : 'Create Sprint'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

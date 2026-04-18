@@ -666,7 +666,8 @@ export function useMyTasks() {
       reorderTask: (payload) => reorderMutation.mutateAsync(payload),
       quickCreateTask: (payload) => quickCreateMutation.mutateAsync(payload).then((res) => res?.data || null),
       updateMyTask: (taskId, patch) => updateMutation.mutateAsync({ taskId, patch }).then((res) => res?.data || null),
-      updateManyTasks: (taskIds, patch) => bulkUpdateMutation.mutateAsync({ taskIds, updates: patch }),
+      updateManyTasks: (taskIds, patch = {}, action = undefined) =>
+        bulkUpdateMutation.mutateAsync({ taskIds, updates: patch, action }),
       isTimerActive: (taskId) => {
         const timer = taskById.get(String(taskId))?.timer;
         return Boolean(timer?.active && !timer?.paused);

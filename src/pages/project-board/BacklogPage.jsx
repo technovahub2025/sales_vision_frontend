@@ -56,12 +56,13 @@ function SortableRow({ task, rowStyle, selected, onToggle, onOpen, showCheckbox,
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid min-h-[44px] grid-cols-[32px_12px_1fr_140px_120px_120px] items-center gap-2 px-4 py-2.5 ${isDragging ? 'opacity-60' : ''}`}
+      className={`sv-backlog-row grid min-h-[44px] grid-cols-[32px_12px_1fr_140px_120px_120px] items-center gap-2 px-4 py-2.5 ${isDragging ? 'opacity-60' : ''}`}
       {...attributes}
       {...listeners}
     >
       {showCheckbox ? (
         <input
+          className="sv-backlog-checkbox"
           type="checkbox"
           checked={selected.has(String(task._id || task.id))}
           onChange={(event) => onToggle(task, event.target.checked)}
@@ -70,8 +71,8 @@ function SortableRow({ task, rowStyle, selected, onToggle, onOpen, showCheckbox,
         <span />
       )}
       <span className={`h-2.5 w-2.5 rounded-full ${priorityDotClass(task.priority)}`} />
-      <button type="button" onClick={() => onOpen(task)} className="truncate text-left text-sm font-semibold text-on-surface hover:text-primary">
-        <span className="mr-2 rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-semibold uppercase text-on-surface-variant">
+      <button type="button" onClick={() => onOpen(task)} className="sv-backlog-title-btn truncate text-left text-sm font-semibold text-on-surface hover:text-primary">
+        <span className="sv-backlog-type-chip mr-2 rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-semibold uppercase text-on-surface-variant">
           {String(task.issueType || 'task')}
         </span>
         <span className={`${String(task.issueType || '') === 'subtask' ? 'ml-3' : ''}`}>{task.title}</span>
@@ -99,18 +100,18 @@ function DroppableContainer({ id, children, className }) {
 
 function SprintLane({ sprint, items, onOpenTask }) {
   return (
-    <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="sv-card sv-backlog-sprint-lane">
+      <div className="sv-backlog-sprint-head mb-2 flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-on-surface-variant">{sprint.status}</p>
-          <h3 className="text-sm font-bold text-on-surface">{sprint.name}</h3>
+          <p className="sv-backlog-sprint-status text-xs font-semibold uppercase text-on-surface-variant">{sprint.status}</p>
+          <h3 className="sv-backlog-sprint-title text-sm font-bold text-on-surface">{sprint.name}</h3>
         </div>
-        <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant">
+        <span className="sv-backlog-sprint-count rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant">
           {(items || []).length}
         </span>
       </div>
 
-      <DroppableContainer id={`sprint:${sprint._id}`} className="min-h-[120px] space-y-2 rounded-lg border border-dashed border-outline-variant/40 p-2">
+      <DroppableContainer id={`sprint:${sprint._id}`} className="sv-backlog-sprint-dropzone min-h-[120px] space-y-2 rounded-lg border border-dashed border-outline-variant/40 p-2">
         <SortableContext items={(items || []).map((task) => `task:${task._id || task.id}`)} strategy={verticalListSortingStrategy}>
           {(items || []).map((task) => (
             <SortableRow
@@ -124,7 +125,7 @@ function SprintLane({ sprint, items, onOpenTask }) {
             />
           ))}
         </SortableContext>
-        {!items?.length ? <p className="text-center text-xs text-on-surface-variant">Drop tasks here</p> : null}
+        {!items?.length ? <p className="sv-backlog-empty-drop text-center text-xs text-on-surface-variant">Drop tasks here</p> : null}
       </DroppableContainer>
     </div>
   );
@@ -146,6 +147,7 @@ function BacklogPage() {
   const [isMoving, setIsMoving] = useState(false);
   const [moveError, setMoveError] = useState('');
   const [moveSuccess, setMoveSuccess] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -336,22 +338,42 @@ function BacklogPage() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="sv-backlog-page">
       <ProjectTabs projectId={projectId} />
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-on-surface">Backlog</h1>
-          <div className="flex items-center gap-2">
+      <div className="sv-backlog-stack">
+        <div className="sv-card sv-backlog-toolbar">
+          <div className="sv-backlog-toolbar-head">
+            <h1 className="sv-backlog-title text-2xl font-semibold text-on-surface">Backlog</h1>
+          </div>
+          <div className="sv-backlog-toolbar-controls">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search backlog"
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+              className="form-control sv-ctl-input sv-backlog-search"
             />
+            <button
+              type="button"
+              onClick={() => setShowFilters((current) => !current)}
+              className={`btn sv-ctl-btn sv-backlog-filter-toggle ${showFilters ? 'btn-primary is-active' : 'btn-light'}`}
+            >
+              Filters
+            </button>
+            <button
+              type="button"
+              onClick={onMoveToSprint}
+              disabled={isMoving || !selectedIds.length}
+              className="btn btn-primary sv-ctl-btn sv-backlog-move-btn"
+            >
+              {isMoving ? 'Moving...' : 'Move to Sprint'}
+            </button>
+          </div>
+          {showFilters ? (
+            <div className="sv-backlog-filter-panel">
             <select
               value={issueTypeFilter}
               onChange={(event) => setIssueTypeFilter(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+              className="form-select sv-ctl-select sv-backlog-filter"
             >
               <option value="all">All types</option>
               <option value="epic">Epic</option>
@@ -361,7 +383,7 @@ function BacklogPage() {
             <select
               value={epicFilter}
               onChange={(event) => setEpicFilter(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+              className="form-select sv-ctl-select sv-backlog-filter"
             >
               <option value="all">All epics</option>
               {epicOptions.map((epic) => (
@@ -373,7 +395,7 @@ function BacklogPage() {
             <select
               value={targetSprintId}
               onChange={(event) => setTargetSprintId(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+              className="form-select sv-ctl-select sv-backlog-filter"
             >
               <option value="">Assign Sprint</option>
               {planningSprints.map((sprint) => (
@@ -382,26 +404,19 @@ function BacklogPage() {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={onMoveToSprint}
-              disabled={isMoving || !selectedIds.length}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white"
-            >
-              {isMoving ? 'Moving...' : 'Move to Sprint'}
-            </button>
-          </div>
+            </div>
+          ) : null}
         </div>
 
-        {loading ? <p className="text-sm text-on-surface-variant">Loading backlog...</p> : null}
-        {error ? <p className="text-sm text-error">{error}</p> : null}
-        {moveError ? <p className="text-sm text-error">{moveError}</p> : null}
-        {moveSuccess ? <p className="text-sm text-emerald-600">{moveSuccess}</p> : null}
+        {loading ? <p className="sv-backlog-message text-sm text-on-surface-variant">Loading backlog...</p> : null}
+        {error ? <p className="sv-backlog-message is-error text-sm text-error">{error}</p> : null}
+        {moveError ? <p className="sv-backlog-message is-error text-sm text-error">{moveError}</p> : null}
+        {moveSuccess ? <p className="sv-backlog-message is-success text-sm text-emerald-600">{moveSuccess}</p> : null}
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-            <DroppableContainer id="backlog" className="overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
-              <div className="grid grid-cols-[32px_12px_1fr_140px_120px_120px] gap-2 bg-surface-container-low/40 px-4 py-3 text-xs font-semibold uppercase text-on-surface-variant">
+          <div className="sv-backlog-layout">
+            <DroppableContainer id="backlog" className="sv-card sv-backlog-table overflow-hidden">
+              <div className="sv-backlog-table-head grid grid-cols-[32px_12px_1fr_140px_120px_120px] gap-2 bg-surface-container-low/40 px-4 py-3 text-xs font-semibold uppercase text-on-surface-variant">
                 <span>Select</span>
                 <span />
                 <span>Title</span>
@@ -424,11 +439,14 @@ function BacklogPage() {
                 ))}
               </SortableContext>
               {!filteredItems.length ? (
-                <div className="px-4 py-8 text-center text-sm text-on-surface-variant">No backlog items.</div>
+                <div className="sv-backlog-empty px-4 py-8 text-center text-sm text-on-surface-variant">No backlog items.</div>
               ) : null}
             </DroppableContainer>
+          </div>
 
-            <div className="space-y-4">
+          <section className="sv-backlog-sprint-section">
+            <h2 className="sv-backlog-sprint-section-title">Planning & Active Sprints</h2>
+            <div className="sv-backlog-sprint-stack">
               {planningSprints.map((sprint) => (
                 <div key={sprint._id}>
                   <SprintLane
@@ -440,7 +458,7 @@ function BacklogPage() {
                     <button
                       type="button"
                       onClick={() => openCompleteModal(sprint)}
-                      className="mt-2 w-full rounded-md border border-outline-variant px-3 py-2 text-xs font-semibold text-on-surface"
+                      className="btn btn-light sv-ctl-btn sv-backlog-complete-btn mt-2 w-full"
                     >
                       Complete Sprint
                     </button>
@@ -448,31 +466,31 @@ function BacklogPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         </DndContext>
       </div>
 
       {completeModal.open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6">
-            <h3 className="text-lg font-semibold text-on-surface">Complete {completeModal.sprint?.name}</h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="sv-card sv-backlog-modal sv-backlog-complete-modal w-full max-w-lg">
+            <h3 className="sv-backlog-modal-title text-lg font-semibold text-on-surface">Complete {completeModal.sprint?.name}</h3>
+            <p className="sv-backlog-modal-subtitle mt-2 text-sm text-on-surface-variant">
               {completeModal.incomplete.length} incomplete tasks found.
             </p>
-            <div className="mt-4 space-y-2 text-xs text-on-surface-variant">
+            <div className="sv-backlog-modal-list mt-4 space-y-2 text-xs text-on-surface-variant">
               {completeModal.incomplete.map((item) => (
-                <div key={item._id} className="flex items-center justify-between rounded-md border border-outline-variant/10 px-2 py-1">
+                <div key={item._id} className="sv-backlog-modal-list-item flex items-center justify-between rounded-md border border-outline-variant/10 px-2 py-1">
                   <span className="truncate">{item.title}</span>
                   <span className="uppercase">{item.status}</span>
                 </div>
               ))}
               {!completeModal.incomplete.length ? <p className="text-xs">All tasks are complete.</p> : null}
             </div>
-            <div className="mt-4">
+            <div className="sv-backlog-modal-controls mt-4">
               <select
                 value={completeModal.action}
                 onChange={(event) => setCompleteModal((current) => ({ ...current, action: event.target.value }))}
-                className="w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
+                className="form-select sv-ctl-select w-full"
               >
                 <option value="backlog">Move incomplete tasks to backlog</option>
                 <option value="move_to_sprint">Move incomplete tasks to another sprint</option>
@@ -481,7 +499,7 @@ function BacklogPage() {
                 <select
                   value={completeModal.nextSprintId}
                   onChange={(event) => setCompleteModal((current) => ({ ...current, nextSprintId: event.target.value }))}
-                  className="mt-2 w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
+                  className="form-select sv-ctl-select mt-2 w-full"
                 >
                   <option value="">Select next sprint</option>
                   {planningSprints.filter((item) => String(item._id) !== String(completeModal.sprint?._id)).map((sprint) => (
@@ -490,18 +508,18 @@ function BacklogPage() {
                 </select>
               ) : null}
             </div>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="sv-backlog-modal-actions mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setCompleteModal({ open: false, sprint: null, incomplete: [], action: 'backlog', nextSprintId: '' })}
-                className="rounded-md border border-outline-variant px-3 py-2 text-sm"
+                className="btn btn-light sv-ctl-btn"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={completeSprint}
-                className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white"
+                className="btn btn-primary sv-ctl-btn"
               >
                 Complete Sprint
               </button>
@@ -511,16 +529,16 @@ function BacklogPage() {
       ) : null}
 
       {moveModal.open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6">
-            <h3 className="text-lg font-semibold text-on-surface">Choose Sprint</h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="sv-card sv-backlog-modal w-full max-w-md">
+            <h3 className="sv-backlog-modal-title text-lg font-semibold text-on-surface">Choose Sprint</h3>
+            <p className="sv-backlog-modal-subtitle mt-2 text-sm text-on-surface-variant">
               Select target sprint for {selectedIds.length} selected task{selectedIds.length === 1 ? '' : 's'}.
             </p>
             <select
               value={moveModal.sprintId}
               onChange={(event) => setMoveModal((current) => ({ ...current, sprintId: event.target.value }))}
-              className="mt-4 w-full rounded-md border border-outline-variant px-3 py-2 text-sm"
+              className="form-select sv-ctl-select mt-4 w-full"
             >
               <option value="">Select sprint</option>
               {planningSprints.map((sprint) => (
@@ -529,11 +547,11 @@ function BacklogPage() {
                 </option>
               ))}
             </select>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="sv-backlog-modal-actions mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setMoveModal({ open: false, sprintId: '' })}
-                className="rounded-md border border-outline-variant px-3 py-2 text-sm"
+                className="btn btn-light sv-ctl-btn"
                 disabled={isMoving}
               >
                 Cancel
@@ -541,7 +559,7 @@ function BacklogPage() {
               <button
                 type="button"
                 onClick={onConfirmMoveFromModal}
-                className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white"
+                className="btn btn-primary sv-ctl-btn"
                 disabled={isMoving || !moveModal.sprintId}
               >
                 {isMoving ? 'Moving...' : 'Move'}

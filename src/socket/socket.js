@@ -12,6 +12,7 @@ export function getSocket() {
   socketInstance = io(socketUrl, {
     autoConnect: true,
     withCredentials: true,
+    transports: ['websocket'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,

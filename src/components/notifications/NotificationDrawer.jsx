@@ -90,6 +90,7 @@ function NotificationDrawer({
   const panelRef = useRef(null);
   const [selectedFilter, setSelectedFilter] = useState('all');
   const rows = useGroupedRows(items, selectedFilter);
+  const deletingAllRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -123,13 +124,30 @@ function NotificationDrawer({
     }
   }, [open, hasNextPage, loadingMore, rows, onLoadMore]);
 
+  const handleClearAll = async () => {
+    if (deletingAllRef.current) return;
+    const deletableIds = (Array.isArray(items) ? items : [])
+      .map((item) => String(item?._id || ''))
+      .filter(Boolean);
+    if (!deletableIds.length) return;
+    const confirmed = window.confirm(`Clear ${deletableIds.length} loaded notifications?`);
+    if (!confirmed) return;
+
+    deletingAllRef.current = true;
+    try {
+      await Promise.all(deletableIds.map((id) => onDelete(id)));
+    } finally {
+      deletingAllRef.current = false;
+    }
+  };
+
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60]" role="presentation">
+    <div className="sv-notifications-layer fixed inset-0 z-[60]" role="presentation">
       <button
         type="button"
-        className="absolute inset-0 bg-black/20"
+        className="sv-notifications-backdrop absolute inset-0 bg-black/20"
         aria-label="Close notifications drawer"
         onClick={onClose}
       />
@@ -139,24 +157,33 @@ function NotificationDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
-        className="absolute right-0 top-0 h-full w-[400px] border-l border-outline-variant bg-surface-container-lowest shadow-xl outline-none"
+        className="sv-notifications-drawer absolute right-0 top-0 h-full w-[400px] border-l border-outline-variant bg-surface-container-lowest shadow-xl outline-none"
       >
-        <div className="flex items-center justify-between border-b border-outline-variant/10 px-4 py-3">
-          <h3 className="text-sm font-semibold text-on-surface">Notifications</h3>
-          <button type="button" onClick={onReadAll} className="text-xs font-semibold text-primary">
-            Mark all read
-          </button>
+        <div className="sv-notifications-head flex items-start justify-between border-b border-outline-variant/10 px-4 py-3">
+          <h3 className="sv-notifications-title text-sm font-semibold text-on-surface">Notifications</h3>
+          <div className="sv-notifications-head-actions">
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="sv-notifications-clearall text-xs fw-semibold"
+            >
+              Clear all
+            </button>
+            <button type="button" onClick={onReadAll} className="sv-notifications-markall text-xs font-semibold text-primary">
+              Mark all read
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-2 border-b border-outline-variant/10 px-3 py-2">
+        <div className="sv-notifications-filters flex gap-2 border-b border-outline-variant/10 px-3 py-2">
           {FILTERS.map((filter) => (
             <button
               key={filter.value}
               type="button"
               onClick={() => setSelectedFilter(filter.value)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+              className={`sv-notifications-filter-chip rounded-full px-2.5 py-1 text-[11px] font-medium ${
                 selectedFilter === filter.value
-                  ? 'bg-primary text-on-primary'
+                  ? 'is-active bg-primary text-on-primary'
                   : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
               }`}
               aria-pressed={selectedFilter === filter.value}
@@ -166,9 +193,9 @@ function NotificationDrawer({
           ))}
         </div>
 
-        <div className="h-[calc(100%-96px)]">
+        <div className="sv-notifications-body">
           {loading ? (
-            <div className="space-y-2 px-4 py-4">
+            <div className="sv-notifications-loading space-y-2 px-4 py-4">
               <div className="h-12 animate-pulse rounded-lg bg-surface-container" />
               <div className="h-12 animate-pulse rounded-lg bg-surface-container" />
               <div className="h-12 animate-pulse rounded-lg bg-surface-container" />
@@ -188,19 +215,21 @@ function NotificationDrawer({
           ) : null}
 
           {!loading && !error && rows.length ? (
-            <List
-              rowComponent={DrawerRow}
-              rowCount={rows.length}
-              rowHeight={(index) => (rows[index]?.type === 'header' ? 32 : 82)}
-              rowProps={{ rows, onRead, onDelete }}
-              style={{ height: '100%' }}
-              onRowsRendered={({ stopIndex }) => {
-                if (!hasNextPage || loadingMore) return;
-                if (stopIndex >= rows.length - 6) {
-                  onLoadMore();
-                }
-              }}
-            />
+            <div className="sv-notifications-list">
+              <List
+                rowComponent={DrawerRow}
+                rowCount={rows.length}
+                rowHeight={(index) => (rows[index]?.type === 'header' ? 32 : 82)}
+                rowProps={{ rows, onRead, onDelete }}
+                style={{ height: '100%', width: '100%' }}
+                onRowsRendered={({ stopIndex }) => {
+                  if (!hasNextPage || loadingMore) return;
+                  if (stopIndex >= rows.length - 6) {
+                    onLoadMore();
+                  }
+                }}
+              />
+            </div>
           ) : null}
         </div>
       </aside>

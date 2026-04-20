@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { campaignsApi, usersApi } from '../../api';
@@ -46,91 +46,278 @@ function EditCampaignModal({ open, form, onChange, onToggleLead, onToggleClient,
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-surface-container-lowest p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-on-surface">Edit Campaign</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container">
-            <Icon name="close" className="text-lg" />
+    <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-3">
+      <div className="sv-card sv-campaigndetail-edit-modal" role="dialog" aria-modal="true" aria-label="Edit Campaign">
+        <div className="sv-campaigndetail-modal-head">
+          <h2 className="sv-campaigndetail-modal-title">Edit Campaign</h2>
+          <button type="button" onClick={onClose} className="sv-modal-close-btn" aria-label="Close">
+            <Icon name="close" className="text-xl" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <input required value={form.name} onChange={(e) => onChange('name', e.target.value)} placeholder="Campaign name *" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.subtitle} onChange={(e) => onChange('subtitle', e.target.value)} placeholder="Subtitle" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input required value={form.channel} onChange={(e) => onChange('channel', e.target.value)} placeholder="Channel *" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
+        <form onSubmit={onSubmit} className="sv-campaigndetail-edit-form">
+          <div className="sv-campaigndetail-form-grid">
+            <div>
+              <label className="sv-campaigndetail-label">
+                Campaign Name <span className="text-error">*</span>
+              </label>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => onChange('name', e.target.value)}
+                placeholder="Campaign name"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
 
-          <select
-            required
-            value={form.ownerId}
-            onChange={(e) => {
-              const selectedId = e.target.value;
-              const selected = users.find((user) => String(user._id) === String(selectedId));
-              onChange('ownerId', selectedId);
-              onChange('owner', selected?.displayName || selected?.name || selected?.email || '');
-              onChange('lead', selected?.displayName || selected?.name || selected?.email || '');
-            }}
-            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
-          >
-            <option value="">Select owner/lead *</option>
-            {users.map((user) => (
-              <option key={user._id} value={user._id}>{user.displayName || user.name || user.email || 'Unknown'}</option>
-            ))}
-          </select>
+            <div>
+              <label className="sv-campaigndetail-label">Subtitle</label>
+              <input
+                value={form.subtitle}
+                onChange={(e) => onChange('subtitle', e.target.value)}
+                placeholder="Subtitle"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
 
-          <select value={form.status} onChange={(e) => onChange('status', e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm">
-            {Object.keys(STATUS_FLOW).map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+            <div>
+              <label className="sv-campaigndetail-label">
+                Channel <span className="text-error">*</span>
+              </label>
+              <input
+                required
+                value={form.channel}
+                onChange={(e) => onChange('channel', e.target.value)}
+                placeholder="Channel"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
 
-          <input type="date" required value={form.startDate} onChange={(e) => onChange('startDate', e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input type="date" value={form.endDate} onChange={(e) => onChange('endDate', e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
+            <div>
+              <label className="sv-campaigndetail-label">
+                Owner/Lead <span className="text-error">*</span>
+              </label>
+              <select
+                required
+                value={form.ownerId}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selected = users.find((user) => String(user._id) === String(selectedId));
+                  onChange('ownerId', selectedId);
+                  onChange('owner', selected?.displayName || selected?.name || selected?.email || '');
+                  onChange('lead', selected?.displayName || selected?.name || selected?.email || '');
+                }}
+                className="sv-ctl-select sv-campaigndetail-field"
+              >
+                <option value="">Select owner/lead</option>
+                {users.map((user) => (
+                  <option key={user._id} value={user._id}>{user.displayName || user.name || user.email || 'Unknown'}</option>
+                ))}
+              </select>
+            </div>
 
-          <input type="number" min="0" value={form.budget} onChange={(e) => onChange('budget', e.target.value)} placeholder="Budget" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input type="number" min="0" value={form.spend} onChange={(e) => onChange('spend', e.target.value)} placeholder="Spend" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input type="number" min="0" value={form.conversionRate} onChange={(e) => onChange('conversionRate', e.target.value)} placeholder="Conversion Rate (%)" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input type="number" step="0.01" value={form.roi} onChange={(e) => onChange('roi', e.target.value)} placeholder="ROI (x)" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.targetAudience} onChange={(e) => onChange('targetAudience', e.target.value)} placeholder="Target audience" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.goalType} onChange={(e) => onChange('goalType', e.target.value)} placeholder="Goal type" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input type="number" min="0" value={form.goalValue} onChange={(e) => onChange('goalValue', e.target.value)} placeholder="Goal value" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.utmSource} onChange={(e) => onChange('utmSource', e.target.value)} placeholder="UTM Source" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.utmMedium} onChange={(e) => onChange('utmMedium', e.target.value)} placeholder="UTM Medium" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.utmCampaign} onChange={(e) => onChange('utmCampaign', e.target.value)} placeholder="UTM Campaign" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm md:col-span-2" />
-          <textarea value={form.notes} onChange={(e) => onChange('notes', e.target.value)} placeholder="Notes" rows={3} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm md:col-span-2" />
+            <div>
+              <label className="sv-campaigndetail-label">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => onChange('status', e.target.value)}
+                className="sv-ctl-select sv-campaigndetail-field"
+              >
+                {Object.keys(STATUS_FLOW).map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="rounded-lg border border-outline-variant/40 p-3 md:col-span-2">
-            <p className="mb-2 text-xs font-semibold uppercase text-on-surface-variant">Linked Leads</p>
-            <div className="grid max-h-28 grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
-              {leads.map((lead) => (
-                <label key={lead._id} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.leadIds.includes(String(lead._id))} onChange={() => onToggleLead(String(lead._id))} />
-                  <span>{lead.title || 'Untitled lead'}</span>
-                </label>
-              ))}
-              {!leads.length ? <p className="text-xs text-on-surface-variant">No leads available.</p> : null}
+            <div>
+              <label className="sv-campaigndetail-label">
+                Start Date <span className="text-error">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.startDate}
+                onChange={(e) => onChange('startDate', e.target.value)}
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">End Date</label>
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={(e) => onChange('endDate', e.target.value)}
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Budget</label>
+              <input
+                type="number"
+                min="0"
+                value={form.budget}
+                onChange={(e) => onChange('budget', e.target.value)}
+                placeholder="Budget"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Spend</label>
+              <input
+                type="number"
+                min="0"
+                value={form.spend}
+                onChange={(e) => onChange('spend', e.target.value)}
+                placeholder="Spend"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Conversion Rate (%)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.conversionRate}
+                onChange={(e) => onChange('conversionRate', e.target.value)}
+                placeholder="Conversion Rate (%)"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">ROI (x)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={form.roi}
+                onChange={(e) => onChange('roi', e.target.value)}
+                placeholder="ROI (x)"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Target Audience</label>
+              <input
+                value={form.targetAudience}
+                onChange={(e) => onChange('targetAudience', e.target.value)}
+                placeholder="Target audience"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Goal Type</label>
+              <input
+                value={form.goalType}
+                onChange={(e) => onChange('goalType', e.target.value)}
+                placeholder="Goal type"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">Goal Value</label>
+              <input
+                type="number"
+                min="0"
+                value={form.goalValue}
+                onChange={(e) => onChange('goalValue', e.target.value)}
+                placeholder="Goal value"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">UTM Source</label>
+              <input
+                value={form.utmSource}
+                onChange={(e) => onChange('utmSource', e.target.value)}
+                placeholder="UTM Source"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div>
+              <label className="sv-campaigndetail-label">UTM Medium</label>
+              <input
+                value={form.utmMedium}
+                onChange={(e) => onChange('utmMedium', e.target.value)}
+                placeholder="UTM Medium"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div className="sv-campaigndetail-span-2">
+              <label className="sv-campaigndetail-label">UTM Campaign</label>
+              <input
+                value={form.utmCampaign}
+                onChange={(e) => onChange('utmCampaign', e.target.value)}
+                placeholder="UTM Campaign"
+                className="sv-ctl-input sv-campaigndetail-field"
+              />
+            </div>
+
+            <div className="sv-campaigndetail-span-2">
+              <label className="sv-campaigndetail-label">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => onChange('notes', e.target.value)}
+                placeholder="Notes"
+                rows={3}
+                className="sv-ctl-input sv-campaigndetail-field sv-campaigndetail-textarea"
+              />
+            </div>
+
+            <div className="sv-campaigndetail-link-box">
+              <p className="sv-campaigndetail-link-title">Linked Leads</p>
+              <div className="sv-campaigndetail-link-list">
+                {leads.map((lead) => (
+                  <label key={lead._id} className="sv-campaigndetail-link-option">
+                    <input
+                      type="checkbox"
+                      checked={form.leadIds.includes(String(lead._id))}
+                      onChange={() => onToggleLead(String(lead._id))}
+                    />
+                    <span>{lead.title || 'Untitled lead'}</span>
+                  </label>
+                ))}
+                {!leads.length ? <p className="sv-campaigndetail-link-empty">No leads available.</p> : null}
+              </div>
+            </div>
+
+            <div className="sv-campaigndetail-link-box">
+              <p className="sv-campaigndetail-link-title">Linked Clients</p>
+              <div className="sv-campaigndetail-link-list">
+                {clients.map((client) => (
+                  <label key={client._id} className="sv-campaigndetail-link-option">
+                    <input
+                      type="checkbox"
+                      checked={form.clientIds.includes(String(client._id))}
+                      onChange={() => onToggleClient(String(client._id))}
+                    />
+                    <span>{client.name || 'Unnamed client'}</span>
+                  </label>
+                ))}
+                {!clients.length ? <p className="sv-campaigndetail-link-empty">No clients available.</p> : null}
+              </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-outline-variant/40 p-3 md:col-span-2">
-            <p className="mb-2 text-xs font-semibold uppercase text-on-surface-variant">Linked Clients</p>
-            <div className="grid max-h-28 grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
-              {clients.map((client) => (
-                <label key={client._id} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.clientIds.includes(String(client._id))} onChange={() => onToggleClient(String(client._id))} />
-                  <span>{client.name || 'Unnamed client'}</span>
-                </label>
-              ))}
-              {!clients.length ? <p className="text-xs text-on-surface-variant">No clients available.</p> : null}
-            </div>
-          </div>
+          {error ? <p className="sv-campaigndetail-inline-error">{error}</p> : null}
 
-          {error ? <p className="text-sm text-error md:col-span-2">{error}</p> : null}
-
-          <div className="flex justify-end gap-2 md:col-span-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button type="submit" disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {busy ? 'Saving...' : 'Save Changes'}
+          <div className="sv-campaigndetail-modal-actions">
+            <button type="button" onClick={onClose} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
+              <Icon name="close" className="sv-campaigns-btn-icon" />
+              <span>Cancel</span>
+            </button>
+            <button type="submit" disabled={busy} className="sv-ctl-btn btn-primary">
+              <Icon name="save" className="sv-campaigns-btn-icon" />
+              <span>{busy ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>
         </form>
@@ -369,104 +556,130 @@ function CampaignDetailPage() {
   const nextActions = campaign ? STATUS_FLOW[String(campaign.status || 'draft').toLowerCase()] || [] : [];
 
   return (
-    <main className="min-h-screen bg-surface">
-      <div className="mx-auto max-w-[1400px] space-y-6 p-8">
-        <section className="flex flex-wrap items-start justify-between gap-4 rounded-xl bg-surface-container-lowest p-6">
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">{campaign?.name || 'Campaign'}</h1>
-            <p className="mt-1 text-sm text-on-surface-variant">{campaign?.channel || '-'} • {campaign?.status || 'draft'}</p>
-            <p className="text-xs text-on-surface-variant">{campaign?.owner || campaign?.lead || 'Unassigned owner'}</p>
+    <main className="sv-campaigndetail-page">
+      <div className="sv-campaigndetail-stack">
+        <section className="sv-card sv-campaigndetail-hero">
+          <div className="sv-campaigndetail-hero-main">
+            <h1 className="sv-campaigndetail-title">{campaign?.name || 'Campaign'}</h1>
+            <p className="sv-campaigndetail-subtitle">{campaign?.channel || '-'} • {campaign?.status || 'draft'}</p>
+            <p className="sv-campaigndetail-owner">{campaign?.owner || campaign?.lead || 'Unassigned owner'}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {nextActions.includes('active') ? <button disabled={busyAction} onClick={() => handleStatusChange('active')} className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">Activate</button> : null}
-            {nextActions.includes('paused') ? <button disabled={busyAction} onClick={() => handleStatusChange('paused')} className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">Pause</button> : null}
-            {nextActions.includes('completed') ? <button disabled={busyAction} onClick={() => handleStatusChange('completed')} className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">Complete</button> : null}
-            <button disabled={busyAction} onClick={startEdit} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white">Edit</button>
-            <button disabled={busyAction} onClick={handleExport} className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">Export</button>
-            <button disabled={busyAction} onClick={handleDelete} className="rounded-lg border border-error/30 px-3 py-2 text-sm font-semibold text-error">Delete</button>
+          <div className="sv-campaigndetail-hero-actions">
+            {nextActions.includes('active') ? (
+              <button disabled={busyAction} onClick={() => handleStatusChange('active')} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
+                <Icon name="play_arrow" className="sv-campaigns-btn-icon" />
+                <span>Activate</span>
+              </button>
+            ) : null}
+            {nextActions.includes('paused') ? (
+              <button disabled={busyAction} onClick={() => handleStatusChange('paused')} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
+                <Icon name="pause" className="sv-campaigns-btn-icon" />
+                <span>Pause</span>
+              </button>
+            ) : null}
+            {nextActions.includes('completed') ? (
+              <button disabled={busyAction} onClick={() => handleStatusChange('completed')} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
+                <Icon name="check_circle" className="sv-campaigns-btn-icon" />
+                <span>Complete</span>
+              </button>
+            ) : null}
+            <button disabled={busyAction} onClick={startEdit} className="sv-ctl-btn btn-primary sv-campaigns-icon-btn">
+              <Icon name="edit" className="sv-campaigns-btn-icon" />
+              <span>Edit</span>
+            </button>
+            <button disabled={busyAction} onClick={handleExport} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
+              <Icon name="download" className="sv-campaigns-btn-icon" />
+              <span>Export</span>
+            </button>
+            <button disabled={busyAction} onClick={handleDelete} className="sv-ctl-btn btn-light sv-campaigns-icon-btn sv-campaigndetail-delete-btn">
+              <Icon name="delete" className="sv-campaigns-btn-icon" />
+              <span>Delete</span>
+            </button>
           </div>
         </section>
 
-        {loading ? <p className="text-sm text-on-surface-variant">Loading campaign...</p> : null}
-        {error ? <p className="text-sm text-error">{error}</p> : null}
+        {loading ? <p className="sv-campaigndetail-message">Loading campaign...</p> : null}
+        {error ? <p className="sv-campaigndetail-message is-error">{error}</p> : null}
 
         {campaign ? (
           <>
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <article className="rounded-xl bg-surface-container-lowest p-4">
-                <p className="text-xs uppercase text-on-surface-variant">Spend</p>
-                <p className="text-2xl font-bold text-on-surface">{formatINR(campaign.spend || 0)}</p>
+            <section className="sv-campaigndetail-kpis">
+              <article className="sv-card sv-campaigndetail-kpi-card">
+                <p className="sv-campaigndetail-kpi-label">Spend</p>
+                <p className="sv-campaigndetail-kpi-value">{formatINR(campaign.spend || 0)}</p>
               </article>
-              <article className="rounded-xl bg-surface-container-lowest p-4">
-                <p className="text-xs uppercase text-on-surface-variant">ROI</p>
-                <p className="text-2xl font-bold text-on-surface">{Number(campaign.roi || 0).toFixed(2)}x</p>
+              <article className="sv-card sv-campaigndetail-kpi-card">
+                <p className="sv-campaigndetail-kpi-label">ROI</p>
+                <p className="sv-campaigndetail-kpi-value">{Number(campaign.roi || 0).toFixed(2)}x</p>
               </article>
-              <article className="rounded-xl bg-surface-container-lowest p-4">
-                <p className="text-xs uppercase text-on-surface-variant">Conversion</p>
-                <p className="text-2xl font-bold text-on-surface">{Number(campaign.conversionRate || 0).toFixed(1)}%</p>
+              <article className="sv-card sv-campaigndetail-kpi-card">
+                <p className="sv-campaigndetail-kpi-label">Conversion</p>
+                <p className="sv-campaigndetail-kpi-value">{Number(campaign.conversionRate || 0).toFixed(1)}%</p>
               </article>
-              <article className="rounded-xl bg-surface-container-lowest p-4">
-                <p className="text-xs uppercase text-on-surface-variant">Linked</p>
-                <p className="text-2xl font-bold text-on-surface">{campaign.linkedLeadsCount || 0} Leads / {campaign.linkedClientsCount || 0} Clients</p>
+              <article className="sv-card sv-campaigndetail-kpi-card">
+                <p className="sv-campaigndetail-kpi-label">Linked</p>
+                <p className="sv-campaigndetail-kpi-value">{campaign.linkedLeadsCount || 0} Leads / {campaign.linkedClientsCount || 0} Clients</p>
               </article>
             </section>
 
-            <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <article className="rounded-xl bg-surface-container-lowest p-4 xl:col-span-2">
-                <h2 className="mb-3 text-lg font-semibold text-on-surface">Associated Leads</h2>
-                <div className="space-y-2">
+            <section className="sv-campaigndetail-content-grid">
+              <article className="sv-card sv-campaigndetail-panel sv-campaigndetail-panel-wide">
+                <h2 className="sv-campaigndetail-panel-title">Associated Leads</h2>
+                <div className="sv-campaigndetail-list">
                   {linkedLeads.map((lead) => (
-                    <div key={lead._id} className="flex items-center justify-between rounded-lg border border-outline-variant/20 px-3 py-2">
+                    <div key={lead._id} className="sv-campaigndetail-list-item">
                       <div>
-                        <p className="text-sm font-semibold text-on-surface">{lead.title || 'Untitled lead'}</p>
-                        <p className="text-xs text-on-surface-variant">{lead.source || '-'} • {lead.statusId || '-'}</p>
+                        <p className="sv-campaigndetail-item-title">{lead.title || 'Untitled lead'}</p>
+                        <p className="sv-campaigndetail-item-meta">{lead.source || '-'} • {lead.statusId || '-'}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => navigate(ROUTES.leads)}
-                        className="rounded bg-surface-container px-2 py-1 text-xs font-semibold"
+                        className="sv-ctl-btn btn-light sv-campaigns-icon-btn"
                       >
-                        Open Leads
+                        <Icon name="open_in_new" className="sv-campaigns-btn-icon" />
+                        <span>Open Leads</span>
                       </button>
                     </div>
                   ))}
-                  {!linkedLeads.length ? <p className="text-sm text-on-surface-variant">No associated leads.</p> : null}
+                  {!linkedLeads.length ? <p className="sv-campaigndetail-empty">No associated leads.</p> : null}
                 </div>
               </article>
 
-              <article className="rounded-xl bg-surface-container-lowest p-4">
-                <h2 className="mb-3 text-lg font-semibold text-on-surface">Converted/Linked Clients</h2>
-                <div className="space-y-2">
+              <article className="sv-card sv-campaigndetail-panel">
+                <h2 className="sv-campaigndetail-panel-title">Converted/Linked Clients</h2>
+                <div className="sv-campaigndetail-list">
                   {linkedClients.map((client) => (
-                    <div key={client._id} className="rounded-lg border border-outline-variant/20 px-3 py-2">
-                      <p className="text-sm font-semibold text-on-surface">{client.name || 'Unnamed client'}</p>
-                      <p className="text-xs text-on-surface-variant">{client.company || '-'} • {client.email || '-'}</p>
+                    <div key={client._id} className="sv-campaigndetail-client-item">
+                      <p className="sv-campaigndetail-item-title">{client.name || 'Unnamed client'}</p>
+                      <p className="sv-campaigndetail-item-meta">{client.company || '-'} • {client.email || '-'}</p>
                       <button
                         type="button"
                         onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', client._id))}
-                        className="mt-2 rounded bg-surface-container px-2 py-1 text-xs font-semibold"
+                        className="sv-ctl-btn btn-light sv-campaigns-icon-btn"
                       >
-                        Open Client
+                        <Icon name="open_in_new" className="sv-campaigns-btn-icon" />
+                        <span>Open Client</span>
                       </button>
                     </div>
                   ))}
-                  {!linkedClients.length ? <p className="text-sm text-on-surface-variant">No linked clients.</p> : null}
+                  {!linkedClients.length ? <p className="sv-campaigndetail-empty">No linked clients.</p> : null}
                 </div>
               </article>
             </section>
 
-            <section className="rounded-xl bg-surface-container-lowest p-4">
-              <h2 className="mb-3 text-lg font-semibold text-on-surface">Activity Timeline</h2>
-              <div className="space-y-2">
+            <section className="sv-card sv-campaigndetail-panel">
+              <h2 className="sv-campaigndetail-panel-title">Activity Timeline</h2>
+              <div className="sv-campaigndetail-timeline">
                 {(campaign.timeline || []).map((item, index) => (
-                  <div key={item._id || index} className="rounded-lg border border-outline-variant/20 px-3 py-2">
-                    <p className="text-sm font-semibold text-on-surface">{item.action || 'updated'}</p>
-                    <p className="text-xs text-on-surface-variant">{item.message || JSON.stringify(item.payload || {})}</p>
-                    <p className="text-[11px] text-on-surface-variant">{item.occurredAt ? new Date(item.occurredAt).toLocaleString() : '-'}</p>
+                  <div key={item._id || index} className="sv-campaigndetail-timeline-item">
+                    <p className="sv-campaigndetail-item-title">{item.action || 'updated'}</p>
+                    <p className="sv-campaigndetail-item-meta">{item.message || JSON.stringify(item.payload || {})}</p>
+                    <p className="sv-campaigndetail-time">{item.occurredAt ? new Date(item.occurredAt).toLocaleString() : '-'}</p>
                   </div>
                 ))}
-                {!campaign.timeline?.length ? <p className="text-sm text-on-surface-variant">No campaign activity yet.</p> : null}
+                {!campaign.timeline?.length ? <p className="sv-campaigndetail-empty">No campaign activity yet.</p> : null}
               </div>
             </section>
           </>
@@ -489,7 +702,7 @@ function CampaignDetailPage() {
       />
 
       {toast ? (
-        <div className={`fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error' : 'bg-green-600'}`}>
+        <div className={`sv-campaigndetail-toast ${toast.tone === 'error' ? 'is-error' : 'is-success'}`}>
           {toast.message}
         </div>
       ) : null}

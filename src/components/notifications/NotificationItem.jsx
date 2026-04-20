@@ -40,8 +40,14 @@ function NotificationItem({ item, onRead, onDelete }) {
           Read
         </button>
       ) : null}
-      <button type="button" onClick={() => onDelete(item._id)} className="text-xs font-semibold text-on-surface-variant">
-        Delete
+      <button
+        type="button"
+        onClick={() => onDelete(item._id)}
+        className="sv-notification-remove-btn"
+        aria-label="Remove notification"
+        title="Remove"
+      >
+        <Icon name="close" className="text-sm" />
       </button>
     </article>
   );

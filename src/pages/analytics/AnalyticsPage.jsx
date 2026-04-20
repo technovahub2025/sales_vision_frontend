@@ -4,8 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Legend,
@@ -81,6 +79,7 @@ function AnalyticsPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [toast, setToast] = useState(null);
   const [exporting, setExporting] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const role = String(activeWorkspace?.role || '').toLowerCase();
   const canExport = role === 'owner' || role === 'admin';
@@ -266,39 +265,48 @@ function AnalyticsPage() {
   };
 
   return (
-    <main className="relative min-h-screen bg-surface">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-wrap items-end justify-between gap-3">
+    <main className="sv-analytics-page relative min-h-screen bg-surface">
+      <div className="sv-analytics-container mx-auto space-y-5">
+        <section className="sv-analytics-header flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-on-surface">Analytics Overview</h1>
-            <p className="mt-1 text-on-surface-variant">Workspace 360 for delivery, sales, workforce, and growth.</p>
+            <h1 className="sv-analytics-title text-3xl font-bold tracking-tight text-on-surface">Analytics Overview</h1>
+            <p className="sv-analytics-subtitle mt-1 text-on-surface-variant">Workspace 360 for delivery, sales, workforce, and growth.</p>
           </div>
-          <div className="flex gap-2">
-            <button type="button" disabled={!canExport || exporting === 'csv'} onClick={() => exportReport('csv')} className="rounded-lg bg-surface-container-low px-4 py-2 font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50">
+          <div className="sv-analytics-actions flex gap-2">
+            <button
+              type="button"
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((current) => !current)}
+              className={`sv-ctl-btn sv-analytics-filter-toggle rounded-lg border border-outline-variant/25 bg-surface px-4 py-2 font-medium text-on-surface transition-colors ${showFilters ? 'is-active' : ''}`}
+            >
+              <i className="bi bi-sliders2 me-2" />
+              Filters
+            </button>
+            <button type="button" disabled={!canExport || exporting === 'csv'} onClick={() => exportReport('csv')} className="sv-ctl-btn sv-analytics-export-btn rounded-lg bg-surface-container-low px-4 py-2 font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50">
               {exporting === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
             </button>
-            <button type="button" disabled={!canExport || exporting === 'json'} onClick={() => exportReport('json')} className="rounded-lg bg-primary px-4 py-2 font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="button" disabled={!canExport || exporting === 'json'} onClick={() => exportReport('json')} className="sv-ctl-btn sv-analytics-export-btn is-primary rounded-lg bg-primary px-4 py-2 font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">
               {exporting === 'json' ? 'Exporting JSON...' : 'Export JSON'}
             </button>
           </div>
         </section>
 
-        <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
-          <div className="flex flex-wrap items-center gap-2">
+        <section className={`sv-card sv-analytics-filters rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 ${showFilters ? 'is-open' : 'is-collapsed'}`}>
+          <div className="sv-analytics-filters-row flex flex-wrap items-center gap-2">
             {['7d', '30d', '90d', 'custom'].map((item) => (
-              <button key={item} type="button" onClick={() => onPresetChange(item)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${preset === item ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'}`}>
+              <button key={item} type="button" onClick={() => onPresetChange(item)} className={`sv-ctl-btn sv-analytics-preset-chip rounded-md px-3 py-1.5 text-sm font-semibold ${preset === item ? 'is-active bg-primary text-white' : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'}`}>
                 {item === 'custom' ? 'Custom' : item.toUpperCase()}
               </button>
             ))}
-            <input type="date" value={customFrom} onChange={(event) => { setPreset('custom'); setCustomFrom(event.target.value); }} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
-            <input type="date" value={customTo} onChange={(event) => { setPreset('custom'); setCustomTo(event.target.value); }} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
-            <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+            <input type="date" value={customFrom} onChange={(event) => { setPreset('custom'); setCustomFrom(event.target.value); }} className="sv-ctl-input sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
+            <input type="date" value={customTo} onChange={(event) => { setPreset('custom'); setCustomTo(event.target.value); }} className="sv-ctl-input sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
+            <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
               <option value="all">All modules</option>
               <option value="delivery">Delivery</option>
               <option value="sales">Sales</option>
               <option value="workforce">Workforce</option>
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
               <option value="">All status</option>
               <option value="todo">Todo</option>
               <option value="in_progress">In Progress</option>
@@ -307,7 +315,7 @@ function AnalyticsPage() {
               <option value="paused">Paused</option>
               <option value="won">Won</option>
             </select>
-            <select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+            <select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
               <option value="">All channels/sources</option>
               <option value="organic">Organic</option>
               <option value="referral">Referral</option>
@@ -315,7 +323,7 @@ function AnalyticsPage() {
               <option value="event">Event</option>
               <option value="cold">Cold</option>
             </select>
-            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
+            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
               <option value="">All priority</option>
               <option value="critical">Critical</option>
               <option value="high">High</option>
@@ -328,38 +336,38 @@ function AnalyticsPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="text-sm text-on-surface-variant">Task Completion</p>
-            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.completionRate)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.myTasks, { status: 'completed' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open My Tasks</button>
+        <section className="sv-analytics-kpis grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Task Completion</p>
+            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.completionRate)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.myTasks, { status: 'completed' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open My Tasks</button>
           </article>
-          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="text-sm text-on-surface-variant">Lead Conversion</p>
-            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(sales.leadConversionRate)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.leads, { status: 'won' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Leads</button>
+          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Lead Conversion</p>
+            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(sales.leadConversionRate)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.leads, { status: 'won' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Leads</button>
           </article>
-          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="text-sm text-on-surface-variant">Campaign Avg ROI</p>
-            <h2 className="mt-1 text-3xl font-black text-on-surface">{Number(sales?.campaign?.averageRoi || 0).toFixed(2)}x</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns, { status: 'active' })} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Campaigns</button>
+          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Campaign Avg ROI</p>
+            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{Number(sales?.campaign?.averageRoi || 0).toFixed(2)}x</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns, { status: 'active' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Campaigns</button>
           </article>
-          <article className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="text-sm text-on-surface-variant">Team Utilization</p>
-            <h2 className="mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.teamUtilizationPct)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.employees)} className="mt-3 text-xs font-semibold text-primary hover:underline">Open Employees</button>
+          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Team Utilization</p>
+            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.teamUtilizationPct)}</h2>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.employees)} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Employees</button>
           </article>
         </section>
 
-        <section className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-8">
+        <section className="sv-analytics-grid grid grid-cols-12 gap-4">
+          <div className="sv-analytics-grid-main col-span-12 lg:col-span-8">
             <ChartPanel
               title="Delivery Trend"
               subtitle="Completion rate and overdue count over time"
               loading={analyticsQuery.isLoading}
               hasData={deliveryTrendData.length > 0}
             >
-              <div className="h-72">
+              <div className="sv-analytics-chart-wrap h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={deliveryTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
@@ -376,9 +384,9 @@ function AnalyticsPage() {
             </ChartPanel>
           </div>
 
-          <div className="col-span-12 lg:col-span-4">
+          <div className="sv-analytics-grid-side col-span-12 lg:col-span-4">
             <ChartPanel title="Lead Funnel" subtitle="Stage-wise lead distribution" loading={analyticsQuery.isLoading} hasData={leadFunnelChartData.some((item) => item.value > 0)}>
-              <div className="h-72">
+              <div className="sv-analytics-chart-wrap h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={leadFunnelChartData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={94} paddingAngle={2}>
@@ -395,33 +403,44 @@ function AnalyticsPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 xl:col-span-8">
+        <section className="sv-analytics-grid grid grid-cols-12 gap-4">
+          <div className="sv-analytics-grid-main col-span-12 xl:col-span-8">
             <ChartPanel
               title="Top Performance"
               subtitle="Projects progress and campaign conversion"
               loading={analyticsQuery.isLoading}
               hasData={topPerformanceData.length > 0}
               actions={
-                <button type="button" onClick={() => openRouteWithParams(ROUTES.projects)} className="text-xs font-semibold text-primary hover:underline">
+                <button type="button" onClick={() => openRouteWithParams(ROUTES.projects)} className="sv-analytics-inline-link text-xs font-semibold text-primary hover:underline">
                   View all projects
                 </button>
               }
             >
-              <div className="h-64">
+              <div className="sv-analytics-chart-wrap h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topPerformanceData} margin={{ top: 8, right: 16, left: 0, bottom: 20 }}>
+                  <AreaChart data={topPerformanceData} margin={{ top: 8, right: 16, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
                     <Tooltip content={<AnalyticsTooltip formatter={(value) => `${Number(value || 0).toFixed(1)}%`} />} />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Bar dataKey="projectProgress" name="Project Progress %" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="campaignConversion" name="Campaign Conversion %" fill="#f97316" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <defs>
+                      <linearGradient id="svTopPerfProj" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.32} />
+                        <stop offset="100%" stopColor="#2563eb" stopOpacity={0.04} />
+                      </linearGradient>
+                      <linearGradient id="svTopPerfCamp" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f97316" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#f97316" stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey="projectProgress" name="Project Progress %" stroke="#2563eb" fill="url(#svTopPerfProj)" strokeWidth={2.4} />
+                    <Line type="monotone" dataKey="campaignConversion" name="Campaign Conversion %" stroke="#f97316" strokeWidth={2.2} dot={{ r: 2 }} />
+                    <Area type="monotone" dataKey="campaignConversion" name="Campaign Conversion Area" stroke="transparent" fill="url(#svTopPerfCamp)" />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-3 overflow-x-auto rounded-md border border-outline-variant/10">
+              <div className="sv-analytics-mini-table mt-3 overflow-x-auto rounded-md border border-outline-variant/10">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-container-low text-on-surface-variant">
                     <tr>
@@ -438,7 +457,7 @@ function AnalyticsPage() {
                         <td className="px-3 py-2 capitalize">{project.status}</td>
                         <td className="px-3 py-2">{Number(project.progress || 0).toFixed(1)}%</td>
                         <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={() => navigate(projectRoute('overview', project.projectId))} className="rounded bg-surface-container px-2 py-1 font-semibold">
+                          <button type="button" onClick={() => navigate(projectRoute('overview', project.projectId))} className="sv-ctl-btn sv-analytics-mini-btn rounded bg-surface-container px-2 py-1 font-semibold">
                             Open
                           </button>
                         </td>
@@ -457,56 +476,67 @@ function AnalyticsPage() {
             </ChartPanel>
           </div>
 
-          <div className="col-span-12 xl:col-span-4">
+          <div className="sv-analytics-grid-side col-span-12 xl:col-span-4">
             <ChartPanel title="Workforce Capacity" subtitle="Availability and utilization view" loading={analyticsQuery.isLoading} hasData={workforceChartData.length > 0}>
-              <div className="h-72">
+              <div className="sv-analytics-chart-wrap h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={workforceChartData} margin={{ top: 8, right: 10, left: 0, bottom: 6 }}>
+                  <AreaChart data={workforceChartData} margin={{ top: 8, right: 10, left: 0, bottom: 6 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
                     <Tooltip content={<AnalyticsTooltip formatter={(value, key) => (String(key).includes('Utilization') ? `${Number(value || 0).toFixed(1)}%` : formatInt(value))} />} />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Bar yAxisId="left" dataKey="utilizationPct" name="Utilization %" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="assignedTasks" name="Assigned Tasks" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <defs>
+                      <linearGradient id="svWorkAssigned" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.28} />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="svWorkUtil" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <Area yAxisId="right" type="monotone" dataKey="assignedTasks" name="Assigned Tasks" stroke="#8b5cf6" fill="url(#svWorkAssigned)" strokeWidth={2.1} />
+                    <Line yAxisId="left" type="monotone" dataKey="utilizationPct" name="Utilization %" stroke="#14b8a6" strokeWidth={2.3} dot={{ r: 2 }} />
+                    <Area yAxisId="left" type="monotone" dataKey="utilizationPct" name="Utilization Area" stroke="transparent" fill="url(#svWorkUtil)" />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-md bg-surface-container-low px-2 py-2">Headcount: <span className="font-semibold">{formatInt(workforce.headcount)}</span></div>
-                <div className="rounded-md bg-surface-container-low px-2 py-2">Avg Capacity: <span className="font-semibold">{Number(workforce.avgCapacityHours || 0).toFixed(1)}h</span></div>
+              <div className="sv-analytics-mini-stats mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="sv-analytics-mini-stat rounded-md bg-surface-container-low px-2 py-2">Headcount: <span className="font-semibold">{formatInt(workforce.headcount)}</span></div>
+                <div className="sv-analytics-mini-stat rounded-md bg-surface-container-low px-2 py-2">Avg Capacity: <span className="font-semibold">{Number(workforce.avgCapacityHours || 0).toFixed(1)}h</span></div>
               </div>
             </ChartPanel>
           </div>
         </section>
 
-        <section className="rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-on-surface">Top Campaigns</h3>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns)} className="text-xs font-semibold text-primary hover:underline">Open campaigns</button>
+        <section className="sv-card sv-analytics-campaigns rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+          <div className="sv-analytics-campaigns-head mb-3 flex items-center justify-between">
+            <h3 className="sv-analytics-section-title text-lg font-bold text-on-surface">Top Campaigns</h3>
+            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns)} className="sv-analytics-inline-link text-xs font-semibold text-primary hover:underline">Open campaigns</button>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="sv-analytics-campaigns-grid grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {topCampaigns.map((campaign) => (
-              <button key={campaign.campaignId} type="button" onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign.campaignId))} className="rounded-md border border-outline-variant/20 bg-surface p-3 text-left transition hover:bg-surface-container-low">
-                <p className="font-semibold">{campaign.name}</p>
-                <p className="mt-1 text-xs capitalize text-on-surface-variant">{campaign.status}</p>
-                <div className="mt-2 flex items-center justify-between text-xs">
+              <button key={campaign.campaignId} type="button" onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign.campaignId))} className="sv-analytics-campaign-card rounded-md border border-outline-variant/20 bg-surface p-3 text-left transition hover:bg-surface-container-low">
+                <p className="sv-analytics-campaign-title font-semibold">{campaign.name}</p>
+                <p className="sv-analytics-campaign-meta mt-1 text-xs capitalize text-on-surface-variant">{campaign.status}</p>
+                <div className="sv-analytics-campaign-stats mt-2 flex items-center justify-between text-xs">
                   <span>ROI: {Number(campaign.roi || 0).toFixed(2)}x</span>
                   <span>Spend: {formatINR(campaign.spend || 0)}</span>
                 </div>
               </button>
             ))}
-            {!topCampaigns.length ? <p className="text-sm text-on-surface-variant">No campaign data in this range.</p> : null}
+            {!topCampaigns.length ? <p className="sv-analytics-empty-note text-sm text-on-surface-variant">No campaign data in this range.</p> : null}
           </div>
         </section>
 
-        {analyticsQuery.isLoading ? <div className="rounded-md bg-surface-container-low p-3 text-sm text-on-surface-variant">Loading analytics...</div> : null}
-        {analyticsQuery.error ? <div className="rounded-md bg-error-container px-3 py-2 text-sm text-error">Failed to load analytics data.</div> : null}
+        {analyticsQuery.isLoading ? <div className="sv-analytics-feedback rounded-md bg-surface-container-low p-3 text-sm text-on-surface-variant">Loading analytics...</div> : null}
+        {analyticsQuery.error ? <div className="sv-analytics-feedback is-error rounded-md bg-error-container px-3 py-2 text-sm text-error">Failed to load analytics data.</div> : null}
       </div>
 
       {toast ? (
-        <div className={`fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error' : 'bg-green-600'}`}>
+        <div className={`sv-analytics-toast fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error is-error' : 'bg-green-600 is-success'}`}>
           {toast.message}
         </div>
       ) : null}

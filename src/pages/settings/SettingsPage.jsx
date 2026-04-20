@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { NavLink } from 'react-router-dom';
 import { z } from 'zod';
+import Icon from '../../components/ui/Icon';
 import { useSettings } from '../../hooks/useSettings';
-import { ROUTES } from '../../routes/routePaths';
+import SettingsTabs from './SettingsTabs';
 
 const PROFILE_SCHEMA = z.object({
   displayName: z.string().trim().min(2, 'Name must be at least 2 characters').max(80, 'Name must be 80 characters or less'),
@@ -43,12 +43,6 @@ const NOTIFICATION_SCHEMA = z.object(
     return shape;
   }, {}),
 );
-
-function tabClassName({ isActive }) {
-  return `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-    isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-  }`;
-}
 
 function SettingsPage() {
   const {
@@ -150,41 +144,28 @@ function SettingsPage() {
   });
 
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2">
-        <div className="mb-6 flex items-center gap-3">
-          <NavLink to={ROUTES.settings} end className={tabClassName}>
-            General
-          </NavLink>
-          <NavLink to={ROUTES.settingsWorkspace} className={tabClassName}>
-            Workspace
-          </NavLink>
-          <NavLink to={ROUTES.settingsMembers} className={tabClassName}>
-            Members
-          </NavLink>
-          <NavLink to={ROUTES.settingsSecurity} className={tabClassName}>
-            Security
-          </NavLink>
-        </div>
+    <main className="min-h-screen sv-settings-page">
+      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+        <SettingsTabs />
 
-        <section className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-on-surface">General Settings</h1>
-          <p className="mt-2 text-sm text-on-surface-variant">
+        <section className="sv-settings-header">
+          <h1 className="sv-settings-title">General Settings</h1>
+          <p className="sv-settings-subtitle">
             Update your profile, password, and notification preferences.
           </p>
         </section>
 
         {error || actionError ? (
-          <section className="mb-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+          <section className="sv-settings-alert">
             {error || actionError}
           </section>
         ) : null}
 
-        <div className="space-y-8">
-          <section className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-on-surface">Profile</h2>
-              <p className="text-sm text-on-surface-variant">Keep your account details up to date.</p>
+        <div className="sv-settings-stack">
+          <section className="sv-settings-card">
+            <div className="sv-settings-card-head">
+              <h2 className="sv-settings-card-title">Profile</h2>
+              <p className="sv-settings-card-subtitle">Keep your account details up to date.</p>
             </div>
 
             {loading ? (
@@ -194,66 +175,67 @@ function SettingsPage() {
                 <div className="h-10 animate-pulse rounded bg-surface-container" />
               </div>
             ) : (
-              <form onSubmit={submitProfile} className="grid gap-4 sm:grid-cols-2">
-                <label className="block sm:col-span-1">
-                  <span className="mb-1 block text-sm font-medium text-on-surface">Display Name</span>
+              <form onSubmit={submitProfile} className="sv-settings-form-grid">
+                <label className="sv-settings-field sm:col-span-1">
+                  <span className="sv-settings-label">Display Name</span>
                   <input
                     type="text"
                     {...profileForm.register('displayName')}
-                    className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                    className="sv-settings-input"
                   />
                   {profileForm.formState.errors.displayName ? (
-                    <span className="mt-1 block text-xs text-error">{profileForm.formState.errors.displayName.message}</span>
+                    <span className="sv-settings-error">{profileForm.formState.errors.displayName.message}</span>
                   ) : null}
                 </label>
 
-                <label className="block sm:col-span-1">
-                  <span className="mb-1 block text-sm font-medium text-on-surface">Email</span>
+                <label className="sv-settings-field sm:col-span-1">
+                  <span className="sv-settings-label">Email</span>
                   <input
                     type="email"
                     {...profileForm.register('email')}
-                    className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                    className="sv-settings-input"
                   />
                   {profileForm.formState.errors.email ? (
-                    <span className="mt-1 block text-xs text-error">{profileForm.formState.errors.email.message}</span>
+                    <span className="sv-settings-error">{profileForm.formState.errors.email.message}</span>
                   ) : null}
                 </label>
 
-                <label className="block sm:col-span-2">
-                  <span className="mb-1 block text-sm font-medium text-on-surface">Avatar URL</span>
+                <label className="sv-settings-field sm:col-span-2">
+                  <span className="sv-settings-label">Avatar URL</span>
                   <input
                     type="url"
                     placeholder="https://cdn.example.com/avatar.webp"
                     {...profileForm.register('avatarUrl')}
-                    className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                    className="sv-settings-input"
                   />
                   {profileForm.formState.errors.avatarUrl ? (
-                    <span className="mt-1 block text-xs text-error">{profileForm.formState.errors.avatarUrl.message}</span>
+                    <span className="sv-settings-error">{profileForm.formState.errors.avatarUrl.message}</span>
                   ) : null}
                 </label>
 
-                <div className="sm:col-span-2 flex items-center justify-between gap-3 pt-2">
-                  <span className="text-xs text-on-surface-variant">Changes apply immediately after save.</span>
+                <div className="sm:col-span-2 sv-settings-form-actions">
+                  <span className="sv-settings-note">Changes apply immediately after save.</span>
                   <button
                     type="submit"
                     disabled={profileForm.formState.isSubmitting}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    className="sv-settings-btn sv-settings-btn-primary"
                   >
+                    <Icon name="save" className="text-[1rem]" />
                     {profileForm.formState.isSubmitting ? 'Saving...' : 'Save Profile'}
                   </button>
                 </div>
-                {profileNotice ? <p className="sm:col-span-2 text-sm text-green-600">{profileNotice}</p> : null}
+                {profileNotice ? <p className="sm:col-span-2 sv-settings-success">{profileNotice}</p> : null}
               </form>
             )}
           </section>
 
-          <section className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-on-surface">Change Password</h2>
-              <p className="text-sm text-on-surface-variant">Use a strong password with at least 8 characters.</p>
+          <section className="sv-settings-card">
+            <div className="sv-settings-card-head">
+              <h2 className="sv-settings-card-title">Change Password</h2>
+              <p className="sv-settings-card-subtitle">Use a strong password with at least 8 characters.</p>
             </div>
 
-            <form onSubmit={submitPassword} className="grid gap-4 sm:grid-cols-3">
+            <form onSubmit={submitPassword} className="sv-settings-form-grid sv-settings-form-grid-3">
               <input
                 type="email"
                 autoComplete="username"
@@ -264,63 +246,64 @@ function SettingsPage() {
                 className="sr-only"
               />
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-on-surface">Current Password</span>
+              <label className="sv-settings-field">
+                <span className="sv-settings-label">Current Password</span>
                 <input
                   type="password"
                   autoComplete="current-password"
                   {...passwordForm.register('currentPassword')}
-                  className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                  className="sv-settings-input"
                 />
                 {passwordForm.formState.errors.currentPassword ? (
-                  <span className="mt-1 block text-xs text-error">{passwordForm.formState.errors.currentPassword.message}</span>
+                  <span className="sv-settings-error">{passwordForm.formState.errors.currentPassword.message}</span>
                 ) : null}
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-on-surface">New Password</span>
+              <label className="sv-settings-field">
+                <span className="sv-settings-label">New Password</span>
                 <input
                   type="password"
                   autoComplete="new-password"
                   {...passwordForm.register('newPassword')}
-                  className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                  className="sv-settings-input"
                 />
                 {passwordForm.formState.errors.newPassword ? (
-                  <span className="mt-1 block text-xs text-error">{passwordForm.formState.errors.newPassword.message}</span>
+                  <span className="sv-settings-error">{passwordForm.formState.errors.newPassword.message}</span>
                 ) : null}
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-on-surface">Confirm Password</span>
+              <label className="sv-settings-field">
+                <span className="sv-settings-label">Confirm Password</span>
                 <input
                   type="password"
                   autoComplete="new-password"
                   {...passwordForm.register('confirmPassword')}
-                  className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                  className="sv-settings-input"
                 />
                 {passwordForm.formState.errors.confirmPassword ? (
-                  <span className="mt-1 block text-xs text-error">{passwordForm.formState.errors.confirmPassword.message}</span>
+                  <span className="sv-settings-error">{passwordForm.formState.errors.confirmPassword.message}</span>
                 ) : null}
               </label>
 
-              <div className="sm:col-span-3 flex items-center justify-between gap-3 pt-2">
-                <span className="text-xs text-on-surface-variant">Updating password revokes existing refresh sessions.</span>
+              <div className="sm:col-span-3 sv-settings-form-actions">
+                <span className="sv-settings-note">Updating password revokes existing refresh sessions.</span>
                 <button
                   type="submit"
                   disabled={passwordForm.formState.isSubmitting}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="sv-settings-btn sv-settings-btn-primary"
                 >
+                  <Icon name="lock_reset" className="text-[1rem]" />
                   {passwordForm.formState.isSubmitting ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
-              {passwordNotice ? <p className="sm:col-span-3 text-sm text-green-600">{passwordNotice}</p> : null}
+              {passwordNotice ? <p className="sm:col-span-3 sv-settings-success">{passwordNotice}</p> : null}
             </form>
           </section>
 
-          <section className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-on-surface">Notification Preferences</h2>
-              <p className="text-sm text-on-surface-variant">Choose which updates you receive in-app.</p>
+          <section className="sv-settings-card">
+            <div className="sv-settings-card-head">
+              <h2 className="sv-settings-card-title">Notification Preferences</h2>
+              <p className="sv-settings-card-subtitle">Choose which updates you receive in-app.</p>
             </div>
 
             <form onSubmit={submitNotifications} className="space-y-4">
@@ -328,7 +311,7 @@ function SettingsPage() {
                 {NOTIFICATION_FIELDS.map((field) => (
                   <label
                     key={field.key}
-                    className="flex items-center justify-between rounded-lg border border-outline-variant/20 bg-surface px-3 py-2"
+                    className="sv-settings-switch"
                   >
                     <span className="text-sm text-on-surface">{field.label}</span>
                     <input
@@ -340,16 +323,17 @@ function SettingsPage() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-end">
+              <div className="sv-settings-form-actions justify-end">
                 <button
                   type="submit"
                   disabled={notificationsForm.formState.isSubmitting}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="sv-settings-btn sv-settings-btn-primary"
                 >
+                  <Icon name="notifications_active" className="text-[1rem]" />
                   {notificationsForm.formState.isSubmitting ? 'Saving...' : 'Save Preferences'}
                 </button>
               </div>
-              {notificationsNotice ? <p className="text-sm text-green-600">{notificationsNotice}</p> : null}
+              {notificationsNotice ? <p className="sv-settings-success">{notificationsNotice}</p> : null}
             </form>
           </section>
         </div>

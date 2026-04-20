@@ -5,6 +5,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 
 const NewTaskContext = createContext(null);
+const DIRECTORY_LIMIT = 25;
 
 function isCanceledError(error) {
   return error?.code === 'ERR_CANCELED' || /canceled/i.test(String(error?.message || ''));
@@ -15,6 +16,44 @@ function createRequestId() {
     return crypto.randomUUID();
   }
   return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function emptyDirectoryState() {
+  return {
+    query: '',
+    page: 1,
+    hasMore: true,
+    loading: false,
+    loadingMore: false,
+    error: '',
+  };
+}
+
+function resolveHasMore(response, rows, page, limit) {
+  const meta = response?.meta || {};
+  if (typeof meta.hasMore === 'boolean') return meta.hasMore;
+  if (meta.nextCursor) return true;
+  const totalPages = Number(meta.totalPages || 0);
+  if (totalPages > 0) return page < totalPages;
+  const total = Number(meta.total || 0);
+  if (total > 0) return page * limit < total;
+  return (rows || []).length >= limit;
+}
+
+function mergeUniqueById(previous, incoming) {
+  const map = new Map();
+  (previous || []).forEach((item) => map.set(String(item?._id || item?.id || ''), item));
+  (incoming || []).forEach((item) => map.set(String(item?._id || item?.id || ''), item));
+  return Array.from(map.values());
+}
+
+function createDirectoryParams(page, query) {
+  const trimmed = String(query || '').trim();
+  return {
+    page,
+    limit: DIRECTORY_LIMIT,
+    ...(trimmed ? { search: trimmed, q: trimmed } : {}),
+  };
 }
 
 const DEFAULT_DRAFT = {
@@ -44,6 +83,11 @@ export function NewTaskProvider({ children }) {
   const [contacts, setContacts] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [parentTasks, setParentTasks] = useState([]);
+  const [directoryMeta, setDirectoryMeta] = useState({
+    users: emptyDirectoryState(),
+    contacts: emptyDirectoryState(),
+    employees: emptyDirectoryState(),
+  });
   const [draft, setDraft] = useState(DEFAULT_DRAFT);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -51,41 +95,124 @@ export function NewTaskProvider({ children }) {
   const [lastCreatedTask, setLastCreatedTask] = useState(null);
   const [workflowStatuses, setWorkflowStatuses] = useState([]);
   const pendingRequestIdRef = useRef('');
+  const directoryRequestIdRef = useRef({
+    users: 0,
+    contacts: 0,
+    employees: 0,
+  });
+
+  const listDirectory = useCallback(
+    async (entity, page = 1, query = '') => {
+      const params = createDirectoryParams(page, query);
+      if (entity === 'users') return usersApi.list(workspaceId, params);
+      if (entity === 'contacts') return contactsApi.list(workspaceId, params);
+      return employeesApi.list(workspaceId, params);
+    },
+    [workspaceId],
+  );
+
+  const applyDirectoryRows = useCallback((entity, rows, append) => {
+    if (entity === 'users') {
+      setUsers((previous) => (append ? mergeUniqueById(previous, rows) : rows));
+      return;
+    }
+    if (entity === 'contacts') {
+      setContacts((previous) => (append ? mergeUniqueById(previous, rows) : rows));
+      return;
+    }
+    setEmployees((previous) => (append ? mergeUniqueById(previous, rows) : rows));
+  }, []);
+
+  const loadDirectory = useCallback(
+    async (entity, options = {}) => {
+      if (!workspaceId) return;
+      const nextQuery = String(options.query ?? '').trim();
+      const nextPage = Number(options.page || 1);
+      const append = Boolean(options.append && nextPage > 1);
+      const requestId = (directoryRequestIdRef.current[entity] || 0) + 1;
+      directoryRequestIdRef.current[entity] = requestId;
+
+      setDirectoryMeta((current) => ({
+        ...current,
+        [entity]: {
+          ...current[entity],
+          query: nextQuery,
+          page: nextPage,
+          error: '',
+          loading: !append,
+          loadingMore: append,
+        },
+      }));
+
+      try {
+        const response = await listDirectory(entity, nextPage, nextQuery);
+        if (directoryRequestIdRef.current[entity] !== requestId) return;
+        const rows = response?.data || [];
+        applyDirectoryRows(entity, rows, append);
+        const hasMore = resolveHasMore(response, rows, nextPage, DIRECTORY_LIMIT);
+        setDirectoryMeta((current) => ({
+          ...current,
+          [entity]: {
+            ...current[entity],
+            query: nextQuery,
+            page: nextPage,
+            hasMore,
+            error: '',
+            loading: false,
+            loadingMore: false,
+          },
+        }));
+        return { rows, hasMore };
+      } catch (loadError) {
+        if (isCanceledError(loadError)) return;
+        if (directoryRequestIdRef.current[entity] !== requestId) return;
+        setDirectoryMeta((current) => ({
+          ...current,
+          [entity]: {
+            ...current[entity],
+            loading: false,
+            loadingMore: false,
+            error: loadError.message || `Failed to load ${entity}`,
+          },
+        }));
+        return { rows: [], hasMore: false };
+      }
+    },
+    [workspaceId, listDirectory, applyDirectoryRows],
+  );
+
+  const setDirectoryQuery = useCallback(
+    (entity, query) => {
+      loadDirectory(entity, { page: 1, query, append: false });
+    },
+    [loadDirectory],
+  );
+
+  const loadMoreDirectory = useCallback(
+    (entity) => {
+      const meta = directoryMeta[entity] || emptyDirectoryState();
+      if (meta.loading || meta.loadingMore || !meta.hasMore) return;
+      loadDirectory(entity, { page: Number(meta.page || 1) + 1, query: meta.query || '', append: true });
+    },
+    [directoryMeta, loadDirectory],
+  );
 
   const hydrate = useCallback(async () => {
     if (!workspaceId) return;
     setLoading(true);
     setError('');
     const projectController = new AbortController();
-    const usersController = new AbortController();
-    const contactsController = new AbortController();
-    const employeesController = new AbortController();
     const parentTasksController = new AbortController();
     const workflowController = new AbortController();
     try {
-      const results = await Promise.allSettled([
+      const [projectsResult, parentTasksResult] = await Promise.allSettled([
         projectsApi.list(workspaceId, { page: 1, limit: 100 }, projectController.signal),
-        usersApi.list(workspaceId, { page: 1, limit: 100 }, usersController.signal),
-        contactsApi.list(workspaceId, { page: 1, limit: 100 }, contactsController.signal),
-        employeesApi.list(workspaceId, { page: 1, limit: 100 }, employeesController.signal),
         tasksApi.list(workspaceId, { page: 1, limit: 100 }, parentTasksController.signal),
       ]);
-      const [projectsResult, usersResult, contactsResult, employeesResult, parentTasksResult] = results;
+
       if (projectsResult.status === 'rejected') {
         console.warn('[NewTaskContext] partial failure:', projectsResult.reason);
         setProjects([]);
-      }
-      if (usersResult.status === 'rejected') {
-        console.warn('[NewTaskContext] partial failure:', usersResult.reason);
-        setUsers([]);
-      }
-      if (contactsResult.status === 'rejected') {
-        console.warn('[NewTaskContext] partial failure:', contactsResult.reason);
-        setContacts([]);
-      }
-      if (employeesResult.status === 'rejected') {
-        console.warn('[NewTaskContext] partial failure:', employeesResult.reason);
-        setEmployees([]);
       }
       if (parentTasksResult.status === 'rejected') {
         console.warn('[NewTaskContext] partial failure:', parentTasksResult.reason);
@@ -93,25 +220,19 @@ export function NewTaskProvider({ children }) {
       }
 
       const projectsData = projectsResult.status === 'fulfilled' ? projectsResult.value?.data || [] : [];
-      const usersData = usersResult.status === 'fulfilled' ? usersResult.value?.data || [] : [];
-      const contactsData = contactsResult.status === 'fulfilled' ? contactsResult.value?.data || [] : [];
-      const employeesData = employeesResult.status === 'fulfilled' ? employeesResult.value?.data || [] : [];
       const parentTasksData = parentTasksResult.status === 'fulfilled' ? parentTasksResult.value?.data || [] : [];
       if (projectsResult.status === 'fulfilled') {
         setProjects(projectsData);
       }
-      if (usersResult.status === 'fulfilled') {
-        setUsers(usersData);
-      }
-      if (contactsResult.status === 'fulfilled') {
-        setContacts(contactsData);
-      }
-      if (employeesResult.status === 'fulfilled') {
-        setEmployees(employeesData);
-      }
       if (parentTasksResult.status === 'fulfilled') {
         setParentTasks(parentTasksData);
       }
+
+      const [usersResult] = await Promise.all([
+        loadDirectory('users', { page: 1, query: '', append: false }),
+        loadDirectory('contacts', { page: 1, query: '', append: false }),
+        loadDirectory('employees', { page: 1, query: '', append: false }),
+      ]);
 
       let defaultWorkflow = null;
       let statuses = [];
@@ -136,11 +257,13 @@ export function NewTaskProvider({ children }) {
         console.warn('[NewTaskContext] partial failure:', workflowError);
         setWorkflowStatuses([]);
       }
+
+      const defaultPrimaryAssigneeId = String(usersResult?.rows?.[0]?._id || '');
       const defaultStatus = statuses[0] || null;
       setDraft((current) => ({
         ...current,
         projectId: current.projectId || String(defaultProjectId || projectsData[0]?._id || ''),
-        primaryAssigneeId: current.primaryAssigneeId || String(usersData[0]?._id || ''),
+        primaryAssigneeId: current.primaryAssigneeId || defaultPrimaryAssigneeId,
         workflowId: String(defaultWorkflow?._id || current.workflowId || ''),
         statusId: String(defaultStatus?._id || current.statusId || ''),
         status: String(defaultStatus?.key || current.status || 'todo'),
@@ -152,7 +275,7 @@ export function NewTaskProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, defaultProjectId]);
+  }, [workspaceId, defaultProjectId, loadDirectory]);
 
   useEffect(() => {
     hydrate();
@@ -274,6 +397,7 @@ export function NewTaskProvider({ children }) {
       users,
       contacts,
       employees,
+      directoryMeta,
       parentTasks,
       draft,
       loading,
@@ -282,6 +406,8 @@ export function NewTaskProvider({ children }) {
       lastCreatedTask,
       workflowStatuses,
       setField,
+      setDirectoryQuery,
+      loadMoreDirectory,
       addTag,
       removeTag,
       setAttachmentFiles,
@@ -293,6 +419,7 @@ export function NewTaskProvider({ children }) {
       users,
       contacts,
       employees,
+      directoryMeta,
       parentTasks,
       draft,
       loading,
@@ -301,6 +428,8 @@ export function NewTaskProvider({ children }) {
       lastCreatedTask,
       workflowStatuses,
       setField,
+      setDirectoryQuery,
+      loadMoreDirectory,
       addTag,
       removeTag,
       setAttachmentFiles,
@@ -312,6 +441,7 @@ export function NewTaskProvider({ children }) {
   return <NewTaskContext.Provider value={value}>{children}</NewTaskContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNewTaskContext() {
   const context = useContext(NewTaskContext);
   if (!context) {
@@ -319,6 +449,3 @@ export function useNewTaskContext() {
   }
   return context;
 }
-
-
-

@@ -1,9 +1,12 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useContacts } from '../../hooks/useContacts';
 import { useEmployees } from '../../hooks/useEmployees';
 import { ROUTES } from '../../routes/routePaths';
 import Icon from '../../components/ui/Icon';
+
+const DEFAULT_PAGE_SIZE = 8;
+const PAGE_SIZE_OPTIONS = [8, 15, 25];
 
 const EMPTY_FORM = {
   name: '',
@@ -58,49 +61,111 @@ function ContactModal({ open, mode, form, onChange, onClose, onSubmit, busy, emp
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-3xl rounded-2xl bg-surface-container-lowest p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-on-surface">{mode === 'edit' ? 'Edit Contact' : 'Create Contact'}</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container">
+    <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="sv-card sv-contacts-modal">
+        <div className="sv-contacts-modal-head">
+          <h3 className="sv-contacts-modal-title">{mode === 'edit' ? 'Edit Contact' : 'Create Contact'}</h3>
+          <button type="button" onClick={onClose} className="sv-modal-close-btn" aria-label="Close">
             <Icon name="close" className="text-lg" />
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <input value={form.name} onChange={(e) => onChange('name', e.target.value)} placeholder="Full name *" required className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.company} onChange={(e) => onChange('company', e.target.value)} placeholder="Company" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.email} onChange={(e) => onChange('email', e.target.value)} placeholder="Email" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.phone} onChange={(e) => onChange('phone', e.target.value)} placeholder="Phone" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.website} onChange={(e) => onChange('website', e.target.value)} placeholder="Website" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.address} onChange={(e) => onChange('address', e.target.value)} placeholder="Address" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.role} onChange={(e) => onChange('role', e.target.value)} placeholder="Role" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.department} onChange={(e) => onChange('department', e.target.value)} placeholder="Department" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
-          <input value={form.project} onChange={(e) => onChange('project', e.target.value)} placeholder="Project" className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
+        <form onSubmit={onSubmit} className="sv-contacts-modal-form">
+          <input value={form.name} onChange={(e) => onChange('name', e.target.value)} placeholder="Full name *" required className="sv-ctl-input sv-contacts-field" />
+          <input value={form.company} onChange={(e) => onChange('company', e.target.value)} placeholder="Company" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.email} onChange={(e) => onChange('email', e.target.value)} placeholder="Email" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.phone} onChange={(e) => onChange('phone', e.target.value)} placeholder="Phone" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.website} onChange={(e) => onChange('website', e.target.value)} placeholder="Website" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.address} onChange={(e) => onChange('address', e.target.value)} placeholder="Address" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.role} onChange={(e) => onChange('role', e.target.value)} placeholder="Role" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.department} onChange={(e) => onChange('department', e.target.value)} placeholder="Department" className="sv-ctl-input sv-contacts-field" />
+          <input value={form.project} onChange={(e) => onChange('project', e.target.value)} placeholder="Project" className="sv-ctl-input sv-contacts-field" />
 
-          <select value={form.status} onChange={(e) => onChange('status', e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm">
+          <select value={form.status} onChange={(e) => onChange('status', e.target.value)} className="sv-ctl-select sv-contacts-field">
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
 
-          <select value={form.employeeId} onChange={(e) => onChange('employeeId', e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm">
+          <select value={form.employeeId} onChange={(e) => onChange('employeeId', e.target.value)} className="sv-ctl-select sv-contacts-field">
             <option value="">No linked employee</option>
             {employees.map((employee) => (
               <option key={employee._id} value={employee._id}>{employee.name || 'Unnamed'}{employee.email ? ` (${employee.email})` : ''}</option>
             ))}
           </select>
 
-          <input value={form.avatarUrl} onChange={(e) => onChange('avatarUrl', e.target.value)} placeholder="Avatar URL" className="md:col-span-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm" />
+          <input value={form.avatarUrl} onChange={(e) => onChange('avatarUrl', e.target.value)} placeholder="Avatar URL" className="md:col-span-2 sv-ctl-input sv-contacts-field" />
 
           {formError ? <p className="md:col-span-2 text-sm text-error">{formError}</p> : null}
 
-          <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button type="submit" disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {busy ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Create Contact'}
+          <div className="md:col-span-2 sv-contacts-modal-actions">
+            <button type="button" onClick={onClose} className="sv-ctl-btn btn-light sv-icon-btn">
+              <Icon name="close" className="sv-icon-btn-icon" />
+              <span>Cancel</span>
+            </button>
+            <button type="submit" disabled={busy} className="sv-ctl-btn btn-primary sv-icon-btn">
+              <Icon name={mode === 'edit' ? 'save' : 'person_add'} className="sv-icon-btn-icon" />
+              <span>{busy ? 'Saving...' : mode === 'edit' ? 'Save Changes' : 'Create Contact'}</span>
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function ContactsPagination({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) {
+  if (totalItems <= 0) return null;
+  const safePage = Math.max(1, Math.min(page, totalPages));
+  const startItem = (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(totalItems, safePage * pageSize);
+  const pages = Array.from({ length: totalPages }, (_, idx) => idx + 1);
+
+  return (
+    <div className="sv-leads-pagination">
+      <div className="sv-leads-pagination-meta">
+        <span className="sv-leads-pagination-text">Showing {startItem}-{endItem} of {totalItems}</span>
+        <label className="sv-leads-pagination-size">
+          <span>Rows per page</span>
+          <select
+            className="form-select form-select-sm sv-ctl-select sv-leads-page-size"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={`contacts-page-size-${size}`} value={size}>{size}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="sv-leads-pagination-controls">
+        <button
+          type="button"
+          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
+          onClick={() => onPageChange(Math.max(1, safePage - 1))}
+          disabled={safePage <= 1}
+        >
+          Prev
+        </button>
+        <div className="sv-leads-page-list">
+          {pages.map((nextPage) => (
+            <button
+              key={`contacts-page-${nextPage}`}
+              type="button"
+              className={`btn btn-sm sv-ctl-btn sv-leads-page-btn ${nextPage === safePage ? 'is-active' : ''}`}
+              onClick={() => onPageChange(nextPage)}
+            >
+              {nextPage}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
+          onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
+          disabled={safePage >= totalPages}
+        >
+          Next
+        </button>
       </div>
     </div>
   );
@@ -115,6 +180,8 @@ function ContactsPage() {
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [sortBy, setSortBy] = useState('updatedAt');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -123,6 +190,8 @@ function ContactsPage() {
   const [busy, setBusy] = useState(false);
   const [deleteId, setDeleteId] = useState('');
   const [toast, setToast] = useState(null);
+  const [openRowMenuId, setOpenRowMenuId] = useState('');
+  const rowMenuRef = useRef(null);
   const linkedEmployeeFilter = useMemo(() => new URLSearchParams(location.search).get('employeeId') || '', [location.search]);
   const filteredEmployee = useMemo(
     () => (linkedEmployeeFilter ? (employees || []).find((item) => String(item._id) === String(linkedEmployeeFilter)) : null),
@@ -134,6 +203,29 @@ function ContactsPage() {
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!openRowMenuId) return undefined;
+
+    const handleClickOutside = (event) => {
+      if (!rowMenuRef.current?.contains(event.target)) {
+        setOpenRowMenuId('');
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setOpenRowMenuId('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [openRowMenuId]);
 
   const departments = useMemo(() => {
     const set = new Set((contacts || []).map((item) => String(item.department || '').trim()).filter(Boolean));
@@ -162,6 +254,23 @@ function ContactsPage() {
       return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     });
   }, [contacts, linkedEmployeeFilter, filteredEmployee?.contactId, departmentFilter, search, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  const pagedContacts = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, departmentFilter, sortBy, pageSize, linkedEmployeeFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const openCreate = () => {
     setModalMode('create');
@@ -233,29 +342,31 @@ function ContactsPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col">
-      <div className="flex-1 space-y-6 overflow-y-auto p-8">
-        <section className="flex flex-wrap items-center gap-3">
+    <main className="sv-contacts-page flex min-h-screen flex-col">
+      <div className="sv-contacts-stack flex-1 overflow-y-auto">
+        <section className="sv-contacts-switch flex flex-wrap items-center gap-3">
           <NavLink
             end
             to={ROUTES.employees}
             className={({ isActive }) =>
-              `rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white shadow-sm' : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'
+              `sv-contacts-switch-btn ${
+                isActive ? 'is-active' : ''
               }`
             }
           >
-            Employee Management
+            <Icon name="groups" className="sv-icon-btn-icon" />
+            <span>Employee Management</span>
           </NavLink>
           <NavLink
             to={ROUTES.contacts}
             className={({ isActive }) =>
-              `rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white shadow-sm' : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'
+              `sv-contacts-switch-btn ${
+                isActive ? 'is-active' : ''
               }`
             }
           >
-            Contacts
+            <Icon name="contacts" className="sv-icon-btn-icon" />
+            <span>Contacts</span>
           </NavLink>
         </section>
 
@@ -266,24 +377,27 @@ function ContactsPage() {
           </div>
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low px-4 py-3 text-sm">{filtered.length} contacts</div>
-            <button type="button" onClick={openCreate} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">New Contact</button>
+            <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
+              <Icon name="person_add" className="sv-icon-btn-icon" />
+              <span>New Contact</span>
+            </button>
           </div>
         </section>
 
         {error ? <section className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</section> : null}
 
-        <section className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 shadow-sm">
+        <section className="sv-card sv-contacts-table-card">
           <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_180px]">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search by name, email, role..."
-              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+              className="sv-ctl-input"
             />
             <select
               value={departmentFilter}
               onChange={(event) => setDepartmentFilter(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+              className="sv-ctl-select"
             >
               <option value="all">All departments</option>
               {departments.map((dept) => (
@@ -293,7 +407,7 @@ function ContactsPage() {
             <select
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+              className="sv-ctl-select"
             >
               <option value="updatedAt">Recently updated</option>
               <option value="name">Name</option>
@@ -304,8 +418,9 @@ function ContactsPage() {
           {loading ? <p className="px-3 py-6 text-sm text-on-surface-variant">Loading contacts...</p> : null}
 
           {!loading ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <>
+              <div className="sv-table-scroll">
+                <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
                     <th className="px-3 py-2">Name</th>
@@ -317,7 +432,7 @@ function ContactsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((contact) => {
+                  {pagedContacts.map((contact) => {
                     const linkedEmployee = employees.find(
                       (employee) =>
                         String(employee._id) === String(contact.employeeId || '') ||
@@ -334,31 +449,89 @@ function ContactsPage() {
                             <button
                               type="button"
                               onClick={() => navigate(ROUTES.employeeDetail.replace(':employeeId', linkedEmployee._id))}
-                              className="rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary"
+                              className="sv-employee-link-chip"
                             >
-                              {linkedEmployee.name || 'Open employee'}
+                              <Icon name="badge" className="sv-icon-btn-icon" />
+                              <span>{linkedEmployee.name || 'Open employee'}</span>
                             </button>
                           ) : (
                             <span className="text-xs text-on-surface-variant">Not linked</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="inline-flex items-center gap-3">
-                            <button type="button" onClick={() => openEdit(contact)} className="text-xs font-semibold text-primary hover:underline">Edit</button>
-                            <button type="button" onClick={() => setDeleteId(String(contact._id))} className="text-xs font-semibold text-error hover:underline">Delete</button>
+                        <td className="px-3 py-3 text-right sv-employees-actions-cell">
+                          <div className="sv-row-menu-container" ref={openRowMenuId === String(contact._id) ? rowMenuRef : null}>
+                            <button
+                              type="button"
+                              className="sv-row-menu-btn"
+                              aria-label="Open actions"
+                              aria-expanded={openRowMenuId === String(contact._id)}
+                              onClick={() =>
+                                setOpenRowMenuId((current) => (current === String(contact._id) ? '' : String(contact._id)))
+                              }
+                            >
+                              <Icon name="more_vert" className="text-lg" />
+                            </button>
+                            {openRowMenuId === String(contact._id) ? (
+                              <div className="sv-row-menu-popover">
+                                {linkedEmployee ? (
+                                  <button
+                                    type="button"
+                                    className="sv-row-menu-item"
+                                    onClick={() => {
+                                      setOpenRowMenuId('');
+                                      navigate(ROUTES.employeeDetail.replace(':employeeId', linkedEmployee._id));
+                                    }}
+                                  >
+                                    <Icon name="open_in_new" className="sv-icon-btn-icon" />
+                                    <span>Open Employee</span>
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="sv-row-menu-item"
+                                  onClick={() => {
+                                    setOpenRowMenuId('');
+                                    openEdit(contact);
+                                  }}
+                                >
+                                  <Icon name="edit" className="sv-icon-btn-icon" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sv-row-menu-item is-danger"
+                                  onClick={() => {
+                                    setOpenRowMenuId('');
+                                    setDeleteId(String(contact._id));
+                                  }}
+                                >
+                                  <Icon name="delete" className="sv-icon-btn-icon" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         </td>
                       </tr>
                     );
                   })}
-                  {!filtered.length ? (
+                  {!pagedContacts.length ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-8 text-center text-sm text-on-surface-variant">No contacts found.</td>
                     </tr>
                   ) : null}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              <ContactsPagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={filtered.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
           ) : null}
         </section>
       </div>
@@ -376,13 +549,19 @@ function ContactsPage() {
       />
 
       {deleteId ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface-container-lowest p-5 shadow-2xl">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="sv-card w-full max-w-md p-5">
             <h3 className="text-lg font-semibold text-on-surface">Delete Contact?</h3>
             <p className="mt-2 text-sm text-on-surface-variant">This will remove the contact and clear linked employee references.</p>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteId('')} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold">Cancel</button>
-              <button type="button" onClick={onDelete} className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white">{busy ? 'Deleting...' : 'Delete'}</button>
+              <button type="button" onClick={() => setDeleteId('')} className="sv-ctl-btn btn-light sv-icon-btn">
+                <Icon name="close" className="sv-icon-btn-icon" />
+                <span>Cancel</span>
+              </button>
+              <button type="button" onClick={onDelete} className="sv-ctl-btn btn-danger sv-icon-btn">
+                <Icon name="delete" className="sv-icon-btn-icon" />
+                <span>{busy ? 'Deleting...' : 'Delete'}</span>
+              </button>
             </div>
           </div>
         </div>

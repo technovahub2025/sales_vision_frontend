@@ -18,6 +18,8 @@ const STAGES = [
 const STAGE_IDS = new Set(STAGES.map((s) => s.statusId));
 const PRIORITY_VALUES = ['cold', 'warm', 'hot'];
 const SOURCE_VALUES = ['organic', 'referral', 'cold', 'paid', 'event'];
+const DEFAULT_PAGE_SIZE = 8;
+const PAGE_SIZE_OPTIONS = [8, 15, 25];
 const EMPTY_DETAIL_FIELDS = {
   leadType: 'company',
   contactName: '',
@@ -152,36 +154,72 @@ function DetailFields({ form, setForm }) {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
         <select value={form.leadType} onChange={(e) => set('leadType', e.target.value)} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">
           <option value="company">Company</option>
           <option value="person">Person</option>
         </select>
         <input value={form.contactName} onChange={(e) => set('contactName', e.target.value)} placeholder="Contact Name" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
         <input value={form.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="Company Name" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.designation} onChange={(e) => set('designation', e.target.value)} placeholder="Designation" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
         <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Email" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Phone" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
         <input value={form.alternatePhone} onChange={(e) => set('alternatePhone', e.target.value)} placeholder="Alternate Phone" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.website} onChange={(e) => set('website', e.target.value)} placeholder="Website" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
-      <input value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Address" className="w-full rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
-      <div className="grid grid-cols-2 gap-2">
+      <input value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Address" className="sv-leads-address-row w-full rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+      <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
         <input value={form.taxId} onChange={(e) => set('taxId', e.target.value)} placeholder="GST/Tax ID" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.pincode} onChange={(e) => set('pincode', e.target.value)} placeholder="Pincode" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="sv-leads-detail-row grid grid-cols-3 gap-2">
         <input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="City" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.state} onChange={(e) => set('state', e.target.value)} placeholder="State" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
         <input value={form.country} onChange={(e) => set('country', e.target.value)} placeholder="Country" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
     </>
+  );
+}
+
+function PaginationControls({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) {
+  if (totalItems <= 0) return null;
+  const safePage = Math.max(1, Math.min(page, totalPages));
+  const startItem = (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(totalItems, safePage * pageSize);
+  const pages = Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  return (
+    <div className="sv-leads-pagination">
+      <div className="sv-leads-pagination-meta">
+        <span className="sv-leads-pagination-text">Showing {startItem}–{endItem} of {totalItems}</span>
+        <label className="sv-leads-pagination-size">
+          <span>Rows per page</span>
+          <select className="form-select form-select-sm sv-ctl-select sv-leads-page-size" value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}>
+            {PAGE_SIZE_OPTIONS.map((size) => <option key={`size-${size}`} value={size}>{size}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="sv-leads-pagination-controls">
+        <button type="button" className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1}>
+          Prev
+        </button>
+        <div className="sv-leads-page-list">
+          {pages.map((p) => (
+            <button key={`page-${p}`} type="button" className={`btn btn-sm sv-ctl-btn sv-leads-page-btn ${p === page ? 'is-active' : ''}`} onClick={() => onPageChange(p)}>
+              {p}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
+          Next
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -200,6 +238,11 @@ function LeadManagementPage() {
   const [openCreateClient, setOpenCreateClient] = useState(false);
   const [toast, setToast] = useState(null);
   const [filters, setFilters] = useState({ search: '', status: 'all', priority: 'all', source: 'all', archiveScope: 'all' });
+  const [clientFilters, setClientFilters] = useState({ search: '', archiveScope: 'all' });
+  const [leadsPage, setLeadsPage] = useState(1);
+  const [clientsPage, setClientsPage] = useState(1);
+  const [leadsPageSize, setLeadsPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [clientsPageSize, setClientsPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [createForm, setCreateForm] = useState(createDefaults);
   const [editForm, setEditForm] = useState(editDefaults);
   const [clientForm, setClientForm] = useState(CLIENT_FORM_DEFAULTS);
@@ -240,6 +283,31 @@ function LeadManagementPage() {
       }),
     [rows, filters],
   );
+  const filteredClients = useMemo(
+    () =>
+      (clients || []).filter((client) => {
+        const q = String(clientFilters.search || '').trim().toLowerCase();
+        const haystack = `${String(client?.name || '')} ${String(client?.company || '')} ${String(client?.email || '')} ${String(client?.phone || '')}`.toLowerCase();
+        if (q && !haystack.includes(q)) return false;
+        if (clientFilters.archiveScope === 'all' && client?.isArchived) return false;
+        if (clientFilters.archiveScope === 'archived' && !client?.isArchived) return false;
+        return true;
+      }),
+    [clients, clientFilters],
+  );
+
+  const leadsTotalPages = Math.max(1, Math.ceil(filtered.length / leadsPageSize));
+  const clientsTotalPages = Math.max(1, Math.ceil(filteredClients.length / clientsPageSize));
+
+  const pagedLeads = useMemo(() => {
+    const start = (leadsPage - 1) * leadsPageSize;
+    return filtered.slice(start, start + leadsPageSize);
+  }, [filtered, leadsPage, leadsPageSize]);
+
+  const pagedClients = useMemo(() => {
+    const start = (clientsPage - 1) * clientsPageSize;
+    return filteredClients.slice(start, start + clientsPageSize);
+  }, [filteredClients, clientsPage, clientsPageSize]);
 
   const selected = useMemo(() => {
     if (!selectedLead) return null;
@@ -255,6 +323,31 @@ function LeadManagementPage() {
   const closeCreate = useCallback(() => setOpenCreate(false), []);
   const closeEdit = useCallback(() => setEditingLead(null), []);
   const resetFilters = useCallback(() => setFilters({ search: '', status: 'all', priority: 'all', source: 'all', archiveScope: 'all' }), []);
+  const resetClientFilters = useCallback(() => setClientFilters({ search: '', archiveScope: 'all' }), []);
+
+  useEffect(() => {
+    setLeadsPage(1);
+  }, [filters.search, filters.status, filters.priority, filters.source, filters.archiveScope]);
+
+  useEffect(() => {
+    setClientsPage(1);
+  }, [clientFilters.search, clientFilters.archiveScope]);
+
+  useEffect(() => {
+    setLeadsPage(1);
+  }, [leadsPageSize]);
+
+  useEffect(() => {
+    setClientsPage(1);
+  }, [clientsPageSize]);
+
+  useEffect(() => {
+    if (leadsPage > leadsTotalPages) setLeadsPage(leadsTotalPages);
+  }, [leadsPage, leadsTotalPages]);
+
+  useEffect(() => {
+    if (clientsPage > clientsTotalPages) setClientsPage(clientsTotalPages);
+  }, [clientsPage, clientsTotalPages]);
 
   const openEdit = useCallback(async (lead) => {
     setEditingLead(lead);
@@ -444,46 +537,46 @@ function LeadManagementPage() {
   const selectedCustom = extractDetails(selected?.customFields);
 
   return (
-    <main className="relative flex min-h-screen flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto p-6">
-        <section className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-lg border border-outline-variant/20 bg-surface-container p-1">
-            <button type="button" onClick={() => setTab('list')} className={`rounded-md px-4 py-2 text-sm font-semibold ${tab === 'list' ? 'bg-primary text-white' : 'text-on-surface-variant'}`}>List</button>
-            <button type="button" onClick={() => setTab('clients')} className={`rounded-md px-4 py-2 text-sm font-semibold ${tab === 'clients' ? 'bg-primary text-white' : 'text-on-surface-variant'}`}>Clients</button>
+    <main className="sv-leads-page relative flex min-h-screen flex-col">
+      <div className="sv-leads-stack flex-1 space-y-5 overflow-y-auto p-6">
+        <section className="sv-leads-toolbar flex flex-wrap items-center justify-between gap-3">
+          <div className="sv-leads-tabs inline-flex rounded-lg border border-outline-variant/20 bg-surface-container p-1">
+            <button type="button" onClick={() => setTab('list')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'list' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Leads</button>
+            <button type="button" onClick={() => setTab('clients')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'clients' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Clients</button>
           </div>
-          {tab === 'list' ? <button type="button" onClick={beginCreate} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">New Lead</button> : null}
-          {tab === 'clients' ? <button type="button" onClick={beginCreateClient} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">New Client</button> : null}
+          {tab === 'list' ? <button type="button" onClick={beginCreate} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white">New Lead</button> : null}
+          {tab === 'clients' ? <button type="button" onClick={beginCreateClient} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white">New Client</button> : null}
         </section>
 
         {tab === 'list' ? (
           <>
-            <section className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_170px_170px_170px_170px_auto]">
-              <input value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search lead title..." className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
-              <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+            <section className="sv-leads-filters grid grid-cols-1 gap-2 md:grid-cols-[1fr_170px_170px_170px_170px_auto]">
+              <input value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search lead title..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+              <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
                 <option value="all">All Status</option>
                 {STAGES.map((stage) => <option key={stage.statusId} value={stage.statusId}>{stage.title}</option>)}
               </select>
-              <select value={filters.priority} onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))} className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+              <select value={filters.priority} onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
                 <option value="all">All Priority</option>
                 {PRIORITY_VALUES.map((priority) => <option key={priority} value={priority}>{priority[0].toUpperCase() + priority.slice(1)}</option>)}
               </select>
-              <select value={filters.source} onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value }))} className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+              <select value={filters.source} onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
                 <option value="all">All Source</option>
                 {SOURCE_VALUES.map((source) => <option key={source} value={source}>{source[0].toUpperCase() + source.slice(1)}</option>)}
               </select>
-              <select value={filters.archiveScope} onChange={(e) => setFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+              <select value={filters.archiveScope} onChange={(e) => setFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
                 <option value="all">All (Active)</option>
                 <option value="archived">Archived Only</option>
               </select>
-              <button type="button" onClick={resetFilters} className="rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+              <button type="button" onClick={resetFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
             </section>
 
-            {leadsError ? <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{leadsError}</div> : null}
+            {leadsError ? <div className="sv-leads-alert rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{leadsError}</div> : null}
 
-            <section className="overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
-              <table className="w-full min-w-[1150px] text-left">
+            <section className="sv-card sv-leads-table-card overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
+              <table className="sv-leads-table w-full min-w-[1150px] text-left">
                 <thead>
-                  <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                  <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
                     <th className="px-3 py-3">Lead</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Move To</th>
@@ -499,20 +592,20 @@ function LeadManagementPage() {
                       <td colSpan={7} className="px-3 py-4"><div className="h-8 animate-pulse rounded bg-surface-container-high" /></td>
                     </tr>
                   )) : null}
-                  {!leadsLoading && filtered.map((lead) => {
+                  {!leadsLoading && pagedLeads.map((lead) => {
                     const id = leadId(lead);
                     const currentStatus = normStage(lead.statusId || lead.stage);
                     return (
-                      <tr key={id} className="border-b border-outline-variant/10">
+                      <tr key={id} className="sv-leads-row border-b border-outline-variant/10">
                         <td className="px-3 py-3 text-sm font-semibold text-on-surface">
                           <div className="inline-flex items-center gap-2">
                             <span>{lead.title || '-'}</span>
-                            {lead.isArchived ? <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
+                            {lead.isArchived ? <span className="sv-leads-archive-pill rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
                           </div>
                         </td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{stageTitle(currentStatus)}</td>
                         <td className="px-3 py-3">
-                          <select value={currentStatus} onChange={(e) => openMove(lead, e.target.value)} className="rounded-lg border border-outline-variant/20 bg-surface px-2 py-1 text-sm">
+                          <select value={currentStatus} onChange={(e) => openMove(lead, e.target.value)} className="form-select form-select-sm sv-ctl-select sv-leads-move-select rounded-lg border border-outline-variant/20 bg-surface px-2 py-1 text-sm">
                             {STAGES.map((stage) => <option key={`${id}-${stage.statusId}`} value={stage.statusId}>{stage.title}</option>)}
                           </select>
                         </td>
@@ -520,11 +613,11 @@ function LeadManagementPage() {
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nSource(lead.source)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{fmtInr(lead.value)}</td>
                         <td className="px-3 py-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button type="button" onClick={() => setSelectedLead(lead)} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Details</button>
-                            <button type="button" onClick={() => openEdit(lead)} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Quick Edit</button>
-                            <button type="button" onClick={() => openLeadClient(lead)} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Client</button>
-                            <button type="button" onClick={() => toggleLeadArchive(lead)} className={`rounded-md px-2 py-1 text-xs font-semibold ${lead?.isArchived ? 'bg-green-100 text-green-700' : 'bg-error/10 text-error'}`}>
+                          <div className="sv-leads-actions inline-flex items-center gap-1">
+                            <button type="button" onClick={() => setSelectedLead(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Details</button>
+                            <button type="button" onClick={() => openEdit(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Quick Edit</button>
+                            <button type="button" onClick={() => openLeadClient(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Client</button>
+                            <button type="button" onClick={() => toggleLeadArchive(lead)} className={`btn btn-sm sv-ctl-btn sv-leads-action-btn sv-leads-archive-btn rounded-md px-2 py-1 text-xs font-semibold ${lead?.isArchived ? 'is-restore bg-green-100 text-green-700' : 'is-archive bg-error/10 text-error'}`}>
                               {lead?.isArchived ? 'Unarchive' : 'Archive'}
                             </button>
                           </div>
@@ -540,67 +633,96 @@ function LeadManagementPage() {
                 </tbody>
               </table>
             </section>
+            <PaginationControls
+              page={leadsPage}
+              totalPages={leadsTotalPages}
+              totalItems={filtered.length}
+              pageSize={leadsPageSize}
+              onPageChange={setLeadsPage}
+              onPageSizeChange={setLeadsPageSize}
+            />
           </>
         ) : (
-          <section className="overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
-            <table className="w-full min-w-[700px] text-left">
-              <thead>
-                <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
-                  <th className="px-3 py-3">Client</th>
-                  <th className="px-3 py-3">Company</th>
-                  <th className="px-3 py-3">Email</th>
-                  <th className="px-3 py-3">Phone</th>
-                  <th className="px-3 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientsLoading ? Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={`client-loading-${idx}`} className="border-b border-outline-variant/10">
-                    <td colSpan={5} className="px-3 py-4"><div className="h-7 animate-pulse rounded bg-surface-container-high" /></td>
+          <>
+            <section className="sv-leads-filters grid grid-cols-1 gap-2 md:grid-cols-[1fr_190px_auto]">
+              <input value={clientFilters.search} onChange={(e) => setClientFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search client name, company, email..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+              <select value={clientFilters.archiveScope} onChange={(e) => setClientFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                <option value="all">All (Active)</option>
+                <option value="archived">Archived Only</option>
+                <option value="with-archived">With Archived</option>
+              </select>
+              <button type="button" onClick={resetClientFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+            </section>
+            <section className="sv-card sv-leads-table-card overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
+              <table className="sv-leads-table w-full min-w-[700px] text-left">
+                <thead>
+                  <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
+                    <th className="px-3 py-3">Client</th>
+                    <th className="px-3 py-3">Company</th>
+                    <th className="px-3 py-3">Email</th>
+                    <th className="px-3 py-3">Phone</th>
+                    <th className="px-3 py-3 text-right">Action</th>
                   </tr>
-                )) : null}
-                {!clientsLoading && (clients || []).map((client) => (
-                  <tr key={`client-row-${client._id}`} className="border-b border-outline-variant/10">
-                    <td className="px-3 py-3 text-sm font-semibold text-on-surface">
-                      <div className="inline-flex items-center gap-2">
-                        <span>{client.name || '-'}</span>
-                        {client?.isArchived ? <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-on-surface-variant">{client.company || '-'}</td>
-                    <td className="px-3 py-3 text-sm text-on-surface-variant">{client.email || '-'}</td>
-                    <td className="px-3 py-3 text-sm text-on-surface-variant">{client.phone || '-'}</td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button type="button" onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', String(client._id)))} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Open</button>
-                        <button type="button" onClick={() => toggleClientArchive(client)} className={`rounded-md px-2 py-1 text-xs font-semibold ${client?.isArchived ? 'bg-green-100 text-green-700' : 'bg-error/10 text-error'}`}>
-                          {client?.isArchived ? 'Unarchive' : 'Archive'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!clientsLoading && !(clients || []).length ? (
-                  <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-on-surface-variant">No clients found.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </section>
+                </thead>
+                <tbody>
+                  {clientsLoading ? Array.from({ length: 4 }).map((_, idx) => (
+                    <tr key={`client-loading-${idx}`} className="border-b border-outline-variant/10">
+                      <td colSpan={5} className="px-3 py-4"><div className="h-7 animate-pulse rounded bg-surface-container-high" /></td>
+                    </tr>
+                  )) : null}
+                  {!clientsLoading && pagedClients.map((client) => (
+                    <tr key={`client-row-${client._id}`} className="sv-leads-row border-b border-outline-variant/10">
+                      <td className="px-3 py-3 text-sm font-semibold text-on-surface">
+                        <div className="inline-flex items-center gap-2">
+                          <span>{client.name || '-'}</span>
+                          {client?.isArchived ? <span className="sv-leads-archive-pill rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm text-on-surface-variant">{client.company || '-'}</td>
+                      <td className="px-3 py-3 text-sm text-on-surface-variant">{client.email || '-'}</td>
+                      <td className="px-3 py-3 text-sm text-on-surface-variant">{client.phone || '-'}</td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="sv-leads-actions inline-flex items-center gap-1">
+                          <button type="button" onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', String(client._id)))} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Open</button>
+                          <button type="button" onClick={() => toggleClientArchive(client)} className={`btn btn-sm sv-ctl-btn sv-leads-action-btn sv-leads-archive-btn rounded-md px-2 py-1 text-xs font-semibold ${client?.isArchived ? 'is-restore bg-green-100 text-green-700' : 'is-archive bg-error/10 text-error'}`}>
+                            {client?.isArchived ? 'Unarchive' : 'Archive'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!clientsLoading && !filteredClients.length ? (
+                    <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-on-surface-variant">{(clients || []).length ? 'No clients match current filters.' : 'No clients found.'}</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </section>
+            <PaginationControls
+              page={clientsPage}
+              totalPages={clientsTotalPages}
+              totalItems={filteredClients.length}
+              pageSize={clientsPageSize}
+              onPageChange={setClientsPage}
+              onPageSizeChange={setClientsPageSize}
+            />
+          </>
         )}
       </div>
 
       {selected ? (
-        <aside className="fixed inset-y-0 right-0 z-40 w-[360px] border-l border-outline-variant/20 bg-surface-container-lowest p-5 shadow-xl">
-          <div className="mb-4 flex items-start justify-between gap-3">
+        <aside className="sv-leads-drawer fixed inset-y-0 right-0 z-40 w-[360px] border-l border-outline-variant/20 bg-surface-container-lowest p-5 shadow-xl">
+          <div className="sv-leads-drawer-head mb-4 flex items-start justify-between gap-3">
             <div>
               <h3 className="text-3xl font-extrabold text-on-surface">{selected.title || 'Lead'}</h3>
               <p className="text-sm text-on-surface-variant">{stageTitle(selected.statusId || selected.stage)}</p>
             </div>
-            <button type="button" onClick={() => setSelectedLead(null)} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Close</button>
+            <button type="button" aria-label="Close details" onClick={() => setSelectedLead(null)} className="sv-modal-close-btn" title="Close">
+              <span className="material-symbols-outlined">close</span>
+            </button>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-outline-variant/10 bg-surface-container p-4 text-sm">
-            <section>
+          <div className="sv-leads-drawer-sections space-y-3 rounded-xl border border-outline-variant/10 bg-surface-container p-4 text-sm">
+            <section className="sv-leads-drawer-section">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Deal</h4>
               <div className="grid grid-cols-[120px_1fr] gap-y-2">
                 <span className="text-on-surface-variant">Value</span><span className="text-right text-on-surface">{fmtInr(selected.value)}</span>
@@ -611,7 +733,7 @@ function LeadManagementPage() {
               </div>
             </section>
 
-            <section>
+            <section className="sv-leads-drawer-section">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Identity</h4>
               <div className="grid grid-cols-[120px_1fr] gap-y-2">
                 <span className="text-on-surface-variant">Lead Type</span><span className="text-right text-on-surface">{selectedCustom.leadType || '-'}</span>
@@ -622,7 +744,7 @@ function LeadManagementPage() {
               </div>
             </section>
 
-            <section>
+            <section className="sv-leads-drawer-section">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Contact</h4>
               <div className="grid grid-cols-[120px_1fr] gap-y-2">
                 <span className="text-on-surface-variant">Email</span><span className="text-right text-on-surface">{selectedCustom.email || '-'}</span>
@@ -632,7 +754,7 @@ function LeadManagementPage() {
               </div>
             </section>
 
-            <section>
+            <section className="sv-leads-drawer-section">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Business & Address</h4>
               <div className="grid grid-cols-[120px_1fr] gap-y-2">
                 <span className="text-on-surface-variant">Tax ID</span><span className="text-right text-on-surface">{selectedCustom.taxId || '-'}</span>
@@ -645,19 +767,21 @@ function LeadManagementPage() {
             </section>
           </div>
 
-          <div className="mt-4 flex items-center gap-2">
-            <button type="button" onClick={() => openEdit(selected)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Quick Edit</button>
-            <button type="button" onClick={() => setSelectedLead(null)} className="rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Done</button>
+          <div className="sv-leads-drawer-actions mt-4 flex items-center gap-2">
+            <button type="button" onClick={() => openEdit(selected)} className="btn btn-primary sv-ctl-btn rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Quick Edit</button>
+            <button type="button" onClick={() => setSelectedLead(null)} className="btn btn-light sv-ctl-btn rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Done</button>
           </div>
         </aside>
       ) : null}
 
       {openCreate ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <form onSubmit={handleCreate} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-surface p-5">
-            <div className="mb-3 flex items-center justify-between">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <form onSubmit={handleCreate} className="sv-card sv-modal-panel-lg sv-leads-modal max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-surface p-4">
+            <div className="sv-leads-modal-head mb-3 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Create Lead</h3>
-              <button type="button" onClick={closeCreate} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold">Close</button>
+              <button type="button" aria-label="Close create lead" onClick={closeCreate} className="sv-modal-close-btn" title="Close">
+                <span className="material-symbols-outlined">close</span>
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input value={createForm.title} onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
@@ -675,11 +799,11 @@ function LeadManagementPage() {
                 {(clients || []).map((client) => <option key={`create-client-${client._id}`} value={String(client._id)}>{client.company || client.name || `Client ${client._id}`}</option>)}
               </select>
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="sv-leads-profile-block mt-3">
               <h4 className="text-sm font-semibold text-on-surface-variant">Profile Details</h4>
               <DetailFields form={createForm} setForm={setCreateForm} />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="sv-leads-modal-actions mt-4 flex justify-end gap-2">
               <button type="button" onClick={closeCreate} className="rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Cancel</button>
               <button type="submit" disabled={createBusy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{createBusy ? 'Saving...' : 'Create Lead'}</button>
             </div>
@@ -688,11 +812,13 @@ function LeadManagementPage() {
       ) : null}
 
       {editingLead ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <form onSubmit={handleSaveEdit} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-surface p-5">
-            <div className="mb-3 flex items-center justify-between">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <form onSubmit={handleSaveEdit} className="sv-card sv-modal-panel-lg sv-leads-modal max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-surface p-4">
+            <div className="sv-leads-modal-head mb-3 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Quick Edit Lead</h3>
-              <button type="button" onClick={closeEdit} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold">Close</button>
+              <button type="button" aria-label="Close edit lead" onClick={closeEdit} className="sv-modal-close-btn" title="Close">
+                <span className="material-symbols-outlined">close</span>
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input value={editForm.title} onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
@@ -709,11 +835,11 @@ function LeadManagementPage() {
                 {(clients || []).map((client) => <option key={`edit-client-${client._id}`} value={String(client._id)}>{client.company || client.name || `Client ${client._id}`}</option>)}
               </select>
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="sv-leads-profile-block mt-3">
               <h4 className="text-sm font-semibold text-on-surface-variant">Profile Details</h4>
               <DetailFields form={editForm} setForm={setEditForm} />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="sv-leads-modal-actions mt-4 flex justify-end gap-2">
               <button type="button" onClick={closeEdit} className="rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Cancel</button>
               <button type="submit" disabled={editBusy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{editBusy ? 'Saving...' : 'Save Changes'}</button>
             </div>
@@ -722,11 +848,13 @@ function LeadManagementPage() {
       ) : null}
 
       {openCreateClient ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <form onSubmit={saveClient} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-surface p-5">
-            <div className="mb-3 flex items-center justify-between">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <form onSubmit={saveClient} className="sv-card sv-modal-panel-lg sv-leads-modal max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-surface p-4">
+            <div className="sv-leads-modal-head mb-3 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Create Client</h3>
-              <button type="button" onClick={closeCreateClient} className="rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold">Close</button>
+              <button type="button" aria-label="Close create client" onClick={closeCreateClient} className="sv-modal-close-btn" title="Close">
+                <span className="material-symbols-outlined">close</span>
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input value={clientForm.name} onChange={(e) => setClientForm((p) => ({ ...p, name: e.target.value }))} placeholder="Client Name *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
@@ -754,7 +882,7 @@ function LeadManagementPage() {
               <input value={clientForm.state} onChange={(e) => setClientForm((p) => ({ ...p, state: e.target.value }))} placeholder="State" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
               <input value={clientForm.country} onChange={(e) => setClientForm((p) => ({ ...p, country: e.target.value }))} placeholder="Country" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="sv-leads-modal-actions mt-4 flex justify-end gap-2">
               <button type="button" onClick={closeCreateClient} className="rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Cancel</button>
               <button type="submit" disabled={createClientBusy} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{createClientBusy ? 'Saving...' : 'Create Client'}</button>
             </div>
@@ -763,8 +891,8 @@ function LeadManagementPage() {
       ) : null}
 
       {pendingMove ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-surface p-5">
+        <div className="sv-modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div className="sv-card sv-modal-panel sv-leads-move-modal w-full max-w-sm rounded-xl bg-surface p-5">
             <h3 className="text-base font-semibold">Confirm Move</h3>
             <p className="mt-2 text-sm text-on-surface-variant">Move lead <span className="font-semibold text-on-surface">{pendingMove.title}</span> from {stageTitle(pendingMove.fromStatusId)} to {stageTitle(pendingMove.toStatusId)}?</p>
             <div className="mt-4 flex justify-end gap-2">
@@ -776,7 +904,7 @@ function LeadManagementPage() {
       ) : null}
 
       {toast ? (
-        <div className={`fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error' : 'bg-green-600'}`}>
+        <div className={`sv-leads-toast fixed bottom-5 right-5 z-[60] rounded-lg px-4 py-2 text-sm font-semibold text-white ${toast.tone === 'error' ? 'bg-error is-error' : 'bg-green-600 is-success'}`}>
           {toast.message}
         </div>
       ) : null}

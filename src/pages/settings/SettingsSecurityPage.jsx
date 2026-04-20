@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
-import { ROUTES } from '../../routes/routePaths';
 import { useSettings } from '../../hooks/useSettings';
+import SettingsTabs from './SettingsTabs';
 
 function SettingsSecurityPage() {
   const {
@@ -42,7 +41,9 @@ function SettingsSecurityPage() {
 
   const sessionsData = useMemo(
     () =>
-      liveSessions.map((session) => ({
+      liveSessions
+        .filter((session) => !session?.revoked)
+        .map((session) => ({
         id: session.id || session.sessionId || session._id,
         device: session.device || session.userAgent || 'Device',
         meta: session.isCurrent ? 'Current Session' : session.revoked ? 'Revoked' : 'Session',
@@ -108,66 +109,24 @@ function SettingsSecurityPage() {
   };
 
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto max-w-7xl px-8 pb-12 pt-2">
-        <div className="mb-6 flex items-center gap-3">
-          <NavLink
-            to={ROUTES.settings}
-            end
-            className={({ isActive }) =>
-              `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-              }`
-            }
-          >
-            General
-          </NavLink>
-          <NavLink
-            to={ROUTES.settingsWorkspace}
-            className={({ isActive }) =>
-              `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-              }`
-            }
-          >
-            Workspace
-          </NavLink>
-          <NavLink
-            to={ROUTES.settingsMembers}
-            className={({ isActive }) =>
-              `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-              }`
-            }
-          >
-            Members
-          </NavLink>
-          <NavLink
-            to={ROUTES.settingsSecurity}
-            className={({ isActive }) =>
-              `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-              }`
-            }
-          >
-            Security
-          </NavLink>
-        </div>
+    <main className="min-h-screen sv-settings-page">
+      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+        <SettingsTabs />
 
-        <section className="mb-10">
-          <h2 className="mb-2 text-3xl font-bold tracking-tight text-on-surface">Security Settings</h2>
-          <p className="max-w-2xl text-on-surface-variant">Manage your account security, authentication methods, and API access.</p>
+        <section className="sv-settings-header mb-10">
+          <h2 className="sv-settings-title">Security Settings</h2>
+          <p className="sv-settings-subtitle max-w-2xl">Manage your account security, authentication methods, and API access.</p>
         </section>
 
         {error || actionError ? (
-          <section className="mb-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+          <section className="sv-settings-alert">
             {error || actionError}
           </section>
         ) : null}
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-          <section className="relative rounded-xl bg-surface-container-lowest p-6 shadow-sm lg:col-span-4">
-            <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold text-on-surface">
+          <section className="sv-settings-card relative lg:col-span-4">
+            <h3 className="sv-settings-card-title mb-6 flex items-center gap-2">
               <Icon name="history" className="text-sm" />
               Security Log
             </h3>
@@ -192,10 +151,13 @@ function SettingsSecurityPage() {
             </div>
           </section>
 
-          <section className="rounded-xl bg-surface-container-lowest p-8 shadow-sm lg:col-span-8">
+          <section className="sv-settings-card lg:col-span-8">
             <div className="mb-8 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-on-surface">API Access Keys</h3>
-              <button className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold transition-colors hover:bg-surface-container-low">Generate New Token</button>
+              <h3 className="sv-settings-card-title">API Access Keys</h3>
+              <button className="sv-settings-btn sv-settings-btn-neutral">
+                <Icon name="key" className="text-[1rem]" />
+                Generate New Token
+              </button>
             </div>
             <div className="space-y-4">
               {loading ? (
@@ -223,30 +185,31 @@ function SettingsSecurityPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm lg:col-span-12">
+          <section className="sv-settings-card overflow-hidden !p-0 lg:col-span-12">
             <div className="flex items-center justify-between border-b border-outline-variant/10 px-8 py-6">
-              <h3 className="text-lg font-semibold text-on-surface">Active Sessions</h3>
+              <h3 className="sv-settings-card-title">Active Sessions</h3>
               <button
                 type="button"
                 onClick={handleRevokeAllOtherSessions}
                 disabled={revokingAll || loading}
-                className="rounded-md border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-60"
+                className="sv-settings-btn sv-settings-btn-danger"
               >
+                <Icon name="restart_alt" className="text-[0.95rem]" />
                 {revokingAll ? 'Revoking...' : 'Revoke All Other Sessions'}
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="sv-settings-scroll-area sv-settings-scroll-area-lg overflow-auto">
+              <table className="sv-settings-table">
                 <thead>
-                  <tr className="bg-surface-container-low">
-                    <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Device / Browser</th>
-                    <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Location</th>
-                    <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">IP Address</th>
-                    <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Last Active</th>
+                  <tr>
+                    <th className="px-8 py-4">Device / Browser</th>
+                    <th className="px-8 py-4">Location</th>
+                    <th className="px-8 py-4">IP Address</th>
+                    <th className="px-8 py-4">Last Active</th>
                     <th className="px-8 py-4" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/10">
+                <tbody>
                   {loading ? (
                     <tr>
                       <td colSpan={5} className="px-8 py-8">
@@ -279,8 +242,9 @@ function SettingsSecurityPage() {
                           <button
                             type="button"
                             onClick={() => handleRevokeSession(session.id)}
-                            className="text-xs font-bold uppercase tracking-wider text-primary transition-colors hover:text-blue-700"
+                            className="sv-settings-btn sv-settings-btn-danger"
                           >
+                            <Icon name="block" className="text-[0.95rem]" />
                             Revoke
                           </button>
                         )}
@@ -297,21 +261,21 @@ function SettingsSecurityPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm lg:col-span-6">
+          <section className="sv-settings-card overflow-hidden !p-0 lg:col-span-6">
             <div className="border-b border-outline-variant/10 px-8 py-6">
-              <h3 className="text-lg font-semibold text-on-surface">Workspace Audit Log</h3>
+              <h3 className="sv-settings-card-title">Workspace Audit Log</h3>
             </div>
-            <div className="max-h-96 overflow-auto">
-              <table className="w-full text-left">
+            <div className="sv-settings-scroll-area">
+              <table className="sv-settings-table">
                 <thead>
-                  <tr className="bg-surface-container-low">
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Action</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Resource</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">IP</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Time</th>
+                  <tr>
+                    <th className="px-6 py-3">Action</th>
+                    <th className="px-6 py-3">Resource</th>
+                    <th className="px-6 py-3">IP</th>
+                    <th className="px-6 py-3">Time</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/10">
+                <tbody>
                   {auditRows.map((row) => (
                     <tr key={row.id}>
                       <td className="px-6 py-3 text-xs font-semibold text-on-surface">{row.action}</td>
@@ -330,22 +294,22 @@ function SettingsSecurityPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm lg:col-span-6">
+          <section className="sv-settings-card overflow-hidden !p-0 lg:col-span-6">
             <div className="border-b border-outline-variant/10 px-8 py-6">
-              <h3 className="text-lg font-semibold text-on-surface">Workspace Activity</h3>
+              <h3 className="sv-settings-card-title">Workspace Activity</h3>
             </div>
             <div className="max-h-96 overflow-auto">
-              <table className="w-full text-left">
+              <table className="sv-settings-table">
                 <thead>
-                  <tr className="bg-surface-container-low">
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Module</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Action</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Entity</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Actor</th>
-                    <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">Time</th>
+                  <tr>
+                    <th className="px-6 py-3">Module</th>
+                    <th className="px-6 py-3">Action</th>
+                    <th className="px-6 py-3">Entity</th>
+                    <th className="px-6 py-3">Actor</th>
+                    <th className="px-6 py-3">Time</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/10">
+                <tbody>
                   {activityRows.map((row) => (
                     <tr key={row.id}>
                       <td className="px-6 py-3 text-xs font-semibold text-on-surface">{row.module}</td>

@@ -1,14 +1,8 @@
 import { useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import Icon from '../../components/ui/Icon';
 import { useSettings } from '../../hooks/useSettings';
 import { usePermission } from '../../hooks/usePermission';
-import { ROUTES } from '../../routes/routePaths';
-
-function tabClassName({ isActive }) {
-  return `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-    isActive ? 'bg-primary text-white' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-  }`;
-}
+import SettingsTabs from './SettingsTabs';
 
 function SettingsWorkspacePage() {
   const { hasAnyRole } = usePermission();
@@ -76,69 +70,57 @@ function SettingsWorkspacePage() {
   };
 
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2">
-        <div className="mb-6 flex items-center gap-3">
-          <NavLink to={ROUTES.settings} end className={tabClassName}>
-            General
-          </NavLink>
-          <NavLink to={ROUTES.settingsWorkspace} className={tabClassName}>
-            Workspace
-          </NavLink>
-          <NavLink to={ROUTES.settingsMembers} className={tabClassName}>
-            Members
-          </NavLink>
-          <NavLink to={ROUTES.settingsSecurity} className={tabClassName}>
-            Security
-          </NavLink>
-        </div>
+    <main className="min-h-screen sv-settings-page">
+      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+        <SettingsTabs />
 
-        <section className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-on-surface">Workspace Settings</h1>
-          <p className="mt-2 text-sm text-on-surface-variant">
+        <section className="sv-settings-header">
+          <h1 className="sv-settings-title">Workspace Settings</h1>
+          <p className="sv-settings-subtitle">
             Create, switch, rename, and delete workspaces.
           </p>
         </section>
 
         {error || actionError ? (
-          <section className="mb-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+          <section className="sv-settings-alert">
             {error || actionError}
           </section>
         ) : null}
 
-        <section className="mb-8 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-on-surface">Create Workspace</h2>
+        <section className="sv-settings-card mb-8">
+          <h2 className="sv-settings-card-title mb-4">Create Workspace</h2>
           {!canManage ? (
-            <p className="text-sm text-on-surface-variant">Only Owner/Admin can create workspaces.</p>
+            <p className="sv-settings-note">Only Owner/Admin can create workspaces.</p>
           ) : (
-            <form onSubmit={onCreate} className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <form onSubmit={onCreate} className="sv-settings-inline-form">
               <input
                 type="text"
                 value={newWorkspaceName}
                 onChange={(event) => setNewWorkspaceName(event.target.value)}
                 placeholder="Workspace name"
-                className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm"
+                className="sv-settings-input"
               />
               <button
                 type="submit"
                 disabled={workspaceBusy}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="sv-settings-btn sv-settings-btn-primary"
               >
+                <Icon name="add_business" className="text-[1rem]" />
                 {workspaceBusy ? 'Saving...' : 'Create'}
               </button>
             </form>
           )}
         </section>
 
-        <section className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-on-surface">Workspace List</h2>
+        <section className="sv-settings-card">
+          <h2 className="sv-settings-card-title mb-4">Workspace List</h2>
           <div className="space-y-3">
             {rows.map((workspace) => {
               const isActive = String(workspace.id) === String(activeWorkspaceId);
               return (
                 <div
                   key={workspace.id}
-                  className="rounded-lg border border-outline-variant/20 bg-surface p-4"
+                  className="sv-settings-list-item"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -157,8 +139,9 @@ function SettingsWorkspacePage() {
                         <button
                           type="button"
                           onClick={() => switchWorkspace(workspace.id)}
-                          className="rounded-md border border-outline-variant px-3 py-1.5 text-xs font-semibold"
+                          className="sv-settings-btn sv-settings-btn-neutral"
                         >
+                          <Icon name="sync_alt" className="text-[0.95rem]" />
                           Switch
                         </button>
                       ) : null}
@@ -166,8 +149,9 @@ function SettingsWorkspacePage() {
                         <button
                           type="button"
                           onClick={() => onDelete(workspace.id, workspace.name)}
-                          className="rounded-md border border-error/40 px-3 py-1.5 text-xs font-semibold text-error"
+                          className="sv-settings-btn sv-settings-btn-danger"
                         >
+                          <Icon name="delete" className="text-[0.95rem]" />
                           Delete
                         </button>
                       ) : null}
@@ -175,7 +159,7 @@ function SettingsWorkspacePage() {
                   </div>
 
                   {canManage ? (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <div className="sv-settings-inline-form mt-3">
                       <input
                         type="text"
                         value={renameDrafts[workspace.id] || ''}
@@ -183,14 +167,15 @@ function SettingsWorkspacePage() {
                           setRenameDrafts((current) => ({ ...current, [workspace.id]: event.target.value }))
                         }
                         placeholder="Rename workspace"
-                        className="rounded-md border border-outline-variant px-3 py-2 text-sm"
+                        className="sv-settings-input"
                       />
                       <button
                         type="button"
                         onClick={() => onRename(workspace.id)}
                         disabled={workspaceBusy}
-                        className="rounded-md bg-surface-container px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                        className="sv-settings-btn sv-settings-btn-neutral"
                       >
+                        <Icon name="drive_file_rename_outline" className="text-[0.95rem]" />
                         Rename
                       </button>
                     </div>
@@ -198,7 +183,7 @@ function SettingsWorkspacePage() {
                 </div>
               );
             })}
-            {!rows.length ? <p className="text-sm text-on-surface-variant">No workspaces found.</p> : null}
+            {!rows.length ? <p className="sv-settings-note">No workspaces found.</p> : null}
           </div>
         </section>
       </div>

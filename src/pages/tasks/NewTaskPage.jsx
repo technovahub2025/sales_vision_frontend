@@ -1,346 +1,481 @@
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
-import { projectRoute } from '../../routes/routePaths';
 import { useNewTask } from '../../hooks/useNewTask';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { projectRoute } from '../../routes/routePaths';
 
-function chipClass(active, tone) {
-  if (!active) return 'border border-outline-variant bg-white text-on-surface';
-  if (tone === 'critical') return 'border border-red-500 bg-red-50 text-red-700';
-  if (tone === 'high') return 'border border-orange-500 bg-orange-50 text-orange-700';
-  if (tone === 'medium') return 'border border-blue-500 bg-blue-50 text-blue-700';
-  return 'border border-slate-500 bg-slate-50 text-slate-700';
+const ISSUE_TYPES = [
+  { value: 'task', label: 'Task' },
+  { value: 'bug', label: 'Bug' },
+  { value: 'story', label: 'Story' },
+  { value: 'epic', label: 'Epic' },
+  { value: 'subtask', label: 'Sub Task' },
+];
+
+const PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
+function getDisplayName(item, fallback = 'Unknown') {
+  return String(item?.displayName || item?.name || item?.email || fallback);
 }
 
-export default function NewTaskPage() {
+function SearchableSinglePicker({
+  label,
+  placeholder,
+  search,
+  onSearch,
+  options,
+  value,
+  onChange,
+  onLoadMore,
+  meta,
+}) {
+  const selectedLabel = useMemo(() => {
+    const selected = (options || []).find((item) => String(item?._id) === String(value || ''));
+    return selected ? getDisplayName(selected) : 'Unassigned';
+  }, [options, value]);
+
+  return (
+    <div className="sv-newtask-picker">
+      <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">{label}</p>
+      <div className="sv-newtask-picker-selected">{selectedLabel}</div>
+      <input
+        type="text"
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+        placeholder={placeholder}
+        className="form-control sv-ctl-input sv-newtask-field sv-newtask-picker-search"
+      />
+      <div className="sv-newtask-picker-list">
+        {(options || []).map((item) => {
+          const itemId = String(item?._id || '');
+          const active = String(value || '') === itemId;
+          return (
+            <button
+              key={`assignee-${itemId}`}
+              type="button"
+              className={`sv-newtask-picker-item ${active ? 'is-active' : ''}`}
+              onClick={() => onChange(itemId)}
+            >
+              <span className="sv-newtask-picker-radio">{active ? '?' : '?'}</span>
+              <span className="text-truncate">{getDisplayName(item, 'User')}</span>
+            </button>
+          );
+        })}
+        {!options?.length && !meta?.loading ? <p className="sv-newtask-picker-empty">No matches found.</p> : null}
+      </div>
+      {meta?.hasMore ? (
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary sv-ctl-btn sv-newtask-picker-more"
+          onClick={onLoadMore}
+          disabled={meta?.loadingMore}
+        >
+          {meta?.loadingMore ? 'Loading...' : 'Load more'}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SearchableMultiPicker({
+  label,
+  placeholder,
+  search,
+  onSearch,
+  options,
+  selected,
+  onToggle,
+  onLoadMore,
+  meta,
+}) {
+  return (
+    <div className="sv-newtask-picker">
+      <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">{label}</p>
+      <input
+        type="text"
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+        placeholder={placeholder}
+        className="form-control sv-ctl-input sv-newtask-field sv-newtask-picker-search"
+      />
+      <div className="sv-newtask-picker-list">
+        {(options || []).map((item) => {
+          const itemId = String(item?._id || '');
+          const active = selected.has(itemId);
+          return (
+            <label key={`${label}-${itemId}`} className={`sv-newtask-picker-item ${active ? 'is-active' : ''}`}>
+              <input
+                type="checkbox"
+                className="form-check-input"
+                checked={active}
+                onChange={() => onToggle(item)}
+              />
+              <span className="text-truncate">{getDisplayName(item, label)}</span>
+            </label>
+          );
+        })}
+        {!options?.length && !meta?.loading ? <p className="sv-newtask-picker-empty">No matches found.</p> : null}
+      </div>
+      {meta?.hasMore ? (
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary sv-ctl-btn sv-newtask-picker-more"
+          onClick={onLoadMore}
+          disabled={meta?.loadingMore}
+        >
+          {meta?.loadingMore ? 'Loading...' : 'Load more'}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function NewTaskPage() {
   const navigate = useNavigate();
-  const { setProjectId } = useWorkspace();
   const {
     projects,
     users,
     contacts,
     employees,
     parentTasks,
+    directoryMeta,
     draft,
     loading,
     submitting,
     error,
     setField,
+    setDirectoryQuery,
+    loadMoreDirectory,
     addTag,
     removeTag,
     setAttachmentFiles,
     submit,
   } = useNewTask();
 
-  if (loading) {
-    return <p className="text-sm text-on-surface-variant">Loading new task form...</p>;
-  }
+  const [userSearch, setUserSearch] = useState('');
+  const [contactSearch, setContactSearch] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDirectoryQuery('users', userSearch);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [userSearch, setDirectoryQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDirectoryQuery('contacts', contactSearch);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [contactSearch, setDirectoryQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDirectoryQuery('employees', employeeSearch);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [employeeSearch, setDirectoryQuery]);
+
+  const contributorSet = useMemo(
+    () => new Set((Array.isArray(draft.assigneeIds) ? draft.assigneeIds : []).map((item) => String(item))),
+    [draft.assigneeIds],
+  );
+
+  const externalContactSet = useMemo(() => {
+    const set = new Set();
+    (Array.isArray(draft.externalCollaborators) ? draft.externalCollaborators : []).forEach((item) => {
+      if (item?.entityType === 'contact') {
+        set.add(String(item.entityId));
+      }
+    });
+    return set;
+  }, [draft.externalCollaborators]);
+
+  const externalEmployeeSet = useMemo(() => {
+    const set = new Set();
+    (Array.isArray(draft.externalCollaborators) ? draft.externalCollaborators : []).forEach((item) => {
+      if (item?.entityType === 'employee') {
+        set.add(String(item.entityId));
+      }
+    });
+    return set;
+  }, [draft.externalCollaborators]);
+
+  const selectedContactNames = useMemo(
+    () => contacts.filter((item) => externalContactSet.has(String(item?._id || ''))).map((item) => getDisplayName(item, 'Contact')),
+    [contacts, externalContactSet],
+  );
+
+  const selectedEmployeeNames = useMemo(
+    () => employees.filter((item) => externalEmployeeSet.has(String(item?._id || ''))).map((item) => getDisplayName(item, 'Employee')),
+    [employees, externalEmployeeSet],
+  );
+
+  const selectedContributorNames = useMemo(
+    () => users.filter((item) => contributorSet.has(String(item?._id || ''))).map((item) => getDisplayName(item, 'User')),
+    [users, contributorSet],
+  );
+
+  const onToggleContributor = (user) => {
+    const id = String(user?._id || '');
+    if (!id) return;
+    const current = Array.isArray(draft.assigneeIds) ? draft.assigneeIds : [];
+    const next = contributorSet.has(id)
+      ? current.filter((item) => String(item) !== id)
+      : [...current, id];
+    setField('assigneeIds', next);
+  };
+
+  const onToggleExternal = (entityType, item) => {
+    const id = String(item?._id || '');
+    if (!id) return;
+    const current = Array.isArray(draft.externalCollaborators) ? draft.externalCollaborators : [];
+    const exists = current.some((entry) => entry?.entityType === entityType && String(entry?.entityId) === id);
+    const next = exists
+      ? current.filter((entry) => !(entry?.entityType === entityType && String(entry?.entityId) === id))
+      : [...current, { entityType, entityId: id }];
+    setField('externalCollaborators', next);
+  };
 
   const onSubmit = async (event) => {
     event.preventDefault();
     const created = await submit();
-    if (created) {
-      const nextProjectId = String(draft.projectId || created.projectId || '');
-      if (nextProjectId) {
-        setProjectId(nextProjectId);
-        window.localStorage.setItem('salevision:projectId', nextProjectId);
-      }
-      navigate(projectRoute('board', nextProjectId));
-    }
+    if (!created) return;
+    const nextProjectId = created?.projectId || draft.projectId;
+    navigate(projectRoute('board', nextProjectId));
   };
 
+  if (loading) {
+    return <div className="sv-card p-4">Loading new task form...</div>;
+  }
+
   return (
-    <main className="min-h-screen">
-      <form onSubmit={onSubmit} className="mx-auto grid max-w-[1500px] grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
-        <section className="space-y-6">
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Task Title</p>
+    <main className="sv-newtask-page" aria-label="Create new task">
+      <form className="sv-newtask-form d-grid" style={{ gridTemplateColumns: 'minmax(0,1fr) 380px', gap: '0.85rem' }} onSubmit={onSubmit}>
+        <section className="d-grid" style={{ gap: '0.85rem' }}>
+          <article className="sv-card sv-newtask-card">
+            <label className="sv-newtask-section-label text-uppercase fw-semibold small" htmlFor="new-task-title">Task title</label>
             <input
+              id="new-task-title"
+              type="text"
               value={draft.title}
-              onChange={(e) => setField('title', e.target.value)}
+              onChange={(event) => setField('title', event.target.value)}
+              className="form-control sv-newtask-title-input border-0 shadow-none px-0"
               placeholder="What needs to be done?"
-              className="w-full border-none bg-transparent text-5xl font-black text-on-surface placeholder:text-slate-300 focus:outline-none"
             />
 
-            <p className="mb-3 mt-8 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Description</p>
-            <div className="rounded-xl border border-outline-variant bg-surface p-4">
-              <div className="mb-3 flex items-center justify-between border-b border-outline-variant pb-3 text-slate-500">
-                <div className="flex items-center gap-3">
-                  <button type="button" className="rounded px-2 py-1 text-sm font-bold">B</button>
-                  <button type="button" className="rounded px-2 py-1 text-sm italic">I</button>
-                  <button type="button" className="rounded px-2 py-1 text-sm">
-                    <Icon name="format_list_bulleted" className="text-[16px]" />
-                  </button>
-                  <button type="button" className="rounded px-2 py-1 text-sm">
-                    <Icon name="link" className="text-[16px]" />
-                  </button>
-                </div>
-                <button type="button">
-                  <Icon name="code" className="text-[18px]" />
-                </button>
+            <label className="sv-newtask-section-label text-uppercase fw-semibold small" htmlFor="new-task-description">Description</label>
+            <div className="sv-newtask-editor rounded-3 border p-3">
+              <div className="sv-newtask-editor-toolbar d-flex align-items-center gap-2 mb-2">
+                <button type="button" className="btn btn-sm sv-newtask-editor-btn"><strong>B</strong></button>
+                <button type="button" className="btn btn-sm sv-newtask-editor-btn"><em>/</em></button>
+                <button type="button" className="btn btn-sm sv-newtask-editor-btn"><Icon name="format_list_bulleted" /></button>
+                <button type="button" className="btn btn-sm sv-newtask-editor-btn"><Icon name="link" /></button>
               </div>
               <textarea
-                rows={9}
+                id="new-task-description"
                 value={draft.description}
-                onChange={(e) => setField('description', e.target.value)}
+                onChange={(event) => setField('description', event.target.value)}
+                className="form-control sv-newtask-editor-input border-0 px-0"
                 placeholder="Describe the task, requirements, and acceptance criteria..."
-                className="w-full resize-none border-none bg-transparent text-base text-on-surface-variant placeholder:text-slate-400 focus:outline-none"
               />
             </div>
-          </div>
+          </article>
 
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Attachments</p>
-            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface p-6 text-center">
-              <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-primary">
-                <Icon name="cloud_upload" className="text-[26px]" />
+          <article className="sv-card sv-newtask-card">
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">Attachments</p>
+            <label className="sv-newtask-upload d-flex flex-column align-items-center justify-content-center text-center border border-2 border-dashed p-4 w-100" htmlFor="new-task-attachments">
+              <span className="sv-newtask-upload-icon rounded-3 d-inline-flex align-items-center justify-content-center mb-3" style={{ width: 46, height: 46 }}>
+                <Icon name="upload_file" className="text-primary" />
               </span>
-              <p className="text-2xl font-bold text-on-surface">
-                Drop files here or <span className="text-primary">browse</span>
-              </p>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                Maximum file size: 50MB. Support for PDF, PNG, JPG, and ZIP.
-              </p>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => setAttachmentFiles(e.target.files)}
-              />
+              <p className="sv-newtask-upload-title fw-semibold mb-1">Drop files here or <span className="text-primary">browse</span></p>
+              <p className="sv-newtask-upload-subtitle mb-0">Maximum file size: 50MB. Support for PDF, PNG, JPG, and ZIP.</p>
             </label>
-            {draft.attachments.length ? (
-              <div className="mt-4 space-y-2">
-                {draft.attachments.map((item) => (
-                  <div key={`${item.fileName}-${item.size}`} className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-2 text-sm">
-                    <span className="font-semibold text-on-surface">{item.fileName}</span>
-                    <span className="text-on-surface-variant">{Math.round(item.size / 1024)} KB</span>
+            <input
+              id="new-task-attachments"
+              type="file"
+              multiple
+              className="d-none"
+              onChange={(event) => setAttachmentFiles(event.target.files)}
+            />
+            {(draft.attachments || []).length ? (
+              <div className="mt-3 d-grid" style={{ gap: '0.45rem' }}>
+                {draft.attachments.map((attachment, index) => (
+                  <div key={`${attachment.fileName || 'file'}-${index}`} className="sv-newtask-attachment-item rounded-3 px-3 py-2 d-flex align-items-center justify-content-between">
+                    <span className="text-truncate pe-2">{attachment.fileName || 'Attachment'}</span>
+                    <small className="text-muted">{Math.max(1, Math.round((Number(attachment.size || 0) / 1024)))} KB</small>
                   </div>
                 ))}
               </div>
             ) : null}
-          </div>
+          </article>
         </section>
 
-        <aside className="space-y-6">
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface">People</p>
-            <label className="mb-2 block text-sm font-semibold text-on-surface-variant">Primary Assignee</label>
-            <select
+        <aside className="d-grid" style={{ gap: '0.75rem', alignContent: 'start' }}>
+          <article className="sv-card sv-newtask-card">
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">People</p>
+
+            <SearchableSinglePicker
+              label="Primary Assignee"
+              placeholder="Search users..."
+              search={userSearch}
+              onSearch={setUserSearch}
+              options={users}
               value={draft.primaryAssigneeId}
-              onChange={(e) => setField('primaryAssigneeId', e.target.value)}
-              className="mb-4 w-full rounded-lg border border-outline-variant bg-white px-3 py-3 text-sm font-semibold"
-            >
-              {users.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.displayName}
-                </option>
-              ))}
-            </select>
-
-            <label className="mb-2 block text-sm font-semibold text-on-surface-variant">Contributors</label>
-            <div className="flex flex-wrap gap-2">
-              {users.map((user) => {
-                const active = draft.assigneeIds.includes(user._id);
-                return (
-                  <button
-                    key={user._id}
-                    type="button"
-                    onClick={() => {
-                      const next = active
-                        ? draft.assigneeIds.filter((id) => id !== user._id)
-                        : [...draft.assigneeIds, user._id];
-                      setField('assigneeIds', next);
-                    }}
-                    className={`rounded-full px-3 py-2 text-xs font-bold ${active ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'}`}
-                  >
-                    {user.displayName}
-                  </button>
-                );
-              })}
-            </div>
-
-            <label className="mb-2 mt-4 block text-sm font-semibold text-on-surface-variant">External Collaborators</label>
-            <div className="space-y-3">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-on-surface-variant">Contacts</p>
-                <div className="flex flex-wrap gap-2">
-                  {(contacts || []).map((contact) => {
-                    const active = (draft.externalCollaborators || []).some(
-                      (item) => item.entityType === 'contact' && String(item.entityId) === String(contact._id),
-                    );
-                    return (
-                      <button
-                        key={`contact-${contact._id}`}
-                        type="button"
-                        onClick={() => {
-                          const current = Array.isArray(draft.externalCollaborators) ? draft.externalCollaborators : [];
-                          const next = active
-                            ? current.filter((item) => !(item.entityType === 'contact' && String(item.entityId) === String(contact._id)))
-                            : [...current, { entityType: 'contact', entityId: String(contact._id) }];
-                          setField('externalCollaborators', next);
-                        }}
-                        className={`rounded-full px-3 py-2 text-xs font-bold ${active ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'}`}
-                      >
-                        {contact.name || 'Contact'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-on-surface-variant">Employees</p>
-                <div className="flex flex-wrap gap-2">
-                  {(employees || []).map((employee) => {
-                    const active = (draft.externalCollaborators || []).some(
-                      (item) => item.entityType === 'employee' && String(item.entityId) === String(employee._id),
-                    );
-                    return (
-                      <button
-                        key={`employee-${employee._id}`}
-                        type="button"
-                        onClick={() => {
-                          const current = Array.isArray(draft.externalCollaborators) ? draft.externalCollaborators : [];
-                          const next = active
-                            ? current.filter((item) => !(item.entityType === 'employee' && String(item.entityId) === String(employee._id)))
-                            : [...current, { entityType: 'employee', entityId: String(employee._id) }];
-                          setField('externalCollaborators', next);
-                        }}
-                        className={`rounded-full px-3 py-2 text-xs font-bold ${active ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'}`}
-                      >
-                        {employee.name || 'Employee'}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Timeline</p>
-            <input
-              type="date"
-              value={draft.dueDate}
-              onChange={(e) => setField('dueDate', e.target.value)}
-              className="mb-6 w-full rounded-lg border border-outline-variant bg-white px-3 py-3 text-sm font-semibold"
+              onChange={(id) => setField('primaryAssigneeId', id)}
+              onLoadMore={() => loadMoreDirectory('users')}
+              meta={directoryMeta.users}
             />
 
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Priority</p>
-            <div className="grid grid-cols-2 gap-2">
-              {['low', 'medium', 'high', 'critical'].map((priority) => (
+            <SearchableMultiPicker
+              label="Contributors"
+              placeholder="Search contributors..."
+              search={userSearch}
+              onSearch={setUserSearch}
+              options={users}
+              selected={contributorSet}
+              onToggle={onToggleContributor}
+              onLoadMore={() => loadMoreDirectory('users')}
+              meta={directoryMeta.users}
+            />
+            {selectedContributorNames.length ? (
+              <div className="sv-newtask-chip-row">
+                {selectedContributorNames.map((name) => (
+                  <span key={`contrib-${name}`} className="sv-newtask-chip px-2 py-1">{name}</span>
+                ))}
+              </div>
+            ) : null}
+
+            <SearchableMultiPicker
+              label="External Contacts"
+              placeholder="Search contacts..."
+              search={contactSearch}
+              onSearch={setContactSearch}
+              options={contacts}
+              selected={externalContactSet}
+              onToggle={(item) => onToggleExternal('contact', item)}
+              onLoadMore={() => loadMoreDirectory('contacts')}
+              meta={directoryMeta.contacts}
+            />
+            {selectedContactNames.length ? (
+              <div className="sv-newtask-chip-row">
+                {selectedContactNames.map((name) => (
+                  <span key={`ext-contact-${name}`} className="sv-newtask-chip px-2 py-1">{name}</span>
+                ))}
+              </div>
+            ) : null}
+
+            <SearchableMultiPicker
+              label="External Employees"
+              placeholder="Search employees..."
+              search={employeeSearch}
+              onSearch={setEmployeeSearch}
+              options={employees}
+              selected={externalEmployeeSet}
+              onToggle={(item) => onToggleExternal('employee', item)}
+              onLoadMore={() => loadMoreDirectory('employees')}
+              meta={directoryMeta.employees}
+            />
+            {selectedEmployeeNames.length ? (
+              <div className="sv-newtask-chip-row">
+                {selectedEmployeeNames.map((name) => (
+                  <span key={`ext-employee-${name}`} className="sv-newtask-chip px-2 py-1">{name}</span>
+                ))}
+              </div>
+            ) : null}
+          </article>
+
+          <article className="sv-card sv-newtask-card">
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">Timeline</p>
+            <input
+              type="date"
+              value={draft.dueDate || ''}
+              onChange={(event) => setField('dueDate', event.target.value)}
+              className="form-control sv-newtask-field mb-2"
+            />
+
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">Priority</p>
+            <div className="d-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.42rem' }}>
+              {PRIORITIES.map((priority) => (
                 <button
                   key={priority}
                   type="button"
                   onClick={() => setField('priority', priority)}
-                  className={`rounded-lg px-3 py-2 text-left text-sm font-bold capitalize ${chipClass(draft.priority === priority, priority)}`}
+                  className={`btn sv-newtask-priority text-start ${String(draft.priority) === priority ? 'btn-warning' : 'btn-outline-secondary'}`}
                 >
                   {priority}
                 </button>
               ))}
             </div>
-          </div>
+          </article>
 
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-            <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Project</p>
+          <article className="sv-card sv-newtask-card">
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Project</p>
             <select
-              value={draft.projectId}
-              onChange={(e) => setField('projectId', e.target.value)}
-              className="mb-6 w-full rounded-lg border border-outline-variant bg-white px-3 py-3 text-sm font-semibold"
+              value={draft.projectId || ''}
+              onChange={(event) => setField('projectId', event.target.value)}
+              className="form-select sv-newtask-field mb-2"
             >
+              <option value="">Select project</option>
               {projects.map((project) => (
-                <option key={project._id} value={project._id}>
-                  {project.name}
-                </option>
+                <option key={project._id} value={project._id}>{project.name || 'Project'}</option>
               ))}
             </select>
 
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Issue Type</p>
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Issue Type</p>
             <select
-              value={draft.issueType}
-              onChange={(e) => {
-                const nextType = e.target.value;
-                setField('issueType', nextType);
-                if (nextType === 'epic') {
-                  setField('parentTaskId', '');
-                }
-              }}
-              className="mb-6 w-full rounded-lg border border-outline-variant bg-white px-3 py-3 text-sm font-semibold"
+              value={draft.issueType || 'task'}
+              onChange={(event) => setField('issueType', event.target.value)}
+              className="form-select sv-newtask-field mb-2"
             >
-              <option value="epic">Epic</option>
-              <option value="task">Task</option>
-              <option value="subtask">Subtask</option>
+              {ISSUE_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
             </select>
 
-            {draft.issueType !== 'epic' ? (
-              <>
-                <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Parent</p>
-                <select
-                  value={draft.parentTaskId}
-                  onChange={(e) => setField('parentTaskId', e.target.value)}
-                  className="mb-6 w-full rounded-lg border border-outline-variant bg-white px-3 py-3 text-sm font-semibold"
-                >
-                  <option value="">No parent</option>
-                  {(parentTasks || [])
-                    .filter((task) => {
-                      if (String(task.projectId) !== String(draft.projectId)) return false;
-                      const issueType = String(task.issueType || 'task');
-                      if (draft.issueType === 'task') return issueType === 'epic';
-                      return issueType === 'task';
-                    })
-                    .map((task) => (
-                      <option key={task._id} value={task._id}>
-                        {task.title}
-                      </option>
-                    ))}
-                </select>
-              </>
-            ) : null}
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Parent</p>
+            <select
+              value={draft.parentTaskId || ''}
+              onChange={(event) => setField('parentTaskId', event.target.value)}
+              className="form-select sv-newtask-field mb-2"
+            >
+              <option value="">No parent</option>
+              {parentTasks.map((task) => (
+                <option key={task._id} value={task._id}>{task.title || 'Task'}</option>
+              ))}
+            </select>
 
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-on-surface">Tags</p>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {draft.tags.map((tag) => (
-                <button
-                  type="button"
-                  key={tag}
-                  onClick={() => removeTag(tag)}
-                  className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold uppercase text-blue-700"
-                >
-                  {tag} x
+            <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Tags</p>
+            <div className="sv-newtask-tag-list mb-2">
+              {(draft.tags || []).map((tag) => (
+                <button key={tag} type="button" className="sv-newtask-tag rounded-pill" onClick={() => removeTag(tag)}>
+                  {tag} <span aria-hidden="true">×</span>
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="d-flex gap-2">
               <input
-                value={draft.tagsInput}
-                onChange={(e) => setField('tagsInput', e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
+                value={draft.tagsInput || ''}
+                onChange={(event) => setField('tagsInput', event.target.value)}
+                className="form-control sv-newtask-field"
                 placeholder="Add tag"
-                className="flex-1 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm"
               />
-              <button type="button" onClick={addTag} className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold">
-                Add
-              </button>
+              <button type="button" className="btn btn-outline-secondary sv-ctl-btn" onClick={addTag}>Add</button>
             </div>
-          </div>
 
-          {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {submitting ? 'Creating Task...' : 'Create Task'}
-          </button>
+            {error ? <p className="sv-newtask-error small mt-2 mb-0">{error}</p> : null}
+
+            <div className="sv-newtask-actions d-grid mt-3" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+              <button type="button" className="btn btn-outline-secondary sv-ctl-btn" onClick={() => navigate(-1)}>Cancel</button>
+              <button type="submit" className="btn btn-primary sv-ctl-btn" disabled={submitting}>{submitting ? 'Creating...' : 'Create Task'}</button>
+            </div>
+          </article>
         </aside>
       </form>
     </main>
   );
 }
 
+export default NewTaskPage;
 

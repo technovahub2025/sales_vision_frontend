@@ -33,7 +33,7 @@ export function leaveWorkspace(payload) {
   const socket = getSocket();
   const workspaceId = payload?.workspaceId;
   if (!workspaceId) return;
-  socket.emit('workspace:leave', payload);
+  socket.emit('workspace:leave', payload);          
 }
 
 export function joinRoom(room) {

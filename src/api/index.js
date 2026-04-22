@@ -216,7 +216,7 @@ export const workspacesApi = {
   get: (workspaceId, signal) => apiRequest({ method: 'get', url: `/v1/workspaces/${workspaceId}`, signal }),
   update: (workspaceId, data) => apiRequest({ method: 'patch', url: `/v1/workspaces/${workspaceId}`, data }),
   remove: (workspaceId) => apiRequest({ method: 'delete', url: `/v1/workspaces/${workspaceId}` }),
-  members: (workspaceId, signal) => apiRequest({ method: 'get', url: `/v1/workspaces/${workspaceId}/members`, signal }),
+  members: (workspaceId, params, signal) => apiRequest({ method: 'get', url: `/v1/workspaces/${workspaceId}/members`, params, signal }),
   invite: (workspaceId, data) => apiRequest({ method: 'post', url: `/v1/workspaces/${workspaceId}/members/invite`, data }),
   updateMember: (workspaceId, userId, data) =>
     apiRequest({ method: 'patch', url: `/v1/workspaces/${workspaceId}/members/${userId}`, data }),

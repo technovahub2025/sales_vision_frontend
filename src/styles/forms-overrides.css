@@ -1,0 +1,36 @@
+.form-control,
+.form-select {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.form-floating > label {
+  color: var(--color-text-muted);
+}
+
+
+.alert {
+  margin-bottom: 0;
+}
+
+.hover-opacity-75:hover {
+  opacity: 0.75;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-muted) 40%, transparent);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+}

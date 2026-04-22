@@ -249,6 +249,7 @@ function EmployeeManagementPage() {
   const { teams, createTeam } = useTeams();
 
   const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
@@ -264,6 +265,8 @@ function EmployeeManagementPage() {
   const [deletingId, setDeletingId] = useState('');
   const [toast, setToast] = useState(null);
   const [openRowMenuId, setOpenRowMenuId] = useState('');
+  const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
+  const [openRowMenuContext, setOpenRowMenuContext] = useState(null);
   const rowMenuRef = useRef(null);
 
   useEffect(() => {
@@ -276,24 +279,55 @@ function EmployeeManagementPage() {
     if (!openRowMenuId) return undefined;
 
     const handleClickOutside = (event) => {
-      if (!rowMenuRef.current?.contains(event.target)) {
-        setOpenRowMenuId('');
-      }
+      if (rowMenuRef.current?.contains(event.target)) return;
+      if (event.target.closest('[data-row-menu-trigger="true"]')) return;
+      setOpenRowMenuId('');
+      setOpenRowMenuContext(null);
     };
 
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
         setOpenRowMenuId('');
+        setOpenRowMenuContext(null);
       }
+    };
+
+    const closeOnViewportChange = () => {
+      setOpenRowMenuId('');
+      setOpenRowMenuContext(null);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', closeOnViewportChange);
+    window.addEventListener('scroll', closeOnViewportChange, true);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', closeOnViewportChange);
+      window.removeEventListener('scroll', closeOnViewportChange, true);
     };
   }, [openRowMenuId]);
+
+  const openRowMenu = (event, employee, linkedContact) => {
+    const id = String(employee._id || '');
+    if (!id) return;
+    if (openRowMenuId === id) {
+      setOpenRowMenuId('');
+      setOpenRowMenuContext(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 188;
+    const menuHeight = 168;
+    const top = rect.bottom + menuHeight + 8 > window.innerHeight
+      ? Math.max(8, rect.top - menuHeight - 8)
+      : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 8);
+    const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+    setOpenRowMenuPos({ top, left });
+    setOpenRowMenuContext({ employee, linkedContact });
+    setOpenRowMenuId(id);
+  };
 
   const departments = useMemo(() => {
     const set = new Set((employees || []).map((item) => String(item.department || '').trim()).filter(Boolean));
@@ -493,14 +527,33 @@ function EmployeeManagementPage() {
         </section>
 
         <section className="sv-card sv-employees-table-card">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-5">
+          <div className="sv-employees-filter-bar">
+            <div className="sv-employees-filter-main">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by name, email, role, team"
-                className="sv-ctl-input md:col-span-2"
+                className="sv-ctl-input sv-employees-search"
               />
+              <button
+                type="button"
+                className={`sv-ctl-btn btn-light sv-employees-filter-toggle ${filtersOpen ? 'is-active' : ''}`}
+                onClick={() => setFiltersOpen((prev) => !prev)}
+              >
+                <Icon name="filter_list" className="sv-icon-btn-icon" />
+                <span>Filter</span>
+              </button>
+            </div>
+
+            <div className="sv-employees-filter-actions">
+              <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
+                <Icon name="person_add" className="sv-icon-btn-icon" />
+                <span>New Employee</span>
+              </button>
+            </div>
+          </div>
+          {filtersOpen ? (
+            <div className="sv-employees-filter-panel">
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="sv-ctl-select">
                 <option value="all">All availability</option>
                 <option value="available">Available</option>
@@ -520,21 +573,14 @@ function EmployeeManagementPage() {
                   <option key={teamName} value={teamName}>{teamName}</option>
                 ))}
               </select>
-            </div>
-
-            <div className="flex items-center gap-2">
               <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="sv-ctl-select">
                 <option value="recent">Recently updated</option>
                 <option value="name">Name</option>
                 <option value="velocity">Velocity</option>
                 <option value="capacity">Capacity</option>
               </select>
-              <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
-                <Icon name="person_add" className="sv-icon-btn-icon" />
-                <span>New Employee</span>
-              </button>
             </div>
-          </div>
+          ) : null}
 
           {loading ? <p className="px-3 py-6 text-sm text-on-surface-variant">Loading employees...</p> : null}
           {error ? <p className="px-3 py-6 text-sm text-error">{error}</p> : null}
@@ -582,80 +628,17 @@ function EmployeeManagementPage() {
                           )}
                         </td>
                         <td className="px-3 py-3 text-right sv-employees-actions-cell">
-                          <div className="sv-row-menu-container" ref={openRowMenuId === String(employee._id) ? rowMenuRef : null}>
+                          <div className="sv-row-menu-container">
                             <button
                               type="button"
                               className="sv-row-menu-btn"
+                              data-row-menu-trigger="true"
                               aria-label="Open actions"
                               aria-expanded={openRowMenuId === String(employee._id)}
-                              onClick={() =>
-                                setOpenRowMenuId((current) => (current === String(employee._id) ? '' : String(employee._id)))
-                              }
+                              onClick={(event) => openRowMenu(event, employee, linkedContact)}
                             >
                               <Icon name="more_vert" className="text-lg" />
                             </button>
-                            {openRowMenuId === String(employee._id) ? (
-                              <div className="sv-row-menu-popover">
-                                <button
-                                  type="button"
-                                  className="sv-row-menu-item"
-                                  onClick={() => {
-                                    setOpenRowMenuId('');
-                                    navigate(ROUTES.employeeDetail.replace(':employeeId', employee._id));
-                                  }}
-                                >
-                                  <Icon name="open_in_new" className="sv-icon-btn-icon" />
-                                  <span>Open</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="sv-row-menu-item"
-                                  onClick={() => {
-                                    setOpenRowMenuId('');
-                                    openEdit(employee);
-                                  }}
-                                >
-                                  <Icon name="edit" className="sv-icon-btn-icon" />
-                                  <span>Quick Edit</span>
-                                </button>
-                                {linkedContact ? (
-                                  <button
-                                    type="button"
-                                    className="sv-row-menu-item is-danger"
-                                    onClick={() => {
-                                      setOpenRowMenuId('');
-                                      linkOrUnlinkContact(employee, null);
-                                    }}
-                                  >
-                                    <Icon name="link_off" className="sv-icon-btn-icon" />
-                                    <span>Unlink</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="sv-row-menu-item"
-                                    onClick={() => {
-                                      setOpenRowMenuId('');
-                                      openEdit(employee);
-                                    }}
-                                  >
-                                    <Icon name="link" className="sv-icon-btn-icon" />
-                                    <span>Link Contact</span>
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  className="sv-row-menu-item is-danger"
-                                  onClick={() => {
-                                    setOpenRowMenuId('');
-                                    setDeletingId(String(employee._id));
-                                  }}
-                                >
-                                  <Icon name="delete" className="sv-icon-btn-icon" />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -682,6 +665,83 @@ function EmployeeManagementPage() {
           ) : null}
         </section>
       </div>
+
+      {openRowMenuId && openRowMenuContext?.employee ? (
+        <div
+          ref={rowMenuRef}
+          className="sv-row-menu-popover sv-row-menu-popover-fixed"
+          style={{ top: `${openRowMenuPos.top}px`, left: `${openRowMenuPos.left}px` }}
+        >
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const targetId = openRowMenuContext.employee._id;
+              setOpenRowMenuId('');
+              setOpenRowMenuContext(null);
+              navigate(ROUTES.employeeDetail.replace(':employeeId', targetId));
+            }}
+          >
+            <Icon name="open_in_new" className="sv-icon-btn-icon" />
+            <span>Open</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const targetEmployee = openRowMenuContext.employee;
+              setOpenRowMenuId('');
+              setOpenRowMenuContext(null);
+              openEdit(targetEmployee);
+            }}
+          >
+            <Icon name="edit" className="sv-icon-btn-icon" />
+            <span>Quick Edit</span>
+          </button>
+          {openRowMenuContext.linkedContact ? (
+            <button
+              type="button"
+              className="sv-row-menu-item is-danger"
+              onClick={() => {
+                const targetEmployee = openRowMenuContext.employee;
+                setOpenRowMenuId('');
+                setOpenRowMenuContext(null);
+                linkOrUnlinkContact(targetEmployee, null);
+              }}
+            >
+              <Icon name="link_off" className="sv-icon-btn-icon" />
+              <span>Unlink</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="sv-row-menu-item"
+              onClick={() => {
+                const targetEmployee = openRowMenuContext.employee;
+                setOpenRowMenuId('');
+                setOpenRowMenuContext(null);
+                openEdit(targetEmployee);
+              }}
+            >
+              <Icon name="link" className="sv-icon-btn-icon" />
+              <span>Link Contact</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="sv-row-menu-item is-danger"
+            onClick={() => {
+              const targetId = String(openRowMenuContext.employee._id || '');
+              setOpenRowMenuId('');
+              setOpenRowMenuContext(null);
+              setDeletingId(targetId);
+            }}
+          >
+            <Icon name="delete" className="sv-icon-btn-icon" />
+            <span>Delete</span>
+          </button>
+        </div>
+      ) : null}
 
       <EmployeeFormModal
         open={modalOpen}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
 import { useCampaigns } from '../../hooks/useCampaigns';
@@ -462,7 +462,7 @@ function CreateCampaignModal({
               <Icon name="close" className="sv-campaigns-btn-icon" />
               <span>Cancel</span>
             </button>
-            <button type="submit" disabled={busy} className="sv-ctl-btn btn-primary">
+            <button type="submit" disabled={busy} className="sv-ctl-btn btn-primary sv-campaigns-icon-btn sv-campaigns-submit-btn">
               <Icon name="add_circle" className="sv-campaigns-btn-icon" />
               <span>{busy ? 'Creating...' : 'Create Campaign'}</span>
             </button>
@@ -482,6 +482,7 @@ function CampaignsPage() {
 
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [archiveScope, setArchiveScope] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
@@ -493,6 +494,10 @@ function CampaignsPage() {
   const [createForm, setCreateForm] = useState(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast] = useState(null);
+  const [openRowMenuId, setOpenRowMenuId] = useState('');
+  const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
+  const [openRowMenuCampaign, setOpenRowMenuCampaign] = useState(null);
+  const rowMenuRef = useRef(null);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -702,6 +707,62 @@ function CampaignsPage() {
     }
   };
 
+  const closeRowMenu = useCallback(() => {
+    setOpenRowMenuId('');
+    setOpenRowMenuCampaign(null);
+  }, []);
+
+  const openRowMenu = useCallback((event, campaign) => {
+    event.stopPropagation();
+    const id = String(campaign?._id || '');
+    if (!id) return;
+    if (openRowMenuId === id) {
+      closeRowMenu();
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const menuHeight = 150;
+    const placeAbove = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight + 12;
+
+    const top = placeAbove
+      ? Math.max(8, rect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 6);
+    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth));
+
+    setOpenRowMenuPos({ top, left });
+    setOpenRowMenuCampaign(campaign);
+    setOpenRowMenuId(id);
+  }, [closeRowMenu, openRowMenuId]);
+
+  useEffect(() => {
+    if (!openRowMenuId) return undefined;
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (rowMenuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-row-menu-trigger="true"]')) return;
+      closeRowMenu();
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') closeRowMenu();
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', closeRowMenu);
+    window.addEventListener('scroll', closeRowMenu, true);
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', closeRowMenu);
+      window.removeEventListener('scroll', closeRowMenu, true);
+    };
+  }, [openRowMenuId, closeRowMenu]);
+
   return (
     <main className="sv-campaigns-page">
       <div className="sv-campaigns-stack">
@@ -744,38 +805,50 @@ function CampaignsPage() {
         <section className="sv-card sv-campaigns-table-card">
           <div className="sv-campaigns-table-head">
             <h2 className="sv-campaigns-table-title">Active Initiatives</h2>
-            <div className="sv-campaigns-controls">
+            <div className="sv-campaigns-filter-bar">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search campaign/channel/owner"
                 className="sv-ctl-input sv-campaigns-search"
               />
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="sv-ctl-select"
+              <button
+                type="button"
+                className={`sv-ctl-btn btn-light sv-campaigns-filter-toggle ${filtersOpen ? 'is-active' : ''}`}
+                onClick={() => setFiltersOpen((prev) => !prev)}
               >
-                <option value="all">All status</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-              <select
-                value={archiveScope}
-                onChange={(event) => setArchiveScope(event.target.value)}
-                className="sv-ctl-select"
-              >
-                <option value="all">All (Active)</option>
-                <option value="archived">Archived only</option>
-              </select>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="sv-ctl-select">
-                <option value="recent">Recently updated</option>
-                <option value="start_date">Start date</option>
-                <option value="spend">Spend</option>
-                <option value="conversion">Conversion</option>
-              </select>
+                <Icon name="filter_list" className="sv-icon-btn-icon" />
+                <span>Filter</span>
+              </button>
             </div>
+            {filtersOpen ? (
+              <div className="sv-campaigns-filter-panel">
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="sv-ctl-select"
+                >
+                  <option value="all">All status</option>
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+                <select
+                  value={archiveScope}
+                  onChange={(event) => setArchiveScope(event.target.value)}
+                  className="sv-ctl-select"
+                >
+                  <option value="all">All (Active)</option>
+                  <option value="archived">Archived only</option>
+                </select>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="sv-ctl-select">
+                  <option value="recent">Recently updated</option>
+                  <option value="start_date">Start date</option>
+                  <option value="spend">Spend</option>
+                  <option value="conversion">Conversion</option>
+                </select>
+              </div>
+            ) : null}
           </div>
 
           {error ? <p className="sv-campaigns-alert is-error">{error}</p> : null}
@@ -813,33 +886,16 @@ function CampaignsPage() {
                       <td>{formatINR(campaign.spend || 0)}</td>
                       <td>{Number(campaign.conversionRate || 0).toFixed(1)}%</td>
                       <td className="is-right">
-                        <div className="sv-campaigns-actions">
+                        <div className="sv-row-menu-container">
                           <button
                             type="button"
-                            onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign._id))}
-                            className="sv-ctl-btn btn-light sv-campaigns-icon-btn"
+                            className="sv-row-menu-btn"
+                            data-row-menu-trigger="true"
+                            aria-label="Open actions"
+                            aria-expanded={openRowMenuId === String(campaign._id)}
+                            onClick={(event) => openRowMenu(event, campaign)}
                           >
-                            <Icon name="open_in_new" className="sv-campaigns-btn-icon" />
-                            <span>Open</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(campaign._id)}
-                            className="sv-ctl-btn btn-light sv-campaigns-icon-btn"
-                          >
-                            <Icon name="content_copy" className="sv-campaigns-btn-icon" />
-                            <span>Duplicate</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(campaign)}
-                            className={`sv-ctl-btn sv-campaigns-icon-btn ${campaign?.isArchived ? 'btn-primary' : 'btn-light sv-campaigns-archive-btn'}`}
-                          >
-                            <Icon
-                              name={campaign?.isArchived ? 'unarchive' : 'archive'}
-                              className="sv-campaigns-btn-icon"
-                            />
-                            <span>{campaign?.isArchived ? 'Unarchive' : 'Archive'}</span>
+                            <Icon name="more_vert" className="text-lg" />
                           </button>
                         </div>
                       </td>
@@ -868,6 +924,51 @@ function CampaignsPage() {
           />
         </section>
       </div>
+
+      {openRowMenuId && openRowMenuCampaign ? (
+        <div
+          ref={rowMenuRef}
+          className="sv-row-menu-popover sv-row-menu-popover-fixed"
+          style={{ top: `${openRowMenuPos.top}px`, left: `${openRowMenuPos.left}px` }}
+        >
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuCampaign;
+              closeRowMenu();
+              navigate(ROUTES.campaignDetail.replace(':campaignId', row._id));
+            }}
+          >
+            <Icon name="open_in_new" className="sv-icon-btn-icon" />
+            <span>Open</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuCampaign;
+              closeRowMenu();
+              handleDuplicate(row._id);
+            }}
+          >
+            <Icon name="content_copy" className="sv-icon-btn-icon" />
+            <span>Duplicate</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item is-danger"
+            onClick={() => {
+              const row = openRowMenuCampaign;
+              closeRowMenu();
+              setDeleteTarget(row);
+            }}
+          >
+            <Icon name={openRowMenuCampaign?.isArchived ? 'unarchive' : 'archive'} className="sv-icon-btn-icon" />
+            <span>{openRowMenuCampaign?.isArchived ? 'Unarchive' : 'Archive'}</span>
+          </button>
+        </div>
+      ) : null}
 
       <CreateCampaignModal
         open={createOpen}

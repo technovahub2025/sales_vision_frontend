@@ -1,0 +1,378 @@
+.sv-taskdetail-page {
+  width: 100%;
+  font-family: var(--font-body);
+}
+
+.sv-taskdetail-stack {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.sv-taskdetail-card {
+  border-radius: 0.9rem;
+  border-color: color-mix(in srgb, var(--color-border) 78%, white) !important;
+  background: color-mix(in srgb, var(--color-surface) 98%, transparent);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.06);
+}
+
+.sv-taskdetail-section {
+  padding: 1rem;
+}
+
+.sv-taskdetail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.sv-taskdetail-head-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sv-taskdetail-head-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sv-taskdetail-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.5rem;
+}
+
+.sv-taskdetail-title {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.2vw, 2.1rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--color-text);
+}
+
+.sv-taskdetail-description {
+  margin: 0.48rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.sv-taskdetail-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sv-taskdetail-pill-label,
+.sv-taskdetail-pill,
+.sv-taskdetail-pill-code {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: 0.22rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 88%, white);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.sv-taskdetail-pill-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sv-taskdetail-pill-code {
+  font-family: "JetBrains Mono", "SF Mono", Menlo, Monaco, Consolas, monospace;
+  color: var(--color-text);
+}
+
+.sv-taskdetail-pill.is-running {
+  background: color-mix(in srgb, #f59e0b 14%, var(--color-surface));
+  border-color: color-mix(in srgb, #f59e0b 28%, var(--color-border));
+  color: #b45309;
+}
+
+.sv-taskdetail-pill.is-paused {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+  color: color-mix(in srgb, var(--color-accent) 80%, #0f172a);
+}
+
+.sv-taskdetail-pill.is-stopped {
+  background: color-mix(in srgb, var(--color-surface-muted) 90%, white);
+}
+
+.sv-taskdetail-status-row {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sv-taskdetail-status-btn {
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 86%, transparent);
+  color: var(--color-text-muted);
+  border-radius: 0.62rem;
+  min-height: 1.96rem;
+  padding: 0.22rem 0.72rem;
+  font-size: 0.79rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.sv-taskdetail-status-btn:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-border));
+  color: var(--color-text);
+}
+
+.sv-taskdetail-status-btn.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+}
+
+.sv-taskdetail-estimate-row {
+  margin-top: 0.95rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.58rem;
+}
+
+.sv-taskdetail-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.26rem;
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.sv-taskdetail-estimate-input {
+  width: 132px;
+}
+
+.sv-taskdetail-field {
+  width: 100%;
+}
+
+.sv-taskdetail-btn {
+  min-height: 1.95rem;
+  border-radius: 0.62rem !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.sv-taskdetail-btn:disabled,
+.sv-taskdetail-field:disabled {
+  opacity: 0.62;
+}
+
+.sv-taskdetail-shortcuts,
+.sv-taskdetail-subtle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.sv-taskdetail-message {
+  margin: 0.68rem 0 0;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sv-taskdetail-section-title {
+  margin: 0 0 0.72rem;
+  font-size: clamp(1.05rem, 1.75vw, 1.45rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.sv-taskdetail-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sv-taskdetail-block {
+  margin-top: 0.78rem;
+}
+
+.sv-taskdetail-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sv-taskdetail-chip {
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 88%, white);
+  color: var(--color-text-muted);
+  border-radius: 999px;
+  min-height: 1.86rem;
+  padding: 0.2rem 0.62rem;
+  font-size: 0.77rem;
+  font-weight: 600;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.sv-taskdetail-chip:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+  color: var(--color-text);
+}
+
+.sv-taskdetail-chip.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-accent);
+}
+
+.sv-taskdetail-section-head {
+  margin-bottom: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sv-taskdetail-activity-list {
+  max-height: 24rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.sv-taskdetail-activity-row {
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 90%, white);
+  border-radius: 0.62rem;
+  padding: 0.52rem 0.6rem;
+}
+
+.sv-taskdetail-meta-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+
+.sv-taskdetail-activity-time {
+  margin: 0.18rem 0 0;
+  font-size: 0.73rem;
+  color: var(--color-text-muted);
+}
+
+.sv-taskdetail-activity-text {
+  margin: 0.28rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  line-height: 1.32;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv-taskdetail-feedback {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.sv-taskdetail-feedback.is-error {
+  color: var(--color-error);
+}
+
+.sv-taskdetail-skeleton {
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, white);
+  background: color-mix(in srgb, var(--color-surface-container, #eceef0) 90%, var(--color-surface));
+  animation: svPulse 1.3s ease-in-out infinite;
+}
+
+.sv-taskdetail-skeleton-header {
+  min-height: 8.4rem;
+}
+
+.sv-taskdetail-skeleton-body {
+  min-height: 15rem;
+}
+
+@keyframes svPulse {
+  0%, 100% { opacity: 0.62; }
+  50% { opacity: 1; }
+}
+
+html[data-theme='dark'] .sv-taskdetail-card {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 72%, #0f172a) !important;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.34);
+}
+
+html[data-theme='dark'] .sv-taskdetail-chip,
+html[data-theme='dark'] .sv-taskdetail-pill,
+html[data-theme='dark'] .sv-taskdetail-pill-label,
+html[data-theme='dark'] .sv-taskdetail-pill-code,
+html[data-theme='dark'] .sv-taskdetail-activity-row,
+html[data-theme='dark'] .sv-taskdetail-status-btn {
+  background: color-mix(in srgb, var(--color-surface-muted) 68%, #0b1220);
+  border-color: color-mix(in srgb, var(--color-border) 72%, #0b1220);
+}
+
+html[data-theme='dark'] .sv-taskdetail-pill.is-running {
+  color: #f59e0b;
+}
+
+html[data-theme='dark'] .sv-taskdetail-pill.is-paused {
+  color: #93c5fd;
+}
+
+@media (max-width: 991.98px) {
+  .sv-taskdetail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sv-taskdetail-section {
+    padding: 0.82rem;
+  }
+
+  .sv-taskdetail-title {
+    font-size: 1.58rem;
+  }
+
+  .sv-taskdetail-head-actions {
+    width: 100%;
+  }
+
+  .sv-taskdetail-head-actions .sv-taskdetail-btn {
+    width: 100%;
+  }
+
+  .sv-taskdetail-estimate-row {
+    gap: 0.5rem;
+  }
+
+  .sv-taskdetail-estimate-input {
+    width: 100%;
+  }
+
+  .sv-taskdetail-estimate-row .sv-taskdetail-btn {
+    width: 100%;
+  }
+}

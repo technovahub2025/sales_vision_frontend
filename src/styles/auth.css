@@ -1,0 +1,57 @@
+.sv-auth-shell {
+  min-height: 100vh;
+  background: linear-gradient(130deg, var(--auth-bg-a) 0%, var(--auth-bg-b) 62%, var(--auth-bg-c) 100%);
+}
+
+.sv-auth-card {
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, white);
+  border-radius: 1.2rem;
+  box-shadow: 0 24px 40px rgba(8, 14, 29, 0.17);
+}
+
+.sv-auth-panel {
+  border-radius: 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, rgba(15, 19, 42, 0.46) 0%, rgba(41, 66, 142, 0.42) 100%);
+  box-shadow: 0 20px 36px rgba(8, 12, 26, 0.22);
+}
+
+.sv-auth-feature {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
+.sv-floating-field > .form-control {
+  height: 3.15rem;
+  min-height: 3.15rem;
+  border-radius: 0.75rem;
+  padding-top: 1.18rem;
+  padding-bottom: 0.35rem;
+}
+
+.sv-floating-field > label {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+.sv-password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  color: var(--color-text-muted);
+  border: 0;
+}
+
+.sv-password-toggle:hover {
+  color: var(--color-text);
+}
+
+.sv-input-field > .form-control {
+  height: 3rem;
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+}

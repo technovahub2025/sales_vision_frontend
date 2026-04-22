@@ -90,7 +90,7 @@ function Sidebar({ collapsed = false, setCollapsed }) {
     >
       <div className={`mb-8 px-3 d-flex align-items-center ${collapsed ? 'justify-content-center' : 'justify-content-between'}`}>
         {!collapsed && (
-          <div className="mb-2">
+          <div className="sv-sidebar-brand">
             <img src={logoLight} alt="Sales Vision" className="sv-logo sv-logo-light sv-logo-dashboard" />
             <img src={logoDark} alt="Sales Vision" className="sv-logo sv-logo-dark sv-logo-dashboard" />
           </div>
@@ -98,8 +98,8 @@ function Sidebar({ collapsed = false, setCollapsed }) {
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="btn btn-sm btn-outline-secondary sv-focus-ring d-flex align-items-center justify-content-center"
-          style={{ width: 32, height: 32, padding: 0, borderRadius: '0.5rem' }}
+          className="sv-sidebar-toggle sv-focus-ring d-flex align-items-center justify-content-center"
+          style={{ width: 32, height: 32, padding: 0 }}
           aria-label="Toggle sidebar"
         >
           <Icon name={collapsed ? 'bi-chevron-right' : 'bi-chevron-left'} />

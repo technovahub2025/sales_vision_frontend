@@ -1,0 +1,380 @@
+/* Settings */
+.sv-settings-page {
+  width: 100%;
+  padding-top: 0.18rem;
+}
+
+.sv-settings-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  padding: 0.82rem 0.94rem 0.92rem !important;
+}
+
+.sv-settings-tabs {
+  margin-bottom: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  padding: 0.28rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 82%, white);
+}
+
+.sv-settings-tab {
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  background: color-mix(in srgb, var(--color-surface) 94%, white);
+  border-radius: 0.62rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  min-height: 2rem;
+  padding: 0.45rem 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 170ms ease;
+}
+
+.sv-settings-tab:hover {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.sv-settings-tab.is-active {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border));
+  background: var(--color-accent);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.sv-settings-header {
+  margin-bottom: 1rem;
+}
+
+.sv-settings-title {
+  margin: 0;
+  font-size: clamp(1.95rem, 2.7vw, 2.85rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.sv-settings-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.sv-settings-alert {
+  margin-bottom: 0.84rem;
+  border-radius: 0.66rem;
+  border: 1px solid color-mix(in srgb, var(--color-error) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  padding: 0.66rem 0.8rem;
+  font-size: 0.82rem;
+  color: var(--color-error);
+}
+
+.sv-settings-stack {
+  display: grid;
+  gap: 0.86rem;
+}
+
+.sv-settings-card {
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white);
+  background: color-mix(in srgb, var(--color-surface) 98%, white);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  padding: 1rem;
+}
+
+.sv-settings-card-head {
+  margin-bottom: 0.82rem;
+}
+
+.sv-settings-card-title {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sv-settings-card-subtitle {
+  margin: 0.16rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.sv-settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.sv-settings-form-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sv-settings-field {
+  display: block;
+}
+
+.sv-settings-label {
+  display: block;
+  margin-bottom: 0.27rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sv-settings-input {
+  width: 100%;
+  min-height: 2.18rem;
+  border-radius: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white);
+  background: color-mix(in srgb, var(--color-surface) 96%, white);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  padding: 0.4rem 0.72rem;
+}
+
+.sv-settings-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-border));
+  box-shadow: 0 0 0 0.14rem color-mix(in srgb, var(--color-accent) 13%, transparent);
+}
+
+.sv-settings-error {
+  margin-top: 0.26rem;
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-error);
+}
+
+.sv-settings-note {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.sv-settings-success {
+  font-size: 0.8rem;
+  color: #16a34a;
+}
+
+.sv-settings-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.56rem;
+  padding-top: 0.12rem;
+}
+
+.sv-settings-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  border-radius: 0.62rem;
+  background: color-mix(in srgb, var(--color-surface) 96%, white);
+  padding: 0.46rem 0.6rem;
+}
+
+.sv-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  min-height: 2.08rem;
+  border-radius: 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  padding: 0.42rem 0.78rem;
+  line-height: 1.1;
+  transition: all 170ms ease;
+}
+
+.sv-settings-btn-primary {
+  background: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border));
+  color: #fff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.sv-settings-btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.sv-settings-btn-neutral {
+  border-color: color-mix(in srgb, var(--color-border) 80%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 84%, white);
+  color: var(--color-text);
+}
+
+.sv-settings-btn-neutral:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.sv-settings-btn-danger {
+  border-color: color-mix(in srgb, var(--color-error) 36%, var(--color-border));
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-surface));
+  color: var(--color-error);
+}
+
+.sv-settings-btn-danger:hover {
+  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface));
+}
+
+.sv-settings-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.sv-settings-inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.52rem;
+  align-items: center;
+}
+
+.sv-settings-invite-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px auto;
+  gap: 0.52rem;
+  align-items: center;
+}
+
+.sv-settings-list-item {
+  border-radius: 0.68rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 75%, white);
+  padding: 0.74rem;
+}
+
+.sv-settings-table-wrap {
+  overflow-x: auto;
+}
+
+.sv-settings-scroll-area {
+  max-height: 24rem;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.sv-settings-scroll-area-lg {
+  max-height: 27rem;
+}
+
+.sv-settings-scroll-area::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.sv-settings-scroll-area::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background: color-mix(in srgb, var(--color-border-strong) 82%, transparent);
+}
+
+.sv-settings-scroll-area::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-surface-muted) 88%, transparent);
+}
+
+.sv-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.sv-settings-table thead th {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.6rem;
+}
+
+.sv-settings-table tbody td {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 88%, white);
+  font-size: 0.8rem;
+  padding: 0.58rem 0.6rem;
+  vertical-align: middle;
+}
+
+.sv-settings-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sv-settings-table-select {
+  min-height: 1.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white);
+  background: color-mix(in srgb, var(--color-surface) 96%, white);
+  font-size: 0.76rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--color-text);
+}
+
+html[data-theme='dark'] .sv-settings-tabs,
+html[data-theme='dark'] .sv-settings-card,
+html[data-theme='dark'] .sv-settings-list-item {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 70%, #0b1220);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.32);
+}
+
+html[data-theme='dark'] .sv-settings-tab,
+html[data-theme='dark'] .sv-settings-input,
+html[data-theme='dark'] .sv-settings-switch,
+html[data-theme='dark'] .sv-settings-table-select,
+html[data-theme='dark'] .sv-settings-btn-neutral {
+  background: color-mix(in srgb, var(--color-surface-muted) 70%, #0b1220);
+  border-color: color-mix(in srgb, var(--color-border) 72%, #0b1220);
+}
+
+@media (max-width: 991.98px) {
+  .sv-settings-shell {
+    width: 100% !important;
+    max-width: none !important;
+    margin-inline: 0 !important;
+    padding: 0.78rem 0.78rem 0.88rem !important;
+  }
+
+  .sv-settings-form-grid,
+  .sv-settings-form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .sv-settings-inline-form,
+  .sv-settings-invite-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sv-settings-shell {
+    padding: 0.66rem 0.58rem 0.8rem !important;
+  }
+
+  .sv-settings-title {
+    font-size: clamp(1.58rem, 8vw, 2.16rem);
+  }
+
+  .sv-settings-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sv-settings-btn {
+    width: 100%;
+  }
+}

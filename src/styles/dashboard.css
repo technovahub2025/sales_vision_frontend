@@ -1,0 +1,85 @@
+.sv-dashboard-page {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  font-family: var(--font-body);
+}
+
+.sv-dashboard-actions .btn {
+  border-radius: 0.6rem !important;
+}
+
+.sv-dashboard-actions > .btn + .btn {
+  margin-left: 0.25rem;
+}
+
+.sv-table thead th {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom-width: 1px;
+}
+
+.sv-dashboard-page .sv-heading,
+.sv-topbar,
+.sv-sidebar {
+  font-family: var(--font-body);
+}
+
+.sv-kpi-card {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.sv-kpi-card:hover {
+  transform: translateY(-3px);
+}
+
+.sv-kpi-trend-wrap .badge {
+  min-width: 62px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sv-kpi-card .sv-kpi-value {
+  min-height: 2.25rem;
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+.sv-kpi-foot {
+  min-height: 1.1rem;
+}
+
+.sv-activity-scroll {
+  max-height: 310px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.sv-dashboard-page .sv-card {
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
+  backdrop-filter: blur(12px);
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.sv-dashboard-page .sv-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme='dark'] .sv-dashboard-page .sv-card {
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 68%, #0f172a);
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.35);
+}
+
+html[data-theme='dark'] .sv-dashboard-page .sv-card:hover {
+  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.45);
+}

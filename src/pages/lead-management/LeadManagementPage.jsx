@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Icon from '../../components/ui/Icon';
 import { useLeads } from '../../hooks/useLeads';
 import { useClients } from '../../hooks/useClients';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -239,13 +240,19 @@ function LeadManagementPage() {
   const [toast, setToast] = useState(null);
   const [filters, setFilters] = useState({ search: '', status: 'all', priority: 'all', source: 'all', archiveScope: 'all' });
   const [clientFilters, setClientFilters] = useState({ search: '', archiveScope: 'all' });
+  const [isLeadFilterOpen, setIsLeadFilterOpen] = useState(false);
+  const [isClientFilterOpen, setIsClientFilterOpen] = useState(false);
   const [leadsPage, setLeadsPage] = useState(1);
   const [clientsPage, setClientsPage] = useState(1);
   const [leadsPageSize, setLeadsPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [clientsPageSize, setClientsPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [openRowMenuId, setOpenRowMenuId] = useState('');
+  const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
+  const [openRowMenuContext, setOpenRowMenuContext] = useState(null);
   const [createForm, setCreateForm] = useState(createDefaults);
   const [editForm, setEditForm] = useState(editDefaults);
   const [clientForm, setClientForm] = useState(CLIENT_FORM_DEFAULTS);
+  const rowMenuRef = useRef(null);
 
   const { items: leads, loading: leadsLoading, error: leadsError, refresh: refreshLeads, createItem, updateItem } = useLeads();
   const { clients, loading: clientsLoading, createClient, list: listClients } = useClients();
@@ -348,6 +355,61 @@ function LeadManagementPage() {
   useEffect(() => {
     if (clientsPage > clientsTotalPages) setClientsPage(clientsTotalPages);
   }, [clientsPage, clientsTotalPages]);
+
+  const closeRowMenu = useCallback(() => {
+    setOpenRowMenuId('');
+    setOpenRowMenuContext(null);
+  }, []);
+
+  const openRowMenu = useCallback((event, type, row) => {
+    event.stopPropagation();
+    const id = `${type}-${String(row?._id || row?.id || '')}`;
+    if (openRowMenuId === id) {
+      closeRowMenu();
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const menuHeight = type === 'lead' ? 190 : 130;
+    const placeAbove = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight + 12;
+
+    const top = placeAbove
+      ? Math.max(8, rect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 6);
+    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth));
+
+    setOpenRowMenuPos({ top, left });
+    setOpenRowMenuContext({ type, row });
+    setOpenRowMenuId(id);
+  }, [closeRowMenu, openRowMenuId]);
+
+  useEffect(() => {
+    if (!openRowMenuId) return undefined;
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (rowMenuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-row-menu-trigger="true"]')) return;
+      closeRowMenu();
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') closeRowMenu();
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', closeRowMenu);
+    window.addEventListener('scroll', closeRowMenu, true);
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', closeRowMenu);
+      window.removeEventListener('scroll', closeRowMenu, true);
+    };
+  }, [openRowMenuId, closeRowMenu]);
 
   const openEdit = useCallback(async (lead) => {
     setEditingLead(lead);
@@ -550,26 +612,39 @@ function LeadManagementPage() {
 
         {tab === 'list' ? (
           <>
-            <section className="sv-leads-filters grid grid-cols-1 gap-2 md:grid-cols-[1fr_170px_170px_170px_170px_auto]">
+            <section className="sv-leads-filter-bar grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
               <input value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search lead title..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
-              <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                <option value="all">All Status</option>
-                {STAGES.map((stage) => <option key={stage.statusId} value={stage.statusId}>{stage.title}</option>)}
-              </select>
-              <select value={filters.priority} onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                <option value="all">All Priority</option>
-                {PRIORITY_VALUES.map((priority) => <option key={priority} value={priority}>{priority[0].toUpperCase() + priority.slice(1)}</option>)}
-              </select>
-              <select value={filters.source} onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                <option value="all">All Source</option>
-                {SOURCE_VALUES.map((source) => <option key={source} value={source}>{source[0].toUpperCase() + source.slice(1)}</option>)}
-              </select>
-              <select value={filters.archiveScope} onChange={(e) => setFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                <option value="all">All (Active)</option>
-                <option value="archived">Archived Only</option>
-              </select>
-              <button type="button" onClick={resetFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+              <button
+                type="button"
+                onClick={() => setIsLeadFilterOpen((prev) => !prev)}
+                className={`btn sv-ctl-btn sv-leads-filter-toggle ${isLeadFilterOpen ? 'is-active' : ''}`}
+                aria-expanded={isLeadFilterOpen}
+              >
+                <Icon name="filter_list" className="text-base" />
+                <span>Filters</span>
+              </button>
             </section>
+            {isLeadFilterOpen ? (
+              <section className="sv-leads-filters sv-leads-filters-panel grid grid-cols-1 gap-2 md:grid-cols-[170px_170px_170px_170px_auto]">
+                <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                  <option value="all">All Status</option>
+                  {STAGES.map((stage) => <option key={stage.statusId} value={stage.statusId}>{stage.title}</option>)}
+                </select>
+                <select value={filters.priority} onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                  <option value="all">All Priority</option>
+                  {PRIORITY_VALUES.map((priority) => <option key={priority} value={priority}>{priority[0].toUpperCase() + priority.slice(1)}</option>)}
+                </select>
+                <select value={filters.source} onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                  <option value="all">All Source</option>
+                  {SOURCE_VALUES.map((source) => <option key={source} value={source}>{source[0].toUpperCase() + source.slice(1)}</option>)}
+                </select>
+                <select value={filters.archiveScope} onChange={(e) => setFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                  <option value="all">All (Active)</option>
+                  <option value="archived">Archived Only</option>
+                </select>
+                <button type="button" onClick={resetFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+              </section>
+            ) : null}
 
             {leadsError ? <div className="sv-leads-alert rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{leadsError}</div> : null}
 
@@ -583,7 +658,7 @@ function LeadManagementPage() {
                     <th className="px-3 py-3">Priority</th>
                     <th className="px-3 py-3">Source</th>
                     <th className="px-3 py-3">Value</th>
-                    <th className="px-3 py-3 text-right">Action</th>
+                    <th className="px-3 py-3 text-right sv-leads-actions-cell">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -612,13 +687,17 @@ function LeadManagementPage() {
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nPriority(lead.priority)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nSource(lead.source)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{fmtInr(lead.value)}</td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="sv-leads-actions inline-flex items-center gap-1">
-                            <button type="button" onClick={() => setSelectedLead(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Details</button>
-                            <button type="button" onClick={() => openEdit(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Quick Edit</button>
-                            <button type="button" onClick={() => openLeadClient(lead)} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Client</button>
-                            <button type="button" onClick={() => toggleLeadArchive(lead)} className={`btn btn-sm sv-ctl-btn sv-leads-action-btn sv-leads-archive-btn rounded-md px-2 py-1 text-xs font-semibold ${lead?.isArchived ? 'is-restore bg-green-100 text-green-700' : 'is-archive bg-error/10 text-error'}`}>
-                              {lead?.isArchived ? 'Unarchive' : 'Archive'}
+                        <td className="px-3 py-3 text-right sv-leads-actions-cell">
+                          <div className="sv-row-menu-container">
+                            <button
+                              type="button"
+                              className="sv-row-menu-btn"
+                              data-row-menu-trigger="true"
+                              aria-label="Open actions"
+                              aria-expanded={openRowMenuId === `lead-${id}`}
+                              onClick={(event) => openRowMenu(event, 'lead', lead)}
+                            >
+                              <Icon name="more_vert" className="text-lg" />
                             </button>
                           </div>
                         </td>
@@ -644,15 +723,28 @@ function LeadManagementPage() {
           </>
         ) : (
           <>
-            <section className="sv-leads-filters grid grid-cols-1 gap-2 md:grid-cols-[1fr_190px_auto]">
+            <section className="sv-leads-filter-bar grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
               <input value={clientFilters.search} onChange={(e) => setClientFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search client name, company, email..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
-              <select value={clientFilters.archiveScope} onChange={(e) => setClientFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                <option value="all">All (Active)</option>
-                <option value="archived">Archived Only</option>
-                <option value="with-archived">With Archived</option>
-              </select>
-              <button type="button" onClick={resetClientFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+              <button
+                type="button"
+                onClick={() => setIsClientFilterOpen((prev) => !prev)}
+                className={`btn sv-ctl-btn sv-leads-filter-toggle ${isClientFilterOpen ? 'is-active' : ''}`}
+                aria-expanded={isClientFilterOpen}
+              >
+                <Icon name="filter_list" className="text-base" />
+                <span>Filters</span>
+              </button>
             </section>
+            {isClientFilterOpen ? (
+              <section className="sv-leads-filters sv-leads-filters-panel grid grid-cols-1 gap-2 md:grid-cols-[190px_auto]">
+                <select value={clientFilters.archiveScope} onChange={(e) => setClientFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
+                  <option value="all">All (Active)</option>
+                  <option value="archived">Archived Only</option>
+                  <option value="with-archived">With Archived</option>
+                </select>
+                <button type="button" onClick={resetClientFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
+              </section>
+            ) : null}
             <section className="sv-card sv-leads-table-card overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
               <table className="sv-leads-table w-full min-w-[700px] text-left">
                 <thead>
@@ -661,7 +753,7 @@ function LeadManagementPage() {
                     <th className="px-3 py-3">Company</th>
                     <th className="px-3 py-3">Email</th>
                     <th className="px-3 py-3">Phone</th>
-                    <th className="px-3 py-3 text-right">Action</th>
+                    <th className="px-3 py-3 text-right sv-leads-actions-cell">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -681,11 +773,17 @@ function LeadManagementPage() {
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.company || '-'}</td>
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.email || '-'}</td>
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.phone || '-'}</td>
-                      <td className="px-3 py-3 text-right">
-                        <div className="sv-leads-actions inline-flex items-center gap-1">
-                          <button type="button" onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', String(client._id)))} className="btn btn-light btn-sm sv-ctl-btn sv-leads-action-btn rounded-md bg-surface-container-high px-2 py-1 text-xs font-semibold text-on-surface">Open</button>
-                          <button type="button" onClick={() => toggleClientArchive(client)} className={`btn btn-sm sv-ctl-btn sv-leads-action-btn sv-leads-archive-btn rounded-md px-2 py-1 text-xs font-semibold ${client?.isArchived ? 'is-restore bg-green-100 text-green-700' : 'is-archive bg-error/10 text-error'}`}>
-                            {client?.isArchived ? 'Unarchive' : 'Archive'}
+                      <td className="px-3 py-3 text-right sv-leads-actions-cell">
+                        <div className="sv-row-menu-container">
+                          <button
+                            type="button"
+                            className="sv-row-menu-btn"
+                            data-row-menu-trigger="true"
+                            aria-label="Open actions"
+                            aria-expanded={openRowMenuId === `client-${String(client?._id || '')}`}
+                            onClick={(event) => openRowMenu(event, 'client', client)}
+                          >
+                            <Icon name="more_vert" className="text-lg" />
                           </button>
                         </div>
                       </td>
@@ -708,6 +806,96 @@ function LeadManagementPage() {
           </>
         )}
       </div>
+
+      {openRowMenuId && openRowMenuContext?.type === 'lead' ? (
+        <div
+          ref={rowMenuRef}
+          className="sv-row-menu-popover sv-row-menu-popover-fixed"
+          style={{ top: `${openRowMenuPos.top}px`, left: `${openRowMenuPos.left}px` }}
+        >
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              setSelectedLead(row);
+            }}
+          >
+            <Icon name="info" className="sv-icon-btn-icon" />
+            <span>Details</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              openEdit(row);
+            }}
+          >
+            <Icon name="edit" className="sv-icon-btn-icon" />
+            <span>Quick Edit</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              openLeadClient(row);
+            }}
+          >
+            <Icon name="contacts" className="sv-icon-btn-icon" />
+            <span>Client</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item is-danger"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              toggleLeadArchive(row);
+            }}
+          >
+            <Icon name={openRowMenuContext.row?.isArchived ? 'unarchive' : 'archive'} className="sv-icon-btn-icon" />
+            <span>{openRowMenuContext.row?.isArchived ? 'Unarchive' : 'Archive'}</span>
+          </button>
+        </div>
+      ) : null}
+
+      {openRowMenuId && openRowMenuContext?.type === 'client' ? (
+        <div
+          ref={rowMenuRef}
+          className="sv-row-menu-popover sv-row-menu-popover-fixed"
+          style={{ top: `${openRowMenuPos.top}px`, left: `${openRowMenuPos.left}px` }}
+        >
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              navigate(ROUTES.clientDetail.replace(':clientId', String(row._id)));
+            }}
+          >
+            <Icon name="open_in_new" className="sv-icon-btn-icon" />
+            <span>Open</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item is-danger"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
+              toggleClientArchive(row);
+            }}
+          >
+            <Icon name={openRowMenuContext.row?.isArchived ? 'unarchive' : 'archive'} className="sv-icon-btn-icon" />
+            <span>{openRowMenuContext.row?.isArchived ? 'Unarchive' : 'Archive'}</span>
+          </button>
+        </div>
+      ) : null}
 
       {selected ? (
         <aside className="sv-leads-drawer fixed inset-y-0 right-0 z-40 w-[360px] border-l border-outline-variant/20 bg-surface-container-lowest p-5 shadow-xl">

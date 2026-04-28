@@ -16,6 +16,10 @@ export const EVENTS = {
   LEAD_UPDATED: 'lead:updated',
   LEAD_MOVED: 'lead:moved',
   LEAD_DELETED: 'lead:deleted',
+  CAMPAIGN_CREATED: 'campaign:created',
+  CAMPAIGN_UPDATED: 'campaign:updated',
+  CAMPAIGN_DELETED: 'campaign:deleted',
+  CAMPAIGN_STATUS_CHANGED: 'campaign:status_changed',
 
   CLIENT_CREATED: 'client:created',
   CLIENT_UPDATED: 'client:updated',
@@ -33,6 +37,7 @@ export const EVENTS = {
 
   DASHBOARD_UPDATED: 'dashboard:updated',
   DASHBOARD_REFRESHED: 'dashboard:refreshed',
+  ANALYTICS_UPDATED: 'analytics:updated',
 
   BOARD_UPDATED: 'board:updated',
   BOARD_REFRESHED: 'board:refreshed',
@@ -67,4 +72,5 @@ export const EVENTS = {
   BOT_PUBLISHED_CREATED: 'bot_published:created',
 
   ACTIVITY_APPENDED: 'activity:appended',
+  SUPERADMIN_USERS_UPDATED: 'superadmin:users_updated',
 };

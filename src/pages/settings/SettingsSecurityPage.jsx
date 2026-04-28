@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import Icon from '../../components/ui/Icon';
 import { useSettings } from '../../hooks/useSettings';
 import SettingsTabs from './SettingsTabs';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import { usePlanAccess } from '../../hooks/usePlanAccess';
 
 function SettingsSecurityPage() {
   const {
@@ -14,6 +16,8 @@ function SettingsSecurityPage() {
     loading,
     error,
   } = useSettings();
+  const { canUseFeature } = usePlanAccess();
+  const canViewAuditLog = canUseFeature('auditLog');
   const [actionError, setActionError] = useState('');
   const [revokingAll, setRevokingAll] = useState(false);
 
@@ -110,7 +114,7 @@ function SettingsSecurityPage() {
 
   return (
     <main className="min-h-screen sv-settings-page">
-      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+      <div className="sv-settings-shell">
         <SettingsTabs />
 
         <section className="sv-settings-header mb-10">
@@ -265,6 +269,19 @@ function SettingsSecurityPage() {
             <div className="border-b border-outline-variant/10 px-8 py-6">
               <h3 className="sv-settings-card-title">Workspace Audit Log</h3>
             </div>
+            {!canViewAuditLog ? (
+              <div className="px-6 py-8 text-sm text-on-surface-variant">
+                <p className="mb-3">Audit log is locked on Free plan.</p>
+                <DeniedActionButton
+                  role="owner"
+                  actionLabel="view audit log"
+                  message="Free plan cannot access audit log"
+                  className="sv-settings-btn sv-settings-btn-neutral"
+                >
+                  Audit Log Locked
+                </DeniedActionButton>
+              </div>
+            ) : (
             <div className="sv-settings-scroll-area">
               <table className="sv-settings-table">
                 <thead>
@@ -292,6 +309,7 @@ function SettingsSecurityPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </section>
 
           <section className="sv-settings-card overflow-hidden !p-0 lg:col-span-6">

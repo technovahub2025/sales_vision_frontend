@@ -8,6 +8,12 @@ import { toRealtimeEvent } from '../socket/realtime';
 
 const SettingsContext = createContext(null);
 
+function normalizeListPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
 export function SettingsProvider({ workspaceId, children }) {
   const { socket, joinWorkspace, leaveWorkspace, onReconnect } = useSocket();
   const { switchWorkspace, workspaceId: activeWorkspaceId, workspaces: workspaceOptions } = useWorkspace();
@@ -35,8 +41,15 @@ export function SettingsProvider({ workspaceId, children }) {
       const profileData = meRes?.data?.user || {};
       setProfile(profileData);
 
-      const role = String(profileData.role || '').toLowerCase();
-      const canSeeAudit = role === 'owner' || role === 'admin';
+      const activeRole =
+        workspaceOptions.find((item) => String(item.id || item._id) === String(workspaceId))?.role ||
+        profileData.role ||
+        '';
+      const workspacePlan = String(
+        workspaceOptions.find((item) => String(item.id || item._id) === String(workspaceId))?.plan || 'free',
+      ).toLowerCase();
+      const role = String(activeRole).toLowerCase();
+      const canSeeAudit = (role === 'owner' || role === 'admin') && workspacePlan === 'pro';
       const canSeeApiKeys = canSeeAudit;
 
       const criticalResults = await Promise.allSettled([
@@ -77,7 +90,7 @@ export function SettingsProvider({ workspaceId, children }) {
         }
       });
 
-      setWorkspaces(workspaceRes?.data || []);
+      setWorkspaces(normalizeListPayload(workspaceRes?.data));
       setSessions(sessionsRes?.data || []);
       setApiKeys(keysRes?.data || []);
       setAuditLog(auditRes?.data || []);
@@ -91,7 +104,7 @@ export function SettingsProvider({ workspaceId, children }) {
         setLoading(false);
       }
     }
-  }, [workspaceId]);
+  }, [workspaceId, workspaceOptions]);
 
   useEffect(() => {
     hasHydratedRef.current = false;
@@ -244,7 +257,7 @@ export function SettingsProvider({ workspaceId, children }) {
       try {
         await workspacesApi.remove(targetId);
         const listRes = await workspacesApi.list();
-        const nextWorkspaces = listRes?.data || [];
+        const nextWorkspaces = normalizeListPayload(listRes?.data);
         setWorkspaces(nextWorkspaces);
 
         if (String(activeWorkspaceId) === targetId) {

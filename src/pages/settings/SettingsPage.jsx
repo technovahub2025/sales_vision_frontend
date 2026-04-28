@@ -145,7 +145,7 @@ function SettingsPage() {
 
   return (
     <main className="min-h-screen sv-settings-page">
-      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+      <div className="sv-settings-shell">
         <SettingsTabs />
 
         <section className="sv-settings-header">

@@ -1,8 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { WorkspaceProvider } from '../contexts/WorkspaceContext';
-import { SocketProvider } from '../contexts/SocketContext';
-import GlobalProviders from '../contexts/GlobalProviders';
 import { ROUTES } from './routePaths';
 
 function AuthLoadingScreen() {
@@ -30,13 +27,5 @@ export default function ProtectedAppLayout() {
     return <Navigate replace to={ROUTES.login} state={{ from: location.pathname }} />;
   }
 
-  return (
-    <WorkspaceProvider>
-      <SocketProvider>
-        <GlobalProviders>
-          <Outlet />
-        </GlobalProviders>
-      </SocketProvider>
-    </WorkspaceProvider>
-  );
+  return <Outlet />;
 }

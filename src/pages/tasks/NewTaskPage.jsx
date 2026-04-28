@@ -1,7 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
 import { useNewTask } from '../../hooks/useNewTask';
+import { usePermission } from '../../hooks/usePermission';
 import { projectRoute } from '../../routes/routePaths';
 
 const ISSUE_TYPES = [
@@ -132,6 +134,8 @@ function SearchableMultiPicker({
 
 function NewTaskPage() {
   const navigate = useNavigate();
+  const { can, role } = usePermission();
+  const canCreateTask = can('task', 'create');
   const {
     projects,
     users,
@@ -240,6 +244,7 @@ function NewTaskPage() {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    if (!canCreateTask) return;
     const created = await submit();
     if (!created) return;
     const nextProjectId = created?.projectId || draft.projectId;
@@ -248,6 +253,20 @@ function NewTaskPage() {
 
   if (loading) {
     return <div className="sv-card p-4">Loading new task form...</div>;
+  }
+
+  if (!canCreateTask) {
+    return (
+      <main className="sv-newtask-page" aria-label="Create new task">
+        <section className="sv-card p-4">
+          <h1 className="h5 mb-2">Create Task</h1>
+          <p className="text-secondary mb-3">Your current role can view tasks but cannot create them.</p>
+          <DeniedActionButton role={role} actionLabel="create tasks" className="btn btn-primary sv-ctl-btn">
+            Create Task
+          </DeniedActionButton>
+        </section>
+      </main>
+    );
   }
 
   return (

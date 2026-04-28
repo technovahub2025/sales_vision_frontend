@@ -48,44 +48,16 @@ function NavItem({ item, activeAware = true, collapsed = false }) {
   );
 }
 
-function Sidebar({ collapsed = false, setCollapsed }) {
+function SidebarFrame({ collapsed, setCollapsed, children, footer }) {
   const logoLight = `${import.meta.env.BASE_URL}assets/light_logo.jpeg`;
   const logoDark = `${import.meta.env.BASE_URL}assets/dark_logo.jpeg`;
-  const { meta } = useMyTasks();
-  const { workspaceId, activeWorkspace, workspacesLoading } = useWorkspace();
-  const myOpenCount = Number(meta?.openCount || 0);
-  const role = String(activeWorkspace?.role || 'member');
-  const canCreate = role !== 'viewer';
-
-  const projectsQuery = useQuery({
-    queryKey: ['sidebar-projects', workspaceId],
-    enabled: Boolean(workspaceId),
-    queryFn: () => projectsApi.list(workspaceId, { page: 1, limit: 7 }).then((res) => res.data || []),
-    staleTime: 60 * 1000,
-  });
-
-  const primaryItems = useMemo(() => {
-    const filtered = NAV_CONFIG.filter((item) => {
-      if (item.roles === 'all') return true;
-      return Array.isArray(item.roles) ? item.roles.includes(role) : false;
-    });
-
-    return filtered.map((item) => {
-      if (item.path === ROUTES.myTasks) {
-        return { ...item, to: item.path, end: true, badge: myOpenCount > 0 ? String(myOpenCount) : '' };
-      }
-      return { ...item, to: item.path, end: true };
-    });
-  }, [role, myOpenCount]);
-
-  const projects = projectsQuery.data || [];
 
   return (
-    <aside 
+    <aside
       className="sv-sidebar fixed left-0 top-0 z-40 d-flex h-100 flex-column border-end p-4 pt-5"
-      style={{ 
+      style={{
         width: collapsed ? '4rem' : '15rem',
-        transition: 'width 0.24s ease-in-out'
+        transition: 'width 0.24s ease-in-out',
       }}
     >
       <div className={`mb-8 px-3 d-flex align-items-center ${collapsed ? 'justify-content-center' : 'justify-content-between'}`}>
@@ -106,6 +78,48 @@ function Sidebar({ collapsed = false, setCollapsed }) {
         </button>
       </div>
 
+      {children}
+      {footer}
+    </aside>
+  );
+}
+
+function WorkspaceSidebar({ collapsed = false, setCollapsed }) {
+  const { meta } = useMyTasks();
+  const { workspaceId, activeWorkspace, workspacesLoading } = useWorkspace();
+  const myOpenCount = Number(meta?.openCount || 0);
+  const role = String(activeWorkspace?.role || 'member');
+  const canCreate = role !== 'viewer';
+
+  const projectsQuery = useQuery({
+    queryKey: ['sidebar-projects', workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: () => projectsApi.list(workspaceId, { page: 1, limit: 3, sort: 'created_desc' }).then((res) => res.data || []),
+    staleTime: 60 * 1000,
+  });
+
+  const primaryItems = useMemo(() => {
+    const filtered = NAV_CONFIG.filter((item) => {
+      if (item.roles === 'all') return true;
+      return Array.isArray(item.roles) ? item.roles.includes(role) : false;
+    });
+
+    return filtered.map((item) => {
+      if (item.path === ROUTES.myTasks) {
+        return { ...item, to: item.path, end: true, badge: myOpenCount > 0 ? String(myOpenCount) : '' };
+      }
+      return { ...item, to: item.path, end: true };
+    });
+  }, [role, myOpenCount]);
+
+  const projects = projectsQuery.data || [];
+
+  return (
+    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={!collapsed ? (
+      <div className="mt-auto space-y-1 border-top pt-4 px-3">
+        <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} />
+      </div>
+    ) : null}>
       <nav className="flex-1 space-y-1 mb-4">
         {primaryItems.map((item) => (
           <NavItem key={item.label} item={item} collapsed={collapsed} />
@@ -167,13 +181,39 @@ function Sidebar({ collapsed = false, setCollapsed }) {
         </NavLink>
       ) : null}
 
-      {!collapsed && (
-        <div className="mt-auto space-y-1 border-top pt-4 px-3">
-          <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} />
-        </div>
-      )}
-    </aside>
+    </SidebarFrame>
   );
+}
+
+function SuperAdminSidebar({ collapsed = false, setCollapsed }) {
+  const items = [
+    { label: 'Dashboard', icon: 'dashboard', to: ROUTES.superAdmin, end: true },
+    { label: 'Workspaces', icon: 'business', to: ROUTES.superAdminWorkspaces, end: true },
+    { label: 'Users', icon: 'group', to: ROUTES.superAdminUserDatas, end: true },
+    { label: 'Activity', icon: 'history', to: ROUTES.superAdminActivity, end: true },
+    { label: 'Security', icon: 'shield', to: ROUTES.superAdminSecurity, end: true },
+  ];
+
+  return (
+    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={!collapsed ? (
+      <div className="mt-auto space-y-1 border-top pt-4 px-3">
+        <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} />
+      </div>
+    ) : null}>
+      <nav className="flex-1 space-y-1 mb-4">
+        {items.map((item) => (
+          <NavItem key={item.label} item={item} collapsed={collapsed} />
+        ))}
+      </nav>
+    </SidebarFrame>
+  );
+}
+
+function Sidebar({ superAdmin = false, ...props }) {
+  if (superAdmin) {
+    return <SuperAdminSidebar {...props} />;
+  }
+  return <WorkspaceSidebar {...props} />;
 }
 
 export default Sidebar;

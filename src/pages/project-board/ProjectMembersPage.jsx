@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,6 +6,8 @@ import { useProjectMembers } from '../../hooks/useProjectMembers';
 import { useProjectRouteSync } from '../../hooks/useProjectRouteSync';
 import ProjectTabs from './ProjectTabs';
 import Icon from '../../components/ui/Icon';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import { usePermission } from '../../hooks/usePermission';
 
 const addMemberSchema = z.object({
   userId: z.string().min(1, 'Select a user'),
@@ -24,6 +26,8 @@ function RoleBadge({ role }) {
 
 function ProjectMembersPage() {
   const projectId = useProjectRouteSync();
+  const { can, role } = usePermission();
+  const canManageMembers = can('workspace', 'manageMembers');
   const {
     members,
     pendingInvites,
@@ -60,10 +64,6 @@ function ProjectMembersPage() {
   const [addMode, setAddMode] = useState('existing');
 
   const isMembersView = viewFilter === 'members';
-
-  useEffect(() => {
-    setRoleFilter('all');
-  }, [viewFilter]);
 
   const rows = useMemo(() => members || [], [members]);
   const filteredRows = useMemo(() => {
@@ -104,18 +104,21 @@ function ProjectMembersPage() {
     ];
 
   async function submitAddMember(values) {
+    if (!canManageMembers) return;
     await addMember(values);
     addMemberForm.reset({ userId: '', role: values.role });
     setIsAddModalOpen(false);
   }
 
   async function submitInvite(values) {
+    if (!canManageMembers) return;
     await createInvite(values);
     inviteForm.reset({ email: '', role: values.role });
     setIsAddModalOpen(false);
   }
 
   function openAddModal() {
+    if (!canManageMembers) return;
     setAddMode('existing');
     setIsAddModalOpen(true);
   }
@@ -151,7 +154,10 @@ function ProjectMembersPage() {
             </div>
             <select
               value={viewFilter}
-              onChange={(event) => setViewFilter(event.target.value)}
+              onChange={(event) => {
+                setViewFilter(event.target.value);
+                setRoleFilter('all');
+              }}
               className="form-select form-select-sm sv-ctl-select sv-members-filter"
             >
               <option value="members">Members</option>
@@ -166,9 +172,15 @@ function ProjectMembersPage() {
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
-            <button type="button" className="btn btn-primary btn-sm sv-ctl-btn sv-members-add-btn" onClick={openAddModal}>
-              Add User
-            </button>
+            {canManageMembers ? (
+              <button type="button" className="btn btn-primary btn-sm sv-ctl-btn sv-members-add-btn" onClick={openAddModal}>
+                Add User
+              </button>
+            ) : (
+              <DeniedActionButton role={role} actionLabel="manage project members" className="btn btn-primary btn-sm sv-ctl-btn sv-members-add-btn">
+                Add User
+              </DeniedActionButton>
+            )}
           </div>
         </section>
 
@@ -216,29 +228,37 @@ function ProjectMembersPage() {
                       <td>
                         <div className="sv-members-role-cell">
                           <RoleBadge role={member.role || 'member'} />
-                          <select
-                            className="form-select form-select-sm sv-ctl-select sv-members-role-edit"
-                            value={member.role || 'member'}
-                            onChange={(event) => updateRole({ userId: member.userId, role: event.target.value })}
-                            disabled={updateRoleState.isPending}
-                          >
-                            <option value="lead">Lead</option>
-                            <option value="member">Member</option>
-                            <option value="viewer">Viewer</option>
-                          </select>
+                          {canManageMembers ? (
+                            <select
+                              className="form-select form-select-sm sv-ctl-select sv-members-role-edit"
+                              value={member.role || 'member'}
+                              onChange={(event) => updateRole({ userId: member.userId, role: event.target.value })}
+                              disabled={updateRoleState.isPending}
+                            >
+                              <option value="lead">Lead</option>
+                              <option value="member">Member</option>
+                              <option value="viewer">Viewer</option>
+                            </select>
+                          ) : null}
                         </div>
                       </td>
                       <td className="sv-members-col-metric">{member.tasksInProject || 0}</td>
                       <td className="sv-members-col-metric">{member.completedInProject || 0}</td>
                       <td className="is-right">
-                        <button
-                          type="button"
-                          className="btn btn-sm sv-ctl-btn sv-members-remove-btn"
-                          onClick={() => removeMember({ userId: member.userId })}
-                          disabled={removeMemberState.isPending}
-                        >
-                          Remove
-                        </button>
+                        {canManageMembers ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm sv-ctl-btn sv-members-remove-btn"
+                            onClick={() => removeMember({ userId: member.userId })}
+                            disabled={removeMemberState.isPending}
+                          >
+                            Remove
+                          </button>
+                        ) : (
+                          <DeniedActionButton role={role} actionLabel="remove project members" className="btn btn-sm sv-ctl-btn sv-members-remove-btn">
+                            Remove
+                          </DeniedActionButton>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -265,14 +285,20 @@ function ProjectMembersPage() {
                         <p className="sv-members-invite-date">Expires: {formatDate(invite.expiresAt)}</p>
                       </td>
                       <td className="is-right">
-                        <button
-                          type="button"
-                          className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn"
-                          onClick={() => revokeInvite({ inviteId: invite._id || invite.id })}
-                          disabled={revokeInviteState.isPending}
-                        >
-                          Revoke
-                        </button>
+                        {canManageMembers ? (
+                          <button
+                            type="button"
+                            className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn"
+                            onClick={() => revokeInvite({ inviteId: invite._id || invite.id })}
+                            disabled={revokeInviteState.isPending}
+                          >
+                            Revoke
+                          </button>
+                        ) : (
+                          <DeniedActionButton role={role} actionLabel="revoke project invites" className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn">
+                            Revoke
+                          </DeniedActionButton>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -20,6 +20,20 @@ import Icon from '../../components/ui/Icon';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../contexts/AuthContext';
 
+const FINAL_STATUS_KEYS = new Set(['completed', 'done', 'closed']);
+const COMPLETED_STATUS_KEY = 'completed';
+const LOCKED_STATUS_MESSAGE = 'Completed task cannot be moved back';
+
+function normalizeStatusKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isCompletedReopenBlocked(fromStatus, toStatus) {
+  const from = normalizeStatusKey(fromStatus);
+  const to = normalizeStatusKey(toStatus);
+  return from === COMPLETED_STATUS_KEY && to && !FINAL_STATUS_KEYS.has(to);
+}
+
 function priorityDotClass(priority) {
   switch (String(priority || '').toLowerCase()) {
     case 'critical':
@@ -63,6 +77,7 @@ const TaskCard = memo(function TaskCard({
   isTimerActive,
   isTimerPaused,
   timerState,
+  onBlockedMove,
 }) {
   const taskId = String(task._id || task.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -155,19 +170,28 @@ const TaskCard = memo(function TaskCard({
                 Edit
               </button>
               <div className="sv-board-menu-label px-3 py-1 text-[10px] font-semibold uppercase text-slate-400">Move to</div>
-              {(columns || []).map((column) => (
+              {(columns || []).map((column) => {
+                const blocked = isCompletedReopenBlocked(task.status, column.key);
+                return (
                 <button
                   key={column.key}
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
+                    if (blocked) {
+                      onBlockedMove?.(LOCKED_STATUS_MESSAGE);
+                      return;
+                    }
                     onMove(taskId, column.key);
                   }}
                   className="sv-board-menu-item"
+                  title={blocked ? LOCKED_STATUS_MESSAGE : column.title}
                 >
+                  {blocked ? <Icon name="block" className="text-[12px] text-danger mr-1" /> : null}
                   {column.title}
                 </button>
-              ))}
+                );
+              })}
               <button
                 type="button"
                 onClick={() => {
@@ -351,6 +375,7 @@ const BoardColumn = memo(function BoardColumn({
   onArchiveTask,
   onDeleteTask,
   onMoveTask,
+  onBlockedMove,
   columns,
   menuOpenColumn,
   onToggleColumnMenu,
@@ -411,6 +436,7 @@ const BoardColumn = memo(function BoardColumn({
                 onArchive={onArchiveTask}
                 onDelete={onDeleteTask}
                 onMove={onMoveTask}
+                onBlockedMove={onBlockedMove}
                 animationStyle={{ animationDelay: `${index * 50}ms` }}
                 onTimerToggle={onTimerToggle}
                 onTimerStop={onTimerStop}
@@ -477,6 +503,7 @@ function ProjectBoardPage() {
   const [isDeletingColumn, setIsDeletingColumn] = useState(false);
   const [deleteColumnError, setDeleteColumnError] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [blockedActionMessage, setBlockedActionMessage] = useState('');
   const [filters, setFilters] = useState({
     myTasks: false,
     overdue: false,
@@ -722,8 +749,21 @@ function ProjectBoardPage() {
   }, []);
 
   const handleMoveTask = useCallback((taskId, toColumnKey) => {
+    let movingTask = null;
+    for (const column of columns) {
+      const candidate = (column.tasks || []).find((task) => String(task._id || task.id) === String(taskId));
+      if (candidate) {
+        movingTask = candidate;
+        break;
+      }
+    }
+    if (isCompletedReopenBlocked(movingTask?.status, toColumnKey)) {
+      setBlockedActionMessage(LOCKED_STATUS_MESSAGE);
+      return;
+    }
+    setBlockedActionMessage('');
     moveTask({ taskId, toColumnKey, toPosition: 0 });
-  }, [moveTask]);
+  }, [moveTask, columns]);
 
   const onDragEnd = useCallback((event) => {
     const { active, over } = event;
@@ -745,8 +785,15 @@ function ProjectBoardPage() {
       if (!taskId || !targetColumnKey) return;
       const targetColumn = columns.find((column) => column.key === targetColumnKey);
       if (!targetColumn) return;
+      const sourceColumn = columns.find((column) => column.key === activeData.columnKey);
+      const movingTask = (sourceColumn?.tasks || []).find((task) => String(task._id || task.id) === String(taskId));
+      if (isCompletedReopenBlocked(movingTask?.status, targetColumnKey)) {
+        setBlockedActionMessage(LOCKED_STATUS_MESSAGE);
+        return;
+      }
       const targetIndex = (targetColumn.tasks || []).findIndex((task) => String(task._id || task.id) === String(overData.taskId));
       const position = targetIndex >= 0 ? targetIndex : (targetColumn.tasks || []).length;
+      setBlockedActionMessage('');
       moveTask({ taskId, toColumnKey: targetColumnKey, toPosition: position });
     }
   }, [filteredColumns, boardGroupBy, columns, reorderColumns, moveTask]);
@@ -790,6 +837,7 @@ function ProjectBoardPage() {
             </select>
           </div>
         {error ? <p className="sv-board-error">{error}</p> : null}
+        {blockedActionMessage ? <p className="sv-board-error">{blockedActionMessage}</p> : null}
       </section>
 
       <section className="sv-board-filters animate-in slide-in-from-top-4 duration-300">
@@ -892,6 +940,7 @@ function ProjectBoardPage() {
                         onArchiveTask={archiveTask}
                         onDeleteTask={removeTask}
                         onMoveTask={handleMoveTask}
+                        onBlockedMove={setBlockedActionMessage}
                         menuOpenColumn={menuOpenColumn}
                         onToggleColumnMenu={handleToggleColumnMenu}
                         onEditColumn={handleOpenEditColumn}
@@ -972,6 +1021,7 @@ function ProjectBoardPage() {
                         onArchiveTask={archiveTask}
                         onDeleteTask={removeTask}
                         onMoveTask={handleMoveTask}
+                        onBlockedMove={setBlockedActionMessage}
                         menuOpenColumn={menuOpenColumn}
                         onToggleColumnMenu={handleToggleColumnMenu}
                         onEditColumn={handleOpenEditColumn}

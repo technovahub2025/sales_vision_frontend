@@ -10,15 +10,32 @@ export const dashboardApi = {
       params: { view, ...(userId ? { userId } : {}) },
       dedupeKey: `dashboard:${workspaceId}:${view}:${userId || 'workspace'}`,
     }),
-  exportReport: (workspaceId, format = 'pdf') =>
-    apiRequest({ method: 'post', url: wsV1(workspaceId, '/dashboard/export-report'), data: { format } }),
+  exportReport: async (workspaceId, format = 'pdf') => {
+    const response = await axiosClient.post(wsV1(workspaceId, '/dashboard/export-report'), { format }, {
+      responseType: 'blob',
+      withCredentials: true,
+    });
+    const disposition = String(response.headers?.['content-disposition'] || '');
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    return {
+      blob: response.data,
+      filename: match?.[1] || `salesvision_dashboard.${String(format || 'pdf').toLowerCase()}`,
+      contentType: response.headers?.['content-type'] || '',
+    };
+  },
   strategyMeeting: (workspaceId) =>
     apiRequest({ method: 'post', url: wsV1(workspaceId, '/dashboard/strategy-meeting'), data: {} }),
 };
 
 export const projectsApi = {
   list: (workspaceId, params, signal) =>
-    apiRequest({ method: 'get', url: wsV1(workspaceId, '/projects'), params, signal, dedupeKey: `projects:${workspaceId}` }),
+    apiRequest({
+      method: 'get',
+      url: wsV1(workspaceId, '/projects'),
+      params,
+      signal,
+      dedupeKey: `projects:${workspaceId}:${JSON.stringify(params || {})}`,
+    }),
   create: (workspaceId, data) => apiRequest({ method: 'post', url: wsV1(workspaceId, '/projects'), data }),
   update: (workspaceId, projectId, data) =>
     apiRequest({ method: 'patch', url: wsV1(workspaceId, `/projects/${projectId}`), data }),
@@ -211,7 +228,21 @@ export const notificationsApi = {
 };
 
 export const workspacesApi = {
-  list: (signal) => apiRequest({ method: 'get', url: '/v1/workspaces', signal, dedupeKey: 'workspaces:list' }),
+  list: (paramsOrSignal, signal) => {
+    const isSignalOnly =
+      paramsOrSignal &&
+      typeof paramsOrSignal === 'object' &&
+      typeof paramsOrSignal.aborted === 'boolean' &&
+      typeof paramsOrSignal.addEventListener === 'function';
+
+    return apiRequest({
+      method: 'get',
+      url: '/v1/workspaces',
+      params: isSignalOnly ? undefined : (paramsOrSignal || undefined),
+      signal: isSignalOnly ? paramsOrSignal : signal,
+      dedupeKey: 'workspaces:list',
+    });
+  },
   create: (data) => apiRequest({ method: 'post', url: '/v1/workspaces', data }),
   get: (workspaceId, signal) => apiRequest({ method: 'get', url: `/v1/workspaces/${workspaceId}`, signal }),
   update: (workspaceId, data) => apiRequest({ method: 'patch', url: `/v1/workspaces/${workspaceId}`, data }),

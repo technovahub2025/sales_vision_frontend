@@ -6,7 +6,8 @@ const apiBaseUrl =
   'http://localhost:3001/api';
 
 const inflight = new Map();
-const ACCESS_TOKEN_STORAGE_KEY = 'salevision:accessToken';
+export const ACCESS_TOKEN_STORAGE_KEY = 'salevision:accessToken';
+export const SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY = 'salevision:superAdminAccessToken';
 
 export class ApiError extends Error {
   constructor(message, options = {}) {
@@ -33,7 +34,10 @@ export const axiosClient = axios.create({
 });
 
 axiosClient.interceptors.request.use((config) => {
-  const token = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+  const url = String(config.url || '');
+  const token = url.includes('/v1/super-admin')
+    ? window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) || window.localStorage.getItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY)
+    : window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
   if (token && !config.headers?.Authorization) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -45,7 +49,11 @@ axiosClient.interceptors.response.use(
   (response) => {
     const token = response?.data?.data?.accessToken;
     if (token) {
-      window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, String(token));
+      const url = String(response.config?.url || '');
+      const storageKey = url.includes('/v1/super-admin')
+        ? SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY
+        : ACCESS_TOKEN_STORAGE_KEY;
+      window.localStorage.setItem(storageKey, String(token));
     }
     return response;
   },
@@ -75,6 +83,7 @@ axiosClient.interceptors.response.use(
         return axiosClient(originalRequest);
       } catch (refreshError) {
         window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+        window.localStorage.removeItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY);
         unauthorizedHandler();
       }
     }

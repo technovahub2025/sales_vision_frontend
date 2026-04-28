@@ -404,6 +404,21 @@
   min-width: 0;
 }
 
+.sv-task-status-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.sv-task-status-lock-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
 .sv-task-card-control {
   min-height: 1.84rem;
   max-width: 100%;

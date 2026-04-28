@@ -7,9 +7,23 @@ import { useMyTasks } from '../../hooks/useMyTasks';
 import { useTimeTracker } from '../../hooks/useTimeTracker';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import CommentThread from '../../components/comments/CommentThread';
+import Icon from '../../components/ui/Icon';
 
 const DEFAULT_STATUSES = ['todo', 'in_progress', 'in_review', 'completed'];
 const ACTIVITY_PAGE_SIZE = 50;
+const FINAL_STATUS_KEYS = new Set(['completed', 'done', 'closed']);
+const COMPLETED_STATUS_KEY = 'completed';
+const LOCKED_STATUS_MESSAGE = 'Completed task cannot be moved back';
+
+function normalizeStatusKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isCompletedReopenBlocked(fromStatus, toStatus) {
+  const from = normalizeStatusKey(fromStatus);
+  const to = normalizeStatusKey(toStatus);
+  return from === COMPLETED_STATUS_KEY && to && !FINAL_STATUS_KEYS.has(to);
+}
 
 function estimateToMinutes(task) {
   return Math.max(0, Math.round(Number(task?.estimateHours || 0) * 60));
@@ -73,6 +87,7 @@ function TaskDetailPage() {
     () => (taskStatuses.length ? taskStatuses.map((item) => item.key) : DEFAULT_STATUSES),
     [taskStatuses],
   );
+  const activeTaskStatus = normalizeStatusKey(activeTask?.status);
 
   const loadActivity = useCallback(
     async () => {
@@ -317,16 +332,29 @@ function TaskDetailPage() {
           </div>
 
           <div className="sv-taskdetail-status-row">
-            {statusKeys.map((status) => (
+            {statusKeys.map((status) => {
+              const blocked = isCompletedReopenBlocked(activeTaskStatus, status);
+              const statusLabel = String(status).replace('_', ' ');
+              return (
               <button
                 key={status}
                 type="button"
-                onClick={() => updateStatus(taskId, status)}
+                onClick={() => {
+                  if (blocked) {
+                    setActionMessage(LOCKED_STATUS_MESSAGE);
+                    return;
+                  }
+                  updateStatus(taskId, status);
+                }}
                 className={`sv-taskdetail-status-btn ${activeTask.status === status ? 'is-active' : ''}`}
+                title={blocked ? LOCKED_STATUS_MESSAGE : statusLabel}
+                disabled={blocked}
               >
-                {String(status).replace('_', ' ')}
+                {blocked ? <Icon name="block" className="text-[12px] me-1 text-danger" /> : null}
+                {statusLabel}
               </button>
-            ))}
+              );
+            })}
           </div>
 
           <div className="sv-taskdetail-estimate-row">

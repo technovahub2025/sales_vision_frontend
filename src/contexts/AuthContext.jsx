@@ -1,13 +1,11 @@
 import { createContext, useContext, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../api/auth.api';
-import { configureAxiosAuth } from '../api/axiosClient';
+import { ACCESS_TOKEN_STORAGE_KEY, SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY, configureAxiosAuth } from '../api/axiosClient';
 
 const AuthContext = createContext(null);
 
 const AUTH_QUERY_KEY = ['auth', 'me'];
-const ACCESS_TOKEN_STORAGE_KEY = 'salevision:accessToken';
-
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient();
 
@@ -25,6 +23,7 @@ export function AuthProvider({ children }) {
         queryClient.setQueryData(AUTH_QUERY_KEY, null);
         window.localStorage.removeItem('salevision:userId');
         window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+        window.localStorage.removeItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY);
       },
     });
   }, [queryClient]);
@@ -68,6 +67,7 @@ export function AuthProvider({ children }) {
       queryClient.removeQueries();
       window.localStorage.removeItem('salevision:userId');
       window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY);
     },
   });
 
@@ -96,6 +96,7 @@ export function AuthProvider({ children }) {
     const session = meQuery.data;
     const user = session?.user || null;
     const memberships = session?.memberships || [];
+    const isSuperAdmin = Boolean(user?.isSuperAdmin || user?.role === 'super_admin');
     // Determine an initial/default workspace ID if available in the session or from memberships.
     // This can be consumed by WorkspaceContext to set the active workspace.
     const defaultWorkspaceId = session?.defaultWorkspaceId || (memberships.length > 0 ? memberships[0].workspace._id : null);
@@ -106,6 +107,7 @@ export function AuthProvider({ children }) {
       user,
       memberships,
       isAuthenticated: Boolean(user),
+      isSuperAdmin,
       isLoading: meQuery.isLoading,
       isFetching: meQuery.isFetching,
       error: meQuery.error,

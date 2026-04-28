@@ -35,6 +35,19 @@ const PRIORITY_OPTIONS = ['critical', 'high', 'medium', 'low'];
 const KANBAN_COLUMN_PREFIX = 'kanban-column-';
 const DEFAULT_VISIBLE_COLUMNS = ['priority', 'title', 'project', 'priorityDropdown', 'dueDate', 'status', 'timer', 'open'];
 const ALLOWED_VISIBLE_COLUMNS = new Set(['checkbox', ...DEFAULT_VISIBLE_COLUMNS]);
+const FINAL_STATUS_KEYS = new Set(['completed', 'done', 'closed']);
+const COMPLETED_STATUS_KEY = 'completed';
+const LOCKED_STATUS_MESSAGE = 'Completed task cannot be moved back';
+
+function normalizeStatusKey(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isCompletedReopenBlocked(fromStatus, toStatus) {
+  const from = normalizeStatusKey(fromStatus);
+  const to = normalizeStatusKey(toStatus);
+  return from === COMPLETED_STATUS_KEY && to && !FINAL_STATUS_KEYS.has(to);
+}
 
 function sanitizeVisibleColumns(columns) {
   const list = Array.isArray(columns) ? columns : [];
@@ -124,6 +137,7 @@ function SortableTaskRow({
   onOpenTask,
   onUnarchiveTask,
   visibleColumns,
+  showBlockedStatusIcon,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: String(task._id) });
 
@@ -230,24 +244,31 @@ function SortableTaskRow({
       )}
 
       {visibleColumns.has('status') && (
-        <select
-          value={task.status || 'todo'}
-          className={`rounded-lg border border-outline-variant/30 backdrop-blur-sm outline-none focus:ring-2 transition-all w-full px-1.5 py-0.5 text-xs font-semibold self-center sv-task-mini-control ${
-            task.status === 'completed'
-              ? 'bg-emerald-100 text-emerald-700 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-200'
-              : task.status === 'in_progress'
-              ? 'bg-blue-100 text-blue-700 border-blue-200 focus:border-blue-400 focus:ring-blue-200'
-              : task.status === 'in_review'
-              ? 'bg-amber-100 text-amber-700 border-amber-200 focus:border-amber-400 focus:ring-amber-200'
-              : 'bg-surface-container-lowest/80 text-on-surface focus:border-primary/50 focus:ring-primary/20'
-          }`}
-          onChange={(event) => onInlinePatch(task._id, { status: event.target.value })}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {STATUS_OPTIONS.map((value) => (
-            <option key={value} value={value}>{value.replace('_', ' ')}</option>
-          ))}
-        </select>
+        <div className="sv-task-status-field">
+          <select
+            value={task.status || 'todo'}
+            className={`rounded-lg border border-outline-variant/30 backdrop-blur-sm outline-none focus:ring-2 transition-all w-full px-1.5 py-0.5 text-xs font-semibold self-center sv-task-mini-control ${
+              task.status === 'completed'
+                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-200'
+                : task.status === 'in_progress'
+                ? 'bg-blue-100 text-blue-700 border-blue-200 focus:border-blue-400 focus:ring-blue-200'
+                : task.status === 'in_review'
+                ? 'bg-amber-100 text-amber-700 border-amber-200 focus:border-amber-400 focus:ring-amber-200'
+                : 'bg-surface-container-lowest/80 text-on-surface focus:border-primary/50 focus:ring-primary/20'
+            }`}
+            onChange={(event) => onInlinePatch(task._id, { status: event.target.value }, task)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {STATUS_OPTIONS.map((value) => (
+              <option key={value} value={value}>{value.replace('_', ' ')}</option>
+            ))}
+          </select>
+          {showBlockedStatusIcon ? (
+            <span className="sv-task-status-lock-icon" aria-label="Blocked status change">
+              <Icon name="block" className="text-[12px]" />
+            </span>
+          ) : null}
+        </div>
       )}
 
       {visibleColumns.has('timer') && (
@@ -335,6 +356,7 @@ function TaskCard({
   timerState,
   onOpenTask,
   onUnarchiveTask,
+  showBlockedStatusIcon,
 }) {
   const isSelected = selected.has(String(task._id));
 
@@ -435,7 +457,7 @@ function TaskCard({
           />
           <select
             value={task.status || 'todo'}
-            onChange={(event) => onInlinePatch(task._id, { status: event.target.value })}
+            onChange={(event) => onInlinePatch(task._id, { status: event.target.value }, task)}
             className={`sv-task-mini-control sv-task-card-control rounded-lg border border-outline-variant/30 backdrop-blur-sm outline-none focus:ring-2 transition-all px-1.5 py-0.5 text-xs font-semibold ${
               task.status === 'completed'
                 ? 'bg-green-100 text-green-700 border-green-200 focus:ring-green-200'
@@ -450,6 +472,11 @@ function TaskCard({
               <option key={value} value={value}>{value.replace('_', ' ')}</option>
             ))}
           </select>
+          {showBlockedStatusIcon ? (
+            <span className="sv-task-status-lock-icon" aria-label="Blocked status change">
+              <Icon name="block" className="text-[12px]" />
+            </span>
+          ) : null}
         </div>
       </div>
     </article>
@@ -537,6 +564,7 @@ function GroupSection({
   onOpenTask,
   onUnarchiveTask,
   visibleColumns,
+  blockedStatusTaskId,
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -601,6 +629,7 @@ function GroupSection({
                     onOpenTask={onOpenTask}
                     onUnarchiveTask={onUnarchiveTask}
                     visibleColumns={visibleColumns}
+                    showBlockedStatusIcon={String(blockedStatusTaskId) === String(task._id)}
                   />
                 ))}
               </SortableContext>
@@ -663,6 +692,7 @@ function MyTasksPage() {
   const [savedViews, setSavedViews] = useState([]);
   const [activeViewId, setActiveViewId] = useState(null);
   const [showSavedViewsMenu, setShowSavedViewsMenu] = useState(false);
+  const [blockedStatusTaskId, setBlockedStatusTaskId] = useState('');
   const [kanbanOrder, setKanbanOrder] = useState(() =>
     STATUS_OPTIONS.reduce((acc, status) => ({ ...acc, [status]: [] }), {}),
   );
@@ -675,6 +705,12 @@ function MyTasksPage() {
       return () => clearTimeout(timeout);
     }
   }, [toast]);
+
+  useEffect(() => {
+    if (!blockedStatusTaskId) return undefined;
+    const timeout = setTimeout(() => setBlockedStatusTaskId(''), 1400);
+    return () => clearTimeout(timeout);
+  }, [blockedStatusTaskId]);
 
   const totalOpen = Number(meta?.openCount || 0);
   const grouped = useMemo(() => groups || [], [groups]);
@@ -1014,6 +1050,24 @@ function MyTasksPage() {
     await reorderTask({ taskId, newPosition, groupKey });
   };
 
+  const handleInlinePatch = useCallback(
+    async (taskId, patch, taskRow = null) => {
+      if (!patch || typeof patch !== 'object') return;
+      if (patch.status !== undefined) {
+        const sourceTask = taskRow || taskById.get(String(taskId));
+        const fromStatus = sourceTask?.status;
+        const nextStatus = patch.status;
+        if (isCompletedReopenBlocked(fromStatus, nextStatus)) {
+          setToast({ type: 'error', message: LOCKED_STATUS_MESSAGE });
+          setBlockedStatusTaskId(String(taskId));
+          return;
+        }
+      }
+      await updateMyTask(taskId, patch);
+    },
+    [taskById, updateMyTask],
+  );
+
   const resolveKanbanStatusById = useCallback((id, orderMap) => {
     const key = String(id || '');
     if (!key) return null;
@@ -1067,6 +1121,12 @@ function MyTasksPage() {
     }));
 
     try {
+      const movingTask = taskById.get(activeId);
+      if (isCompletedReopenBlocked(movingTask?.status, targetStatus)) {
+        setKanbanOrder(previousOrder);
+        setToast({ type: 'error', message: LOCKED_STATUS_MESSAGE });
+        return;
+      }
       await updateMyTask(activeId, { status: targetStatus });
       await reorderTask({ taskId: activeId, newPosition: clampedIndex, groupKey: targetStatus });
       setToast({ type: 'success', message: `Moved to ${targetStatus.replace('_', ' ')}` });
@@ -1422,7 +1482,7 @@ function MyTasksPage() {
               onFocusTask={setFocusedTaskId}
               selected={selectedTaskIds}
               onToggleSelected={toggleSelected}
-              onInlinePatch={updateMyTask}
+              onInlinePatch={handleInlinePatch}
               onTimerToggle={handleTimerToggle}
               onTimerStop={handleTimerStop}
               isTimerActive={isTimerActive}
@@ -1433,6 +1493,7 @@ function MyTasksPage() {
               onOpenTask={(taskRow) => navigate(`/tasks/${taskRow._id || taskRow.id}`)}
               onUnarchiveTask={handleUnarchiveTask}
               visibleColumns={visibleColumns}
+              blockedStatusTaskId={blockedStatusTaskId}
             />
           ))}
 
@@ -1465,7 +1526,7 @@ function MyTasksPage() {
                                 task={task}
                                 selected={selectedTaskIds}
                                 onToggleSelected={toggleSelected}
-                                onInlinePatch={updateMyTask}
+                                onInlinePatch={handleInlinePatch}
                                 onTimerToggle={handleTimerToggle}
                                 onTimerStop={handleTimerStop}
                                 isTimerActive={isTimerActive(String(task._id))}
@@ -1474,6 +1535,7 @@ function MyTasksPage() {
                                 timerState={timerState}
                                 onOpenTask={(taskRow) => navigate(`/tasks/${taskRow._id || taskRow.id}`)}
                                 onUnarchiveTask={handleUnarchiveTask}
+                                showBlockedStatusIcon={String(blockedStatusTaskId) === String(task._id)}
                               />
                             ))
                           ) : (

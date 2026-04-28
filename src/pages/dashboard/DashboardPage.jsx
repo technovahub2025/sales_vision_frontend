@@ -111,8 +111,20 @@ function DashboardPage() {
 
   async function handleExport(format) {
     try {
-      await exportReport(format);
-      setNotice({ tone: 'success', text: `${String(format).toUpperCase()} report export started.` });
+      const result = await exportReport(format);
+      const blob = result?.blob;
+      if (!blob) {
+        throw new Error('Empty export file');
+      }
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result?.filename || `salesvision_dashboard.${String(format).toLowerCase()}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      setNotice({ tone: 'success', text: `${String(format).toUpperCase()} report downloaded.` });
       setActionMenuOpen(false);
     } catch (errorPayload) {
       setNotice({ tone: 'error', text: errorPayload?.message || 'Unable to export report right now.' });

@@ -5,10 +5,10 @@
 }
 
 .sv-settings-shell {
-  width: 100% !important;
-  max-width: none !important;
-  margin-inline: 0 !important;
-  padding: 0.82rem 0.94rem 0.92rem !important;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding: 0.82rem 1rem 0.92rem;
 }
 
 .sv-settings-tabs {
@@ -77,6 +77,18 @@
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
   padding: 0.66rem 0.8rem;
   font-size: 0.82rem;
+  color: var(--color-error);
+}
+
+.sv-denied-action,
+.sv-denied-action:disabled {
+  border-color: color-mix(in srgb, var(--color-error) 45%, var(--color-border));
+  color: var(--color-error);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.sv-denied-action .material-symbols-outlined {
   color: var(--color-error);
 }
 
@@ -243,6 +255,145 @@
   align-items: center;
 }
 
+.sv-settings-members-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.92rem;
+  flex-wrap: wrap;
+}
+
+.sv-settings-members-toolbar-card {
+  padding: 0.9rem 1rem;
+}
+
+.sv-settings-members-toolbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.72rem;
+  margin-bottom: 0.72rem;
+}
+
+.sv-settings-members-filter-btn.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-muted));
+  color: var(--color-accent);
+}
+
+.sv-settings-members-filter-panel {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 76%, white);
+  transition: max-height 220ms ease, opacity 170ms ease, margin-top 220ms ease;
+  overflow: hidden;
+}
+
+.sv-settings-members-filter-panel.is-collapsed {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sv-settings-members-filter-panel.is-open {
+  max-height: 24rem;
+  margin-top: 0.72rem;
+  opacity: 1;
+}
+
+.sv-settings-members-filter-grid {
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.sv-settings-members-filter-bottom {
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.sv-settings-members-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem;
+  border-radius: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 86%, white);
+}
+
+.sv-settings-members-view-switch .sv-settings-tab {
+  min-height: 1.75rem;
+  border-radius: 0.5rem;
+  padding-inline: 0.74rem;
+  font-size: 0.74rem;
+}
+
+.sv-settings-members-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.62rem;
+}
+
+.sv-settings-members-pagination {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  margin-top: 0.76rem;
+  padding-top: 0.76rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.sv-settings-members-pagination-meta {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.sv-settings-members-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  flex-wrap: wrap;
+}
+
+.sv-settings-members-pagination-controls .sv-settings-btn {
+  min-width: 2rem;
+  min-height: 1.88rem;
+  padding-inline: 0.58rem;
+}
+
+.sv-settings-members-pagination-controls .sv-settings-btn.is-active {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 16%, white);
+  color: var(--color-accent);
+}
+
+.sv-settings-members-invite-modal {
+  width: min(620px, calc(100vw - 2rem));
+  max-height: min(86vh, 760px);
+  overflow: auto;
+}
+
+.sv-settings-members-invite-modal-body {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.sv-settings-workspace-modal {
+  width: min(560px, calc(100vw - 2rem));
+}
+
+.sv-settings-workspace-item {
+  padding: 0.8rem;
+}
+
 .sv-settings-invite-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 170px auto;
@@ -341,12 +492,15 @@ html[data-theme='dark'] .sv-settings-btn-neutral {
   border-color: color-mix(in srgb, var(--color-border) 72%, #0b1220);
 }
 
+html[data-theme='dark'] .sv-settings-members-view-switch,
+html[data-theme='dark'] .sv-settings-members-filter-panel {
+  border-color: color-mix(in srgb, var(--color-border) 70%, #0b1220);
+}
+
 @media (max-width: 991.98px) {
   .sv-settings-shell {
-    width: 100% !important;
-    max-width: none !important;
-    margin-inline: 0 !important;
-    padding: 0.78rem 0.78rem 0.88rem !important;
+    width: 100%;
+    padding: 0.78rem 0.78rem 0.88rem;
   }
 
   .sv-settings-form-grid,
@@ -358,11 +512,15 @@ html[data-theme='dark'] .sv-settings-btn-neutral {
   .sv-settings-invite-form {
     grid-template-columns: 1fr;
   }
+
+  .sv-settings-members-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767.98px) {
   .sv-settings-shell {
-    padding: 0.66rem 0.58rem 0.8rem !important;
+    padding: 0.66rem 0.58rem 0.8rem;
   }
 
   .sv-settings-title {
@@ -376,5 +534,25 @@ html[data-theme='dark'] .sv-settings-btn-neutral {
 
   .sv-settings-btn {
     width: 100%;
+  }
+
+  .sv-settings-members-header,
+  .sv-settings-members-toolbar-top,
+  .sv-settings-members-list-head,
+  .sv-settings-members-filter-bottom {
+    align-items: stretch;
+  }
+
+  .sv-settings-members-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sv-settings-members-view-switch {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .sv-settings-members-view-switch .sv-settings-tab {
+    flex: 1;
   }
 }

@@ -3,9 +3,20 @@ import { EVENTS } from './events';
 
 let socketInstance = null;
 const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+const ACCESS_TOKEN_STORAGE_KEY = 'salevision:accessToken';
+const SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY = 'salevision:superAdminAccessToken';
+
+function readSocketToken() {
+  return (
+    window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) ||
+    window.localStorage.getItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY) ||
+    ''
+  );
+}
 
 export function getSocket() {
   if (socketInstance) {
+    socketInstance.auth = { token: readSocketToken() };
     return socketInstance;
   }
 
@@ -17,6 +28,7 @@ export function getSocket() {
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
     reconnectionDelayMax: 4000,
+    auth: () => ({ token: readSocketToken() }),
   });
 
   return socketInstance;

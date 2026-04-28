@@ -7,11 +7,13 @@ import NotificationDrawer from '../notifications/NotificationDrawer';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import ThemeModeToggle from '../ui/ThemeModeToggle';
+import { usePermission } from '../../hooks/usePermission';
 
 function Topbar({ collapsed = false, onToggleSidebar }) {
   const { items, meta, markRead, markAllRead, remove, loading, error, hasNextPage, loadingMore, loadMore } = useNotifications();
   const { user, logout } = useAuth();
   const { workspaceId, selectedWorkspaceId, workspaces, switchWorkspace, workspacesLoading } = useWorkspace();
+  const { role } = usePermission();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const unreadCount = Number(meta?.unreadCount || 0);
 
@@ -83,7 +85,7 @@ function Topbar({ collapsed = false, onToggleSidebar }) {
                 <span className="d-none d-lg-inline text-truncate fw-medium" style={{ maxWidth: 120 }}>{user?.displayName || 'User'}</span>
               </button>
               <ul className="dropdown-menu dropdown-menu-end">
-                <li><span className="dropdown-item-text small text-muted">{user?.role || 'member'}</span></li>
+                <li><span className="dropdown-item-text small text-muted text-capitalize">{role}</span></li>
               </ul>
             </div>
             <button

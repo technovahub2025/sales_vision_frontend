@@ -5,6 +5,8 @@ import { projectsApi, usersApi, teamsApi, clientsApi } from '../../api';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useSocket } from '../../contexts/SocketContext';
 import Icon from '../../components/ui/Icon';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import { usePermission } from '../../hooks/usePermission';
 import { EVENTS } from '../../socket/events';
 import { toRealtimeEvent } from '../../socket/realtime';
 
@@ -12,6 +14,10 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
   const { workspaceId, setProjectId } = useWorkspace();
   const { socket, joinWorkspace, leaveWorkspace } = useSocket();
+  const { can, role } = usePermission();
+  const canCreateProject = can('project', 'create');
+  const canUpdateProject = can('project', 'update');
+  const canDeleteProject = can('project', 'delete');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -223,6 +229,7 @@ export default function ProjectsPage() {
   const canCreate = useMemo(() => name.trim().length >= 2 && ownerId, [name, ownerId]);
 
   function openCreateModal() {
+    if (!canCreateProject) return;
     resetForm();
     setShowCreateForm(true);
   }
@@ -259,6 +266,10 @@ export default function ProjectsPage() {
   function handleCreate(event) {
     event.preventDefault();
     setError('');
+    if (!canCreateProject) {
+      setError(`${role} cannot create projects`);
+      return;
+    }
     if (!canCreate) {
       setError('Project name and owner are required');
       return;
@@ -279,6 +290,7 @@ export default function ProjectsPage() {
   }
 
   function handleOpenEditModal(project) {
+    if (!canUpdateProject) return;
     setEditingProjectId(project._id);
     setEditProjectData({
       name: project.name || '',
@@ -318,6 +330,10 @@ export default function ProjectsPage() {
   function handleUpdateProject(event) {
     event.preventDefault();
     setEditProjectError('');
+    if (!canUpdateProject) {
+      setEditProjectError(`${role} cannot update projects`);
+      return;
+    }
     if (!editProjectData.name.trim() || !editProjectData.ownerId) {
       setEditProjectError('Project name and owner are required');
       return;
@@ -338,6 +354,7 @@ export default function ProjectsPage() {
   }
 
   function handleOpenDeleteConfirm(projectId) {
+    if (!canDeleteProject) return;
     setDeletingProjectId(projectId);
     setDeleteProjectError('');
     setDeleteConfirmOpen(true);
@@ -352,6 +369,10 @@ export default function ProjectsPage() {
 
   function handleConfirmDelete() {
     setDeleteProjectError('');
+    if (!canDeleteProject) {
+      setDeleteProjectError(`${role} cannot delete projects`);
+      return;
+    }
     deleteMutation.mutate(deletingProjectId);
   }
 
@@ -409,14 +430,20 @@ export default function ProjectsPage() {
             </div>
           </div>
           <div className="sv-projects-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn"
-              onClick={openCreateModal}
-            >
-              <Icon name="add" className="text-lg" />
-              Create Project
-            </button>
+            {canCreateProject ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn"
+                onClick={openCreateModal}
+              >
+                <Icon name="add" className="text-lg" />
+                Create Project
+              </button>
+            ) : (
+              <DeniedActionButton role={role} actionLabel="create projects" className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn">
+                Create Project
+              </DeniedActionButton>
+            )}
           </div>
         </header>
 
@@ -455,14 +482,20 @@ export default function ProjectsPage() {
             </div>
             <h3 className="sv-projects-empty-title">No projects yet</h3>
             <p className="sv-projects-empty-text">Create your first project to get started with planning.</p>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn"
-              onClick={openCreateModal}
-            >
-              <Icon name="add" className="text-lg" />
-              Create Your First Project
-            </button>
+            {canCreateProject ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn"
+                onClick={openCreateModal}
+              >
+                <Icon name="add" className="text-lg" />
+                Create Your First Project
+              </button>
+            ) : (
+              <DeniedActionButton role={role} actionLabel="create projects" className="btn btn-primary btn-sm sv-ctl-btn sv-projects-create-btn">
+                Create Your First Project
+              </DeniedActionButton>
+            )}
           </div>
         ) : !filteredProjects.length ? (
           <div className="sv-card sv-projects-empty-card">
@@ -498,22 +531,34 @@ export default function ProjectsPage() {
                             </button>
                             {menuOpenProjectId === id && (
                               <div className="sv-projects-menu-popover">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditModal(project)}
-                                  className="sv-projects-menu-item"
-                                >
-                                  <Icon name="edit" className="text-sm" />
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenDeleteConfirm(id)}
-                                  className="sv-projects-menu-item is-danger"
-                                >
-                                  <Icon name="delete" className="text-sm" />
-                                  Delete
-                                </button>
+                                {canUpdateProject ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(project)}
+                                    className="sv-projects-menu-item"
+                                  >
+                                    <Icon name="edit" className="text-sm" />
+                                    Edit
+                                  </button>
+                                ) : (
+                                  <DeniedActionButton role={role} actionLabel="edit projects" className="sv-projects-menu-item">
+                                    Edit
+                                  </DeniedActionButton>
+                                )}
+                                {canDeleteProject ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDeleteConfirm(id)}
+                                    className="sv-projects-menu-item is-danger"
+                                  >
+                                    <Icon name="delete" className="text-sm" />
+                                    Delete
+                                  </button>
+                                ) : (
+                                  <DeniedActionButton role={role} actionLabel="delete projects" className="sv-projects-menu-item is-danger">
+                                    Delete
+                                  </DeniedActionButton>
+                                )}
                               </div>
                             )}
                           </div>

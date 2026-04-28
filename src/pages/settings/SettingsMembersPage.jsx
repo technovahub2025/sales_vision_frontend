@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../../components/ui/Icon';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
 import { useWorkspaceMembers } from '../../hooks/useWorkspaceMembers';
+import { usePermission } from '../../hooks/usePermission';
 import SettingsTabs from './SettingsTabs';
 
 const ROLE_OPTIONS = ['owner', 'admin', 'member', 'viewer'];
 const PAGE_SIZE_OPTIONS = [8, 15, 25];
 
 function SettingsMembersPage() {
+  const { role } = usePermission();
   const [inviteForm, setInviteForm] = useState({ email: '', role: 'member' });
   const [actionError, setActionError] = useState('');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -128,7 +131,7 @@ function SettingsMembersPage() {
 
   return (
     <main className="min-h-screen sv-settings-page">
-      <div className="mx-auto max-w-6xl px-8 pb-12 pt-2 sv-settings-shell">
+      <div className="sv-settings-shell">
         <SettingsTabs />
 
         <section className="sv-settings-header sv-settings-members-header">
@@ -145,7 +148,11 @@ function SettingsMembersPage() {
               <Icon name="person_add" className="text-[1rem]" />
               Invite Member
             </button>
-          ) : null}
+          ) : (
+            <DeniedActionButton role={role} actionLabel="invite members" className="sv-settings-btn sv-settings-btn-primary">
+              Invite Member
+            </DeniedActionButton>
+          )}
         </section>
 
         {listError || actionError ? (
@@ -238,7 +245,10 @@ function SettingsMembersPage() {
                   role="tab"
                   className={`sv-settings-tab ${isInvitesView ? 'is-active' : ''}`}
                   aria-selected={isInvitesView}
+                  disabled={!canManageMembers}
+                  title={!canManageMembers ? `${role} cannot view pending invites` : undefined}
                   onClick={() => {
+                    if (!canManageMembers) return;
                     setView('invites');
                     setPage(1);
                   }}
@@ -317,7 +327,11 @@ function SettingsMembersPage() {
                                 <Icon name="person_remove" className="text-[0.95rem]" />
                                 Remove
                               </button>
-                            ) : null}
+                            ) : (
+                              <DeniedActionButton role={role} actionLabel="remove members">
+                                Remove
+                              </DeniedActionButton>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -355,7 +369,11 @@ function SettingsMembersPage() {
                                 <Icon name="mail_off" className="text-[0.95rem]" />
                                 Revoke
                               </button>
-                            ) : null}
+                            ) : (
+                              <DeniedActionButton role={role} actionLabel="revoke invites">
+                                Revoke
+                              </DeniedActionButton>
+                            )}
                           </td>
                         </tr>
                       ))}

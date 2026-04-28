@@ -1,8 +1,10 @@
 import { Component, lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import SaasLayout from '../layouts/SaasLayout';
+import SuperAdminLayout from '../layouts/SuperAdminLayout';
+import { SocketProvider } from '../contexts/SocketContext';
 import { ROUTES } from './routePaths';
 import ProtectedAppLayout from './ProtectedAppLayout';
+import WorkspaceAppLayout from './WorkspaceAppLayout';
 import RoleGuard from './RoleGuard';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -37,6 +39,11 @@ const RegisterPage = lazy(() => import('../pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const InvitePage = lazy(() => import('../pages/auth/InvitePage'));
+const SuperAdminPage = lazy(() => import('../pages/super-admin/SuperAdminPage'));
+const SuperAdminUserDatasPage = lazy(() => import('../pages/super-admin/SuperAdminUserDatasPage'));
+const SuperAdminWorkspacesPage = lazy(() => import('../pages/super-admin/SuperAdminWorkspacesPage'));
+const SuperAdminActivityPage = lazy(() => import('../pages/super-admin/SuperAdminActivityPage'));
+const SuperAdminSecurityPage = lazy(() => import('../pages/super-admin/SuperAdminSecurityPage'));
 
 function RouteFallback() {
   return <div className="animate-pulse rounded-xl bg-surface-container-low p-6 text-sm text-on-surface-variant">Loading...</div>;
@@ -69,11 +76,11 @@ class RouteErrorBoundary extends Component {
   }
 }
 
-function lazyElement(Component) {
+function lazyElement(PageComponent) {
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
-        <Component />
+        <PageComponent />
       </Suspense>
     </RouteErrorBoundary>
   );
@@ -90,17 +97,27 @@ function LegacyProjectRedirect() {
 }
 
 function RedirectIfAuthenticated({ to = ROUTES.dashboard, children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isSuperAdmin } = useAuth();
 
   if (isLoading) {
     return <RouteFallback />;
   }
 
   if (isAuthenticated) {
-    return <Navigate replace to={to} />;
+    return <Navigate replace to={isSuperAdmin ? ROUTES.superAdmin : to} />;
   }
 
   return children;
+}
+
+function SuperAdminOnly({ children }) {
+  const { isSuperAdmin } = useAuth();
+  return isSuperAdmin ? children : <Navigate replace to={ROUTES.dashboard} />;
+}
+
+function WorkspaceOnly({ children }) {
+  const { isSuperAdmin } = useAuth();
+  return isSuperAdmin ? <Navigate replace to={ROUTES.superAdmin} /> : children;
 }
 
 function AppRoutes() {
@@ -120,9 +137,16 @@ function AppRoutes() {
       />
       <Route path={ROUTES.resetPassword} element={lazyElement(ResetPasswordPage)} />
       <Route path={ROUTES.invite} element={<RedirectIfAuthenticated>{lazyElement(InvitePage)}</RedirectIfAuthenticated>} />
-
       <Route element={<ProtectedAppLayout />}>
-        <Route element={<SaasLayout />}>
+        <Route element={<SuperAdminOnly><SocketProvider><SuperAdminLayout /></SocketProvider></SuperAdminOnly>}>
+          <Route path={ROUTES.superAdmin} element={lazyElement(SuperAdminPage)} />
+          <Route path={ROUTES.superAdminUserDatas} element={lazyElement(SuperAdminUserDatasPage)} />
+          <Route path={ROUTES.superAdminWorkspaces} element={lazyElement(SuperAdminWorkspacesPage)} />
+          <Route path={ROUTES.superAdminActivity} element={lazyElement(SuperAdminActivityPage)} />
+          <Route path={ROUTES.superAdminSecurity} element={lazyElement(SuperAdminSecurityPage)} />
+        </Route>
+
+        <Route element={<WorkspaceOnly><WorkspaceAppLayout /></WorkspaceOnly>}>
           <Route index element={<Navigate replace to={ROUTES.dashboard} />} />
 
           <Route path={ROUTES.dashboard} element={lazyElement(DashboardPage)} />
@@ -139,14 +163,14 @@ function AppRoutes() {
           <Route path={ROUTES.projectMembers} element={lazyElement(ProjectMembersPage)} />
           <Route path={ROUTES.projectOverview} element={lazyElement(ProjectOverviewPage)} />
 
-          <Route path={ROUTES.leads} element={lazyElement(LeadManagementPage)} />
-          <Route path={ROUTES.clientDetail} element={lazyElement(ClientDetailPage)} />
+          <Route path={ROUTES.leads} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(LeadManagementPage)}</RoleGuard>} />
+          <Route path={ROUTES.clientDetail} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(ClientDetailPage)}</RoleGuard>} />
           <Route path={ROUTES.employees} element={lazyElement(EmployeeManagementPage)} />
           <Route path={ROUTES.employeeDetail} element={lazyElement(EmployeeDetailPage)} />
 
-          <Route path={ROUTES.campaigns} element={lazyElement(CampaignsPage)} />
-          <Route path={ROUTES.campaignDetail} element={lazyElement(CampaignDetailPage)} />
-          <Route path={ROUTES.contacts} element={lazyElement(ContactsPage)} />
+          <Route path={ROUTES.campaigns} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(CampaignsPage)}</RoleGuard>} />
+          <Route path={ROUTES.campaignDetail} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(CampaignDetailPage)}</RoleGuard>} />
+          <Route path={ROUTES.contacts} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(ContactsPage)}</RoleGuard>} />
           <Route path={ROUTES.analytics} element={lazyElement(AnalyticsPage)} />
           <Route path={ROUTES.settings} element={lazyElement(SettingsPage)} />
           <Route path={ROUTES.settingsWorkspace} element={lazyElement(SettingsWorkspacePage)} />

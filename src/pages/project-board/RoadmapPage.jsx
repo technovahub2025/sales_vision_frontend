@@ -4,6 +4,8 @@ import { useRoadmap } from '../../hooks/useRoadmap';
 import { useProjectRouteSync } from '../../hooks/useProjectRouteSync';
 import ProjectTabs from './ProjectTabs';
 import Icon from '../../components/ui/Icon';
+import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import { usePlanAccess } from '../../hooks/usePlanAccess';
 
 function formatShortDate(value) {
   if (!value) return '-';
@@ -15,6 +17,8 @@ function formatShortDate(value) {
 function RoadmapPage() {
   const navigate = useNavigate();
   const projectId = useProjectRouteSync();
+  const { canUseFeature } = usePlanAccess();
+  const roadmapAllowed = canUseFeature('roadmap');
   const { items, loading, error } = useRoadmap(projectId);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -70,6 +74,23 @@ function RoadmapPage() {
   return (
     <main className="sv-roadmap-page">
       <ProjectTabs projectId={projectId} />
+      {!roadmapAllowed ? (
+        <div className="sv-roadmap-stack">
+          <section className="sv-card sv-roadmap-toolbar">
+            <h1 className="sv-roadmap-title">Roadmap</h1>
+            <p className="sv-roadmap-subtitle">This feature is available on Pro plan.</p>
+            <DeniedActionButton
+              role="owner"
+              actionLabel="use roadmap"
+              message="Free plan cannot access roadmap"
+              className="btn btn-light btn-sm sv-ctl-btn sv-roadmap-open-btn"
+            >
+              Roadmap Locked
+            </DeniedActionButton>
+          </section>
+        </div>
+      ) : null}
+      {roadmapAllowed ? (
       <div className="sv-roadmap-stack">
         <section className="sv-card sv-roadmap-toolbar">
           <div className="sv-roadmap-toolbar-head">
@@ -187,6 +208,7 @@ function RoadmapPage() {
           </div>
         </section>
       </div>
+      ) : null}
     </main>
   );
 }

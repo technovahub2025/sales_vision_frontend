@@ -74,9 +74,20 @@ export function WorkspaceProvider({ children }) {
   const workspaceReady = bootstrapStatus === 'ready' && Boolean(workspaceId);
   const effectiveWorkspaceId = workspaceReady ? workspaceId : '';
 
+  const sessionMemberships = useMemo(() => normalizeMemberships(authMemberships), [authMemberships]);
+
   const membershipsQuery = useQuery({
     queryKey: ['memberships', userId || 'current'],
     queryFn: async () => {
+      // If AuthContext already has memberships, avoid a duplicate /me call.
+      if (sessionMemberships.length > 0) {
+        const firstWorkspace = sessionMemberships[0]?.workspaceId || '';
+        return {
+          memberships: sessionMemberships,
+          userWorkspaceId: String(session?.user?.workspaceId || firstWorkspace || ''),
+        };
+      }
+
       const payload = await authApi.me();
       const memberships = payload?.data?.memberships || payload?.data?.user?.memberships || [];
       return {
@@ -89,9 +100,9 @@ export function WorkspaceProvider({ children }) {
     gcTime: 5 * 60_000,
   });
 
-  const sessionMemberships = useMemo(() => normalizeMemberships(authMemberships), [authMemberships]);
   const membershipsFromQuery = membershipsQuery.data?.memberships || [];
   const memberships = membershipsFromQuery.length ? membershipsFromQuery : sessionMemberships;
+
   const userWorkspaceId = String(
     membershipsQuery.data?.userWorkspaceId ||
       session?.user?.workspaceId ||

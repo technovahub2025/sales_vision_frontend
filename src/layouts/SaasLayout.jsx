@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import AppFooter from '../components/layout/AppFooter';
 import Sidebar from '../components/layout/Sidebar';
 import Topbar from '../components/layout/Topbar';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -36,16 +37,17 @@ function SaasLayout() {
     <div className="sv-app-shell">
       <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
       <main 
-        className="sv-main-content min-h-screen"
+        className="sv-main-content min-h-screen d-flex flex-column"
         style={{ 
           marginLeft: sidebarCollapsed ? '4rem' : '15rem',
           transition: 'margin-left 0.24s ease-in-out'
         }}
       >
         <Topbar collapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className="px-3 px-md-4 px-xl-5 pb-5 pb-lg-6">
+        <div className="flex-grow-1 px-3 px-md-4 px-xl-5 pb-5 pb-lg-6">
           <Outlet />
         </div>
+        <AppFooter />
       </main>
     </div>
   );

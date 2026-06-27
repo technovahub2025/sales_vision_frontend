@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import AppFooter from '../layout/AppFooter';
 import ThemeModeToggle from '../ui/ThemeModeToggle';
 
 export default function AuthLayout({
@@ -13,8 +14,8 @@ export default function AuthLayout({
   const logoDark = `${import.meta.env.BASE_URL}assets/dark_logo.jpeg`;
 
   return (
-    <div className={`sv-auth-shell ${compact ? 'min-vh-100 d-flex align-items-center py-3' : 'py-4 py-lg-5'}`}>
-      <div className="container-fluid px-3 px-md-4 px-xl-5 w-100">
+    <div className={`sv-auth-shell ${compact ? 'min-vh-100 d-flex flex-column justify-content-center py-3' : 'min-vh-100 d-flex flex-column py-4 py-lg-5'}`}>
+      <div className={`container-fluid flex-grow-1 px-3 px-md-4 px-xl-5 w-100 ${compact ? 'd-flex flex-column justify-content-center' : ''}`}>
         {showThemeToggle ? (
           <div className="d-flex justify-content-end mb-3 mb-lg-4">
             <ThemeModeToggle />
@@ -64,6 +65,7 @@ export default function AuthLayout({
           </div>
         </div>
       </div>
+      <AppFooter />
     </div>
   );
 }

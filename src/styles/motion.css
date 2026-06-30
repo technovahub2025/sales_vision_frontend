@@ -1,0 +1,284 @@
+/* Shared motion layer. Imported last so interactions stay consistent across pages. */
+:root {
+  --sv-motion-fast: 140ms;
+  --sv-motion-base: 220ms;
+  --sv-motion-slow: 360ms;
+  --sv-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sv-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --sv-motion-lift: translate3d(0, -2px, 0);
+  --sv-motion-press: scale3d(0.985, 0.985, 1);
+}
+
+.sv-page-transition {
+  min-width: 0;
+  animation: sv-page-enter var(--sv-motion-slow) var(--sv-ease-emphasized) both;
+  will-change: opacity;
+}
+
+@keyframes sv-page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sv-route-fallback {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 58rem);
+  margin: clamp(1rem, 4vw, 2rem) auto;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  border-radius: 1.1rem;
+  padding: clamp(1rem, 3vw, 1.4rem);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 72%, white));
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  animation: sv-page-enter var(--sv-motion-slow) var(--sv-ease-emphasized) both;
+}
+
+.sv-route-fallback__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.sv-route-fallback__pulse {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 28%, transparent);
+  animation: sv-pulse 1.25s var(--sv-ease-standard) infinite;
+}
+
+.sv-route-fallback__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.sv-skeleton-line,
+.sv-skeleton-card,
+:where(.sv-skeleton, .skeleton, [class*="skeleton"], [class*="skel"]) {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--color-border) 46%, var(--color-surface-muted));
+}
+
+.sv-skeleton-line {
+  height: 0.9rem;
+}
+
+.sv-skeleton-line.is-wide {
+  grid-column: 1 / -1;
+  width: 76%;
+}
+
+.sv-skeleton-card {
+  min-height: 6.8rem;
+}
+
+.sv-skeleton-card.is-long {
+  grid-column: 1 / -1;
+  min-height: 9rem;
+}
+
+.sv-skeleton-line::after,
+.sv-skeleton-card::after,
+:where(.sv-skeleton, .skeleton, [class*="skeleton"], [class*="skel"])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-110%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 54%, transparent), transparent);
+  animation: sv-shimmer 1.45s linear infinite;
+}
+
+@keyframes sv-shimmer {
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes sv-pulse {
+  70% {
+    box-shadow: 0 0 0 0.55rem color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
+:where(
+  .btn,
+  button,
+  a,
+  .sv-sidebar-nav-item,
+  .sv-sidebar-project-item,
+  .sv-workspace-option,
+  .sv-notification-item,
+  .dropdown-item,
+  .sv-page-dropdown__option,
+  .sv-page-calendar__day
+) {
+  transition:
+    transform var(--sv-motion-fast) var(--sv-ease-standard),
+    box-shadow var(--sv-motion-base) var(--sv-ease-standard),
+    border-color var(--sv-motion-base) var(--sv-ease-standard),
+    background-color var(--sv-motion-base) var(--sv-ease-standard),
+    color var(--sv-motion-base) var(--sv-ease-standard),
+    opacity var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+:where(.btn, button, .sv-ctl-btn):not(:disabled):active {
+  transform: var(--sv-motion-press);
+}
+
+:where(.sv-card, .card, [class*="-card"], [class*="-panel"]):not(.sv-route-fallback) {
+  transition:
+    transform var(--sv-motion-base) var(--sv-ease-standard),
+    box-shadow var(--sv-motion-base) var(--sv-ease-standard),
+    border-color var(--sv-motion-base) var(--sv-ease-standard),
+    background-color var(--sv-motion-base) var(--sv-ease-standard),
+    color var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(.sv-card, .card, [class*="-card"]):not(.sv-route-fallback):not([class*="modal"]):not([class*="drawer"]):hover {
+    transform: var(--sv-motion-lift);
+  }
+
+  :where(.btn, .sv-ctl-btn, .sv-icon-btn, .sv-topbar-icon-btn):not(:disabled):hover {
+    transform: translate3d(0, -1px, 0);
+  }
+}
+
+:where(input, textarea, select, .form-control, .form-select, .sv-page-dropdown__trigger, .sv-page-calendar__trigger) {
+  transition:
+    transform var(--sv-motion-fast) var(--sv-ease-standard),
+    box-shadow var(--sv-motion-base) var(--sv-ease-standard),
+    border-color var(--sv-motion-base) var(--sv-ease-standard),
+    background-color var(--sv-motion-base) var(--sv-ease-standard),
+    color var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+:where(input, textarea, select, .form-control, .form-select):focus {
+  transform: translate3d(0, -1px, 0);
+}
+
+:where(.dropdown-menu.show, .sv-workspace-menu.show, .sv-page-dropdown__menu, .sv-page-calendar__menu, .sv-export-menu-popover) {
+  animation: sv-popover-enter var(--sv-motion-base) var(--sv-ease-emphasized) both;
+  transform-origin: top right;
+  will-change: opacity, transform;
+}
+
+@keyframes sv-popover-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale3d(0.98, 0.98, 1);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+:where(.modal.show .modal-dialog, .sv-modal-panel, .sv-modal-panel-lg, [role="dialog"], [class*="drawer"].is-open, [class*="drawer"].show) {
+  animation: sv-modal-enter var(--sv-motion-slow) var(--sv-ease-emphasized) both;
+  will-change: opacity, transform;
+}
+
+@keyframes sv-modal-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale3d(0.985, 0.985, 1);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+:where(.accordion-collapse, .collapse) {
+  transition: height var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+:where(.accordion-button, [aria-expanded]) :where(.bi-chevron-down, .bi-chevron-up, svg:last-child) {
+  transition: transform var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+:where(.tooltip, .popover) {
+  animation: sv-fade-enter var(--sv-motion-base) var(--sv-ease-standard) both;
+}
+
+@keyframes sv-fade-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+:where(.spinner-border, .spinner-grow, [class*="spinner"], [class*="loader"]) {
+  color: var(--color-accent);
+}
+
+:where(.progress-bar, [class*="progress-bar"]) {
+  transition: width var(--sv-motion-slow) var(--sv-ease-emphasized), background-color var(--sv-motion-base) var(--sv-ease-standard);
+}
+
+:where(img) {
+  content-visibility: auto;
+}
+
+html[data-theme='dark'] .sv-route-fallback {
+  border-color: color-mix(in srgb, var(--color-border) 74%, #020617);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, #020617), color-mix(in srgb, var(--color-surface-muted) 80%, #020617));
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.38);
+}
+
+html[data-theme='dark'] :where(.sv-skeleton-line, .sv-skeleton-card, .sv-skeleton, .skeleton, [class*="skeleton"], [class*="skel"]) {
+  background: color-mix(in srgb, var(--color-border) 46%, #020617);
+}
+
+html[data-theme='dark'] :where(.sv-skeleton-line, .sv-skeleton-card, .sv-skeleton, .skeleton, [class*="skeleton"], [class*="skel"])::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+}
+
+@media (max-width: 575.98px) {
+  .sv-route-fallback__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sv-skeleton-line.is-wide,
+  .sv-skeleton-card.is-long {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .sv-page-transition,
+  .sv-route-fallback,
+  :where(.dropdown-menu.show, .sv-workspace-menu.show, .sv-page-dropdown__menu, .sv-page-calendar__menu, .sv-export-menu-popover),
+  :where(.modal.show .modal-dialog, .sv-modal-panel, .sv-modal-panel-lg, [role="dialog"], [class*="drawer"].is-open, [class*="drawer"].show) {
+    animation: none !important;
+    transform: none !important;
+  }
+}

@@ -5,21 +5,23 @@ import { NAV_CONFIG } from '../../config/navConfig';
 import { projectsApi } from '../../api';
 import { ROUTES, projectRoute } from '../../routes/routePaths';
 import Icon from '../ui/Icon';
+import { Plus } from 'lucide-react';
 import { useMyTasks } from '../../hooks/useMyTasks';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 function NavItem({ item, activeAware = true, collapsed = false }) {
   const baseClass = collapsed
-    ? 'sv-sidebar-nav-item d-flex align-items-center justify-content-center px-3 py-3 rounded-3 fw-semibold small'
-    : 'sv-sidebar-nav-item d-flex align-items-center gap-3 px-3 py-2 rounded-3 fw-semibold small';
+    ? 'sv-sidebar-nav-item sv-sidebar-nav-item--collapsed d-flex align-items-center justify-content-center rounded-3 fw-semibold small'
+    : 'sv-sidebar-nav-item d-flex align-items-center gap-3 rounded-3 fw-semibold small';
+  const title = collapsed ? item.label : undefined;
 
   if (!activeAware || item.to === '#') {
     return (
-      <a href={item.to} className={baseClass}>
+      <a href={item.to} className={baseClass} title={title} aria-label={item.label}>
         <Icon name={item.icon} />
-        {!collapsed && <span className="flex-grow-1">{item.label}</span>}
+        {!collapsed && <span className="sv-sidebar-nav-label flex-grow-1">{item.label}</span>}
         {!collapsed && item.badge ? (
-          <span className="badge rounded-pill text-bg-primary">
+          <span className="badge rounded-pill text-bg-primary sv-sidebar-nav-badge">
             {item.badge}
           </span>
         ) : null}
@@ -31,6 +33,8 @@ function NavItem({ item, activeAware = true, collapsed = false }) {
     <NavLink
       to={item.to}
       end={item.end}
+      title={title}
+      aria-label={item.label}
       className={({ isActive }) =>
         isActive
           ? `${baseClass} is-active`
@@ -38,9 +42,9 @@ function NavItem({ item, activeAware = true, collapsed = false }) {
       }
     >
       <Icon name={item.icon} />
-      {!collapsed && <span className="flex-grow-1">{item.label}</span>}
+      {!collapsed && <span className="sv-sidebar-nav-label flex-grow-1">{item.label}</span>}
       {!collapsed && item.badge ? (
-        <span className="badge rounded-pill text-bg-primary">
+        <span className="badge rounded-pill text-bg-primary sv-sidebar-nav-badge">
           {item.badge}
         </span>
       ) : null}
@@ -48,34 +52,34 @@ function NavItem({ item, activeAware = true, collapsed = false }) {
   );
 }
 
-function SidebarFrame({ collapsed, setCollapsed, children, footer }) {
+function SidebarFrame({ collapsed, children, footer }) {
   const logoLight = `${import.meta.env.BASE_URL}assets/light_logo.jpeg`;
   const logoDark = `${import.meta.env.BASE_URL}assets/dark_logo.jpeg`;
+  const logoSecondary = `${import.meta.env.BASE_URL}assets/logo_2.png`;
 
   return (
     <aside
-      className="sv-sidebar fixed left-0 top-0 z-40 d-flex h-100 flex-column border-end p-4 pt-5"
+      className={`sv-sidebar fixed left-0 top-0 z-40 d-flex h-100 flex-column border-end ${collapsed ? 'is-collapsed' : ''}`}
       style={{
         width: collapsed ? '4rem' : '15rem',
-        transition: 'width 0.24s ease-in-out',
       }}
     >
-      <div className={`mb-8 px-3 d-flex align-items-center ${collapsed ? 'justify-content-center' : 'justify-content-between'}`}>
-        {!collapsed && (
-          <div className="sv-sidebar-brand">
-            <img src={logoLight} alt="Sales Vision" className="sv-logo sv-logo-light sv-logo-dashboard" />
-            <img src={logoDark} alt="Sales Vision" className="sv-logo sv-logo-dark sv-logo-dashboard" />
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          className="sv-sidebar-toggle sv-focus-ring d-flex align-items-center justify-content-center"
-          style={{ width: 32, height: 32, padding: 0 }}
-          aria-label="Toggle sidebar"
-        >
-          <Icon name={collapsed ? 'bi-chevron-right' : 'bi-chevron-left'} />
-        </button>
+      <div className={`sv-sidebar-header ${collapsed ? 'is-collapsed' : ''}`}>
+        <div className="sv-sidebar-brand-stack">
+          <img
+            src={logoSecondary}
+            alt="Technova Hub"
+            className={`sv-sidebar-brand-secondary ${collapsed ? 'sv-sidebar-brand-secondary--collapsed' : ''}`}
+            loading="eager"
+            decoding="async"
+          />
+          {!collapsed && (
+            <div className="sv-sidebar-brand">
+              <img src={logoLight} alt="Sales Vision" className="sv-logo sv-logo-light sv-logo-dashboard" loading="eager" decoding="async" />
+              <img src={logoDark} alt="Sales Vision" className="sv-logo sv-logo-dark sv-logo-dashboard" loading="eager" decoding="async" />
+            </div>
+          )}
+        </div>
       </div>
 
       {children}
@@ -115,71 +119,78 @@ function WorkspaceSidebar({ collapsed = false, setCollapsed }) {
   const projects = projectsQuery.data || [];
 
   return (
-    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={!collapsed ? (
-      <div className="mt-auto space-y-1 border-top pt-4 px-3">
-        <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} />
+    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={(
+      <div className="sv-sidebar-footer">
+        {canCreate ? (
+          <NavLink
+            to={ROUTES.newTask}
+            className={`sv-sidebar-new-task ${collapsed ? 'is-collapsed' : ''} btn sv-btn-primary fw-bold`}
+            title="New Task"
+            aria-label="New Task"
+          >
+            <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
+            {!collapsed ? <span>New Task</span> : null}
+          </NavLink>
+        ) : null}
+        {!collapsed ? <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} /> : null}
       </div>
-    ) : null}>
-      <nav className="flex-1 space-y-1 mb-4">
-        {primaryItems.map((item) => (
-          <NavItem key={item.label} item={item} collapsed={collapsed} />
-        ))}
-      </nav>
+    )}>
+      <div className="sv-sidebar-body">
+        <nav className="sv-sidebar-nav">
+          {primaryItems.map((item) => (
+            <NavItem key={item.label} item={item} collapsed={collapsed} />
+          ))}
+        </nav>
 
-      {!collapsed && (
-        <div className="mt-2 px-3">
-          <div className="d-flex align-items-center justify-content-between text-xs fw-semibold text-uppercase tracking-widest mb-3" style={{ color: 'var(--color-text-muted)' }}>
-            <span>Projects</span>
-            <NavLink to={ROUTES.projects} className="small fw-bold" style={{ color: 'var(--color-accent)' }}>
-              View all
-            </NavLink>
-          </div>
-          {projectsQuery.isLoading || workspacesLoading ? (
-            <div className="space-y-2">
-              <div className="h-10 animate-pulse rounded-lg" style={{ background: 'var(--color-border)' }} />
-              <div className="h-10 animate-pulse rounded-lg" style={{ background: 'var(--color-border)' }} />
-              <div className="h-10 animate-pulse rounded-lg" style={{ background: 'var(--color-border)' }} />
+        {!collapsed && (
+          <section className="sv-sidebar-projects">
+            <div className="sv-sidebar-section-head">
+              <span>Projects</span>
+              <NavLink to={ROUTES.projects} className="sv-sidebar-section-link">
+                View all
+              </NavLink>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {projects.length > 0 ? (
-                projects.map((project) => {
-                  const color = project?.metadata?.color || '#94a3b8';
-                  return (
-                    <div key={project._id} className="d-flex align-items-center justify-content-between rounded-3 border px-3 py-2.5 sv-sidebar-project-item">
-                      <NavLink
-                        to={projectRoute('board', project._id)}
-                        className="d-flex min-w-0 align-items-center gap-2 text-start flex-grow-1"
-                      >
-                        <span className="rounded-full" style={{ width: 10, height: 10, backgroundColor: color }} />
-                        <span className="truncate text-xs fw-semibold" style={{ fontSize: '0.85rem' }}>{project.name}</span>
-                      </NavLink>
-                      <div className="d-flex align-items-center gap-2 text-secondary">
-                        <NavLink to={projectRoute('board', project._id)} className="hover-opacity-75">
-                          <Icon name="view_kanban" className="text-[16px]" />
+            {projectsQuery.isLoading || workspacesLoading ? (
+              <div className="sv-sidebar-project-list is-loading">
+                <div className="sv-sidebar-skel" />
+                <div className="sv-sidebar-skel" />
+                <div className="sv-sidebar-skel" />
+              </div>
+            ) : (
+              <div className="sv-sidebar-project-list">
+                {projects.length > 0 ? (
+                  projects.map((project) => {
+                    const color = project?.metadata?.color || '#94a3b8';
+                    return (
+                      <div key={project._id} className="sv-sidebar-project-item">
+                        <NavLink
+                          to={projectRoute('board', project._id)}
+                          className="sv-sidebar-project-main"
+                        >
+                          <span className="sv-sidebar-project-dot" style={{ backgroundColor: color }} />
+                          <span className="sv-sidebar-project-name">{project.name}</span>
                         </NavLink>
-                        <NavLink to={projectRoute('backlog', project._id)} className="hover-opacity-75">
-                          <Icon name="list" className="text-[16px]" />
-                        </NavLink>
+                        <div className="sv-sidebar-project-actions">
+                          <NavLink to={projectRoute('board', project._id)} className="sv-sidebar-project-icon-btn" aria-label={`${project.name} board`}>
+                            <Icon name="view_kanban" className="text-[16px]" />
+                          </NavLink>
+                          <NavLink to={projectRoute('backlog', project._id)} className="sv-sidebar-project-icon-btn" aria-label={`${project.name} backlog`}>
+                            <Icon name="list" className="text-[16px]" />
+                          </NavLink>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="rounded-3 border border-dashed px-3 py-3 small" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
-                  No projects yet.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {!collapsed && canCreate ? (
-        <NavLink to={ROUTES.newTask} className="mx-3 mt-4 rounded-3 btn sv-btn-primary fw-bold py-2.5">
-          New Task
-        </NavLink>
-      ) : null}
+                    );
+                  })
+                ) : (
+                  <div className="sv-sidebar-empty-state">
+                    No projects yet.
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
 
     </SidebarFrame>
   );
@@ -195,12 +206,12 @@ function SuperAdminSidebar({ collapsed = false, setCollapsed }) {
   ];
 
   return (
-    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={!collapsed ? (
-      <div className="mt-auto space-y-1 border-top pt-4 px-3">
-        <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} />
+    <SidebarFrame collapsed={collapsed} setCollapsed={setCollapsed} footer={(
+      <div className="sv-sidebar-footer">
+        {!collapsed ? <NavItem item={{ label: 'Support', icon: 'help', to: '#' }} activeAware={false} /> : null}
       </div>
-    ) : null}>
-      <nav className="flex-1 space-y-1 mb-4">
+    )}>
+      <nav className="sv-sidebar-nav">
         {items.map((item) => (
           <NavItem key={item.label} item={item} collapsed={collapsed} />
         ))}

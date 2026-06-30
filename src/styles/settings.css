@@ -2,47 +2,62 @@
 .sv-settings-page {
   width: 100%;
   padding-top: 0.18rem;
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-accent) 11%, transparent), transparent 30rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 52%, transparent), transparent 26rem);
 }
 
 .sv-settings-shell {
   width: 100%;
   max-width: none;
   margin-inline: 0;
-  padding: 0.82rem 1rem 0.92rem;
+  padding: 1rem 1.15rem 1.15rem;
 }
 
 .sv-settings-tabs {
+  position: sticky;
+  top: 0.35rem;
+  z-index: 15;
   margin-bottom: 0.92rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.34rem;
   flex-wrap: wrap;
-  padding: 0.28rem;
-  border-radius: 0.85rem;
+  padding: 0.3rem;
+  border-radius: 1rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 75%, white);
-  background: color-mix(in srgb, var(--color-surface-muted) 82%, white);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.075);
 }
 
 .sv-settings-tab {
   border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
   background: color-mix(in srgb, var(--color-surface) 94%, white);
-  border-radius: 0.62rem;
+  border-radius: 0.78rem;
   color: var(--color-text-muted);
   text-decoration: none;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 850;
   line-height: 1;
-  min-height: 2rem;
-  padding: 0.45rem 0.92rem;
+  min-height: 2.25rem;
+  padding: 0.5rem 0.9rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4rem;
   transition: all 170ms ease;
+}
+
+.sv-settings-tab-icon {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .sv-settings-tab:hover {
   color: var(--color-text);
   border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
 }
 
 .sv-settings-tab.is-active {
@@ -53,14 +68,41 @@
 }
 
 .sv-settings-header {
+  position: relative;
+  overflow: hidden;
   margin-bottom: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  border-radius: 1.08rem;
+  padding: 1.15rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 68%, white)),
+    radial-gradient(circle at 94% 0%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 18rem);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.075);
+}
+
+.sv-settings-header::after {
+  content: "";
+  position: absolute;
+  right: -4rem;
+  top: -4.6rem;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  pointer-events: none;
+}
+
+.sv-settings-header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .sv-settings-title {
   margin: 0;
-  font-size: clamp(1.95rem, 2.7vw, 2.85rem);
-  line-height: 1.06;
-  letter-spacing: -0.02em;
+  font-size: clamp(2.05rem, 3.2vw, 3.45rem);
+  line-height: 0.98;
+  font-weight: 900;
+  letter-spacing: -0.06em;
   color: var(--color-text);
 }
 
@@ -98,10 +140,13 @@
 }
 
 .sv-settings-card {
-  border-radius: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white);
-  background: color-mix(in srgb, var(--color-surface) 98%, white);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 99%, white), color-mix(in srgb, var(--color-surface) 96%, transparent));
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.065);
   padding: 1rem;
 }
 
@@ -111,8 +156,9 @@
 
 .sv-settings-card-title {
   margin: 0;
-  font-size: 1.04rem;
-  font-weight: 700;
+  font-size: 1.12rem;
+  font-weight: 900;
+  letter-spacing: -0.025em;
   color: var(--color-text);
 }
 
@@ -192,9 +238,18 @@
   justify-content: space-between;
   gap: 0.6rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
-  border-radius: 0.62rem;
-  background: color-mix(in srgb, var(--color-surface) 96%, white);
-  padding: 0.46rem 0.6rem;
+  border-radius: 0.82rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 72%, white));
+  padding: 0.68rem 0.78rem;
+  font-weight: 800;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.sv-settings-switch:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.055);
+  transform: translateY(-1px);
 }
 
 .sv-settings-btn {
@@ -264,7 +319,7 @@
 }
 
 .sv-settings-members-toolbar-card {
-  padding: 0.9rem 1rem;
+  padding: 0.95rem 1rem;
 }
 
 .sv-settings-members-toolbar-top {
@@ -283,6 +338,8 @@
 
 .sv-settings-members-filter-panel {
   border-top: 1px solid color-mix(in srgb, var(--color-border) 76%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 42%, transparent);
+  border-radius: 0 0 0.9rem 0.9rem;
   transition: max-height 220ms ease, opacity 170ms ease, margin-top 220ms ease;
   overflow: hidden;
 }
@@ -391,7 +448,7 @@
 }
 
 .sv-settings-workspace-item {
-  padding: 0.8rem;
+  padding: 0.86rem;
 }
 
 .sv-settings-invite-form {
@@ -402,10 +459,18 @@
 }
 
 .sv-settings-list-item {
-  border-radius: 0.68rem;
-  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
-  background: color-mix(in srgb, var(--color-surface-muted) 75%, white);
-  padding: 0.74rem;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 96%, white), color-mix(in srgb, var(--color-surface-muted) 72%, white));
+  padding: 0.78rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.sv-settings-list-item:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.07);
+  transform: translateY(-1px);
 }
 
 .sv-settings-table-wrap {
@@ -415,7 +480,7 @@
 .sv-settings-scroll-area {
   max-height: 24rem;
   overflow: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .sv-settings-scroll-area-lg {
@@ -423,42 +488,44 @@
 }
 
 .sv-settings-scroll-area::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.sv-settings-scroll-area::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  background: color-mix(in srgb, var(--color-border-strong) 82%, transparent);
-}
-
-.sv-settings-scroll-area::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--color-surface-muted) 88%, transparent);
+  width: 0;
+  height: 0;
 }
 
 .sv-settings-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
 }
 
 .sv-settings-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 86%, white);
   color: var(--color-text-muted);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 900;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 0.5rem 0.6rem;
+  padding: 0.72rem 0.78rem;
 }
 
 .sv-settings-table tbody td {
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 88%, white);
   font-size: 0.8rem;
-  padding: 0.58rem 0.6rem;
+  padding: 0.82rem 0.78rem;
   vertical-align: middle;
+}
+
+.sv-settings-table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.sv-settings-table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
 }
 
 .sv-settings-table tbody tr:last-child td {
@@ -475,7 +542,49 @@
   color: var(--color-text);
 }
 
+.sv-settings-page .lg\:grid-cols-12 {
+  gap: 0.9rem !important;
+}
+
+.sv-settings-page .sv-settings-card code {
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, white);
+  border-radius: 0.62rem;
+  background: color-mix(in srgb, var(--color-surface-muted) 80%, white);
+  color: var(--color-text);
+}
+
+.sv-settings-page .sv-settings-card .rounded-lg.bg-surface-container-low {
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, white);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 84%, white), color-mix(in srgb, var(--color-surface) 96%, white));
+}
+
+.sv-settings-page .sv-settings-card .relative.pl-8 {
+  border-radius: 0.82rem;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+  transition: background-color 150ms ease;
+}
+
+.sv-settings-page .sv-settings-card .relative.pl-8:hover {
+  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+}
+
+.sv-settings-page .sv-settings-card .sv-settings-scroll-area-lg {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, white);
+}
+
+.sv-settings-page .sv-settings-table td:first-child {
+  overflow-wrap: anywhere;
+}
+
+.sv-settings-page .sv-settings-table .font-mono {
+  border-radius: 0.5rem;
+  color: color-mix(in srgb, var(--color-text) 84%, var(--color-accent));
+}
+
 html[data-theme='dark'] .sv-settings-tabs,
+html[data-theme='dark'] .sv-settings-header,
 html[data-theme='dark'] .sv-settings-card,
 html[data-theme='dark'] .sv-settings-list-item {
   background: color-mix(in srgb, var(--color-surface) 90%, transparent);
@@ -524,7 +633,14 @@ html[data-theme='dark'] .sv-settings-members-filter-panel {
   }
 
   .sv-settings-title {
-    font-size: clamp(1.58rem, 8vw, 2.16rem);
+    font-size: clamp(1.82rem, 8vw, 2.35rem);
+  }
+
+  .sv-settings-tabs {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .sv-settings-form-actions {

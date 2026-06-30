@@ -98,8 +98,8 @@ export default function SuperAdminPage() {
   }, [socket, onReconnect, queryClient]);
 
   const data = dashboardQuery.data?.data || {};
-  const fallbackRows = fallbackHealthQuery.data?.data || [];
-  const fallbackSummary = fallbackSummaryQuery.data?.data || {};
+  const fallbackRows = useMemo(() => fallbackHealthQuery.data?.data || [], [fallbackHealthQuery.data?.data]);
+  const fallbackSummary = useMemo(() => fallbackSummaryQuery.data?.data || {}, [fallbackSummaryQuery.data?.data]);
   const fallbackActivityRows = fallbackActivityQuery.data?.data || [];
   const fallbackActivityMeta = fallbackActivityQuery.data?.meta || {};
 

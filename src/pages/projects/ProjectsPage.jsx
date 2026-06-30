@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { projectsApi, usersApi, teamsApi, clientsApi } from '../../api';
@@ -6,9 +6,211 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useSocket } from '../../contexts/SocketContext';
 import Icon from '../../components/ui/Icon';
 import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import ExportMenu from '../../components/ui/ExportMenu';
 import { usePermission } from '../../hooks/usePermission';
 import { EVENTS } from '../../socket/events';
 import { toRealtimeEvent } from '../../socket/realtime';
+import DatePicker from '../../components/ui/DatePicker';
+import { exportRows } from '../../lib/exportData';
+
+const PROJECT_PAGE_SIZE = 24;
+
+const PROJECT_STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'planned', label: 'Planned' },
+];
+
+const PROJECT_FILTER_OPTIONS = [{ value: 'all', label: 'All Status' }, ...PROJECT_STATUS_OPTIONS];
+
+const fmtShortDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+function ProjectDropdown({ value, options, onChange, className = '', disabled = false }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [open]);
+
+  return (
+    <div className={`sv-page-dropdown sv-projects-dropdown ${className}`}>
+      <button
+        type="button"
+        className={`sv-page-dropdown__trigger ${open ? 'is-open' : ''}`}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={selected?.label ? `Selected ${selected.label}` : 'Select option'}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false);
+          }
+          if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <span className="sv-page-dropdown__value">{selected?.label || 'Select'}</span>
+        <Icon name="expand_more" className="sv-page-dropdown__chevron" />
+      </button>
+      {open ? (
+        <div className="sv-page-dropdown__menu" role="listbox" onClick={(event) => event.stopPropagation()}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`sv-page-dropdown__option ${option.value === value ? 'is-selected' : ''}`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              <span className="sv-page-dropdown__option-check">{option.value === value ? <Icon name="check" /> : null}</span>
+              <span className="sv-page-dropdown__option-label">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProjectDatePicker({ value, onChange, className = '' }) {
+  return (
+    <DatePicker
+      value={value}
+      onChange={onChange}
+      className={`sv-projects-date ${className}`}
+      triggerClassName="sv-projects-field"
+    />
+  );
+}
+
+const ProjectListRow = memo(function ProjectListRow({
+  project,
+  statusBadge,
+  menuOpen,
+  canUpdateProject,
+  canDeleteProject,
+  role,
+  onToggleMenu,
+  onEdit,
+  onDelete,
+  onOpenBoard,
+}) {
+  const id = String(project._id || project.id || '');
+  const progress = Math.max(0, Math.min(100, Number(project.progress || 0)));
+  const projectName = project.name || 'Untitled project';
+  const clientName = project.clientName || 'No client';
+  const startDate = fmtShortDate(project.startDate);
+  const endDate = fmtShortDate(project.endDate);
+
+  return (
+    <li className="sv-projects-row">
+      <div className="sv-projects-cell sv-projects-cell-project">
+        <div className="sv-projects-row-icon">
+          <Icon name="folder" className="text-lg" />
+        </div>
+        <div className="sv-projects-row-copy">
+          <button
+            type="button"
+            className="sv-projects-row-title"
+            title={`Open ${projectName}`}
+            aria-label={`Open ${projectName}`}
+            onClick={() => onOpenBoard(id)}
+          >
+            {projectName}
+          </button>
+          <p className="sv-projects-row-subtitle">
+            {endDate ? `Due ${endDate}` : startDate ? `Started ${startDate}` : 'Project workspace'}
+          </p>
+          <div className="sv-projects-row-tags" aria-label={`${projectName} context`}>
+            <span><Icon name="calendar_today" className="text-xs" />{endDate || startDate || 'No timeline'}</span>
+            <span><Icon name="trending_up" className="text-xs" />{progress}% complete</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="sv-projects-cell sv-projects-cell-members" data-label="Members">
+        <Icon name="people" className="text-sm" />
+        <span>{project.memberCount || 0} members</span>
+      </div>
+
+      <div className="sv-projects-cell sv-projects-cell-client" data-label="Client" title={clientName}>
+        <Icon name="business" className="text-sm" />
+        <span>{clientName}</span>
+      </div>
+
+      <div className="sv-projects-cell sv-projects-cell-status" data-label="Status">
+        <span className={`sv-projects-status-chip ${statusBadge.className}`}>{statusBadge.label}</span>
+      </div>
+
+      <div className="sv-projects-cell sv-projects-cell-progress" data-label="Progress">
+        <div className="sv-projects-progress-meter" aria-label={`${progress}% complete`}>
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        <strong>{progress}%</strong>
+        <small>{progress >= 90 ? 'Nearly done' : progress >= 50 ? 'In progress' : progress > 0 ? 'Started' : 'Not started'}</small>
+      </div>
+
+      <div className="sv-projects-cell sv-projects-cell-actions">
+        <div className="relative project-menu-container">
+          <button
+            type="button"
+            onClick={() => onToggleMenu(id)}
+            className="sv-projects-menu-btn"
+            title="Project options"
+          >
+            <Icon name="more_vert" className="text-lg" />
+          </button>
+          {menuOpen ? (
+            <div className="sv-projects-menu-popover">
+              <button type="button" onClick={() => onOpenBoard(id)} className="sv-projects-menu-item">
+                <Icon name="folder_open" className="text-sm" />
+                Open
+              </button>
+              {canUpdateProject ? (
+                <button type="button" onClick={() => onEdit(project)} className="sv-projects-menu-item">
+                  <Icon name="description" className="text-sm" />
+                  Edit
+                </button>
+              ) : (
+                <DeniedActionButton role={role} actionLabel="edit projects" className="sv-projects-menu-item">
+                  Edit
+                </DeniedActionButton>
+              )}
+              {canDeleteProject ? (
+                <button type="button" onClick={() => onDelete(id)} className="sv-projects-menu-item is-danger">
+                  <Icon name="delete_outline" className="text-sm" />
+                  Delete
+                </button>
+              ) : (
+                <DeniedActionButton role={role} actionLabel="delete projects" className="sv-projects-menu-item is-danger">
+                  Delete
+                </DeniedActionButton>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  );
+});
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -21,6 +223,8 @@ export default function ProjectsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectPages, setProjectPages] = useState([]);
   const [name, setName] = useState('');
   const [status, setStatus] = useState('active');
   const [progress, setProgress] = useState(0);
@@ -53,10 +257,17 @@ export default function ProjectsPage() {
   const [deletingProjectId, setDeletingProjectId] = useState(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [deleteProjectError, setDeleteProjectError] = useState('');
+  const projectSearchParam = searchQuery.trim();
+  const hasActiveFilters = Boolean(projectSearchParam || filterStatus !== 'all');
 
   const projectsQuery = useQuery({
-    queryKey: ['projects', workspaceId],
-    queryFn: () => projectsApi.list(workspaceId, { page: 1, limit: 50 }).then((payload) => payload.data || []),
+    queryKey: ['projects', workspaceId, projectPage, projectSearchParam, filterStatus],
+    queryFn: () => projectsApi.list(workspaceId, {
+      page: projectPage,
+      limit: PROJECT_PAGE_SIZE,
+      ...(projectSearchParam && { search: projectSearchParam }),
+      ...(filterStatus !== 'all' && { status: filterStatus }),
+    }),
     enabled: Boolean(workspaceId),
     staleTime: 30_000,
   });
@@ -105,6 +316,8 @@ export default function ProjectsPage() {
       setIsUpdatingProject(true);
     },
     onSuccess: () => {
+      setProjectPages([]);
+      setProjectPage(1);
       projectsQuery.refetch();
       handleCloseEditModal();
     },
@@ -122,6 +335,8 @@ export default function ProjectsPage() {
       setIsDeletingProject(true);
     },
     onSuccess: () => {
+      setProjectPages([]);
+      setProjectPage(1);
       projectsQuery.refetch();
       handleCloseDeleteConfirm();
     },
@@ -146,6 +361,25 @@ export default function ProjectsPage() {
     setMetadata('');
     setError('');
   }, []);
+
+  useEffect(() => {
+    // Reset paging when the workspace or filters change so the list reloads from page 1.
+    setProjectPage(1);
+    setProjectPages([]);
+    setMenuOpenProjectId(null);
+  }, [workspaceId, projectSearchParam, filterStatus]);
+
+  useEffect(() => {
+    if (!projectsQuery.data) return;
+    const incomingProjects = projectsQuery.data.data || [];
+    // Keep the cached page buffer in sync with the latest fetched page.
+    setProjectPages((current) => {
+      if (projectPage === 1) return [incomingProjects];
+      const next = current.slice(0, projectPage - 1);
+      next[projectPage - 1] = incomingProjects;
+      return next;
+    });
+  }, [projectPage, projectsQuery.data]);
 
   // Close project menu when clicking outside
   useEffect(() => {
@@ -189,7 +423,11 @@ export default function ProjectsPage() {
     const joinPayload = { workspaceId, modules: ['projects'] };
     joinWorkspace(joinPayload);
 
-    const refreshProjects = () => refetchProjects();
+    const refreshProjects = () => {
+      setProjectPages([]);
+      setProjectPage(1);
+      refetchProjects();
+    };
     const onRealtime = (raw) => {
       const evt = toRealtimeEvent(raw);
       if (String(evt.workspaceId || '') !== String(workspaceId)) return;
@@ -211,22 +449,126 @@ export default function ProjectsPage() {
     };
   }, [socket, workspaceId, joinWorkspace, leaveWorkspace, refetchProjects]);
 
-  const projects = useMemo(() => projectsQuery.data || [], [projectsQuery.data]);
-  const users = usersQuery.data || [];
-  const teams = teamsQuery.data || [];
-  const clients = clientsQuery.data || [];
+  const loadedProjects = useMemo(() => projectPages.flat(), [projectPages]);
+  const projectsMeta = projectsQuery.data?.meta || {};
+  const projectsTotal = Number(projectsMeta.total ?? loadedProjects.length);
+  const currentPageItems = projectsQuery.data?.data || [];
+  const hasMoreProjects = projectsTotal > loadedProjects.length || (!projectsMeta.total && currentPageItems.length === PROJECT_PAGE_SIZE);
+  const users = useMemo(() => usersQuery.data || [], [usersQuery.data]);
+  const teams = useMemo(() => teamsQuery.data || [], [teamsQuery.data]);
+  const clients = useMemo(() => clientsQuery.data || [], [clientsQuery.data]);
 
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
+    return loadedProjects.filter((project) => {
       const matchesSearch = !searchQuery || 
         (project.name || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = filterStatus === 'all' || 
         (project.status || 'active') === filterStatus;
       return matchesSearch && matchesStatus;
     });
-  }, [projects, searchQuery, filterStatus]);
+  }, [loadedProjects, searchQuery, filterStatus]);
 
   const canCreate = useMemo(() => name.trim().length >= 2 && ownerId, [name, ownerId]);
+
+  const userOptions = useMemo(
+    () => users.map((u) => ({ value: u._id, label: u.displayName || u.email || 'Unknown' })),
+    [users]
+  );
+  const optionalUserOptions = useMemo(() => [{ value: '', label: 'Select user' }, ...userOptions], [userOptions]);
+  const ownerOptions = useMemo(() => [{ value: '', label: 'Select owner' }, ...userOptions], [userOptions]);
+  const teamOptions = useMemo(
+    () => [{ value: '', label: 'Select team' }, ...teams.map((t) => ({ value: t._id, label: t.name || 'Unknown Team' }))],
+    [teams]
+  );
+  const clientOptions = useMemo(
+    () => [{ value: '', label: 'Select client' }, ...clients.map((c) => ({ value: c._id, label: c.name || 'Unknown Client' }))],
+    [clients]
+  );
+  const summaryCards = useMemo(() => {
+    const counts = loadedProjects.reduce((acc, project) => {
+      const key = project.status || 'active';
+      acc[key] = (acc[key] || 0) + 1;
+      acc.progress += Math.max(0, Math.min(100, Number(project.progress || 0)));
+      if (project.clientId || project.clientName) acc.withClient += 1;
+      if (project.endDate) acc.withTimeline += 1;
+      return acc;
+    }, { active: 0, archived: 0, on_hold: 0, planned: 0, progress: 0, withClient: 0, withTimeline: 0 });
+    const total = loadedProjects.length || 0;
+    const averageProgress = total ? Math.round(counts.progress / total) : 0;
+
+    return [
+      { label: 'Total', value: String(total), hint: total === 1 ? 'project loaded' : 'projects loaded', tone: 'blue' },
+      { label: 'Active', value: String(counts.active || 0), hint: 'in motion', tone: 'green' },
+      { label: 'Clients', value: String(counts.withClient || 0), hint: 'linked accounts', tone: 'amber' },
+      { label: 'Average', value: `${averageProgress}%`, hint: 'completion', tone: 'red' },
+    ];
+  }, [loadedProjects]);
+  const projectPulse = useMemo(() => {
+    const total = loadedProjects.length || 0;
+    const average = total
+      ? Math.round(loadedProjects.reduce((sum, project) => sum + Math.max(0, Math.min(100, Number(project.progress || 0))), 0) / total)
+      : 0;
+    const readyCount = loadedProjects.filter((project) => Number(project.progress || 0) >= 90).length;
+    const plannedCount = loadedProjects.filter((project) => (project.status || 'active') === 'planned').length;
+    return {
+      average,
+      readyCount,
+      plannedCount,
+      label: average >= 75 ? 'Strong delivery motion' : average >= 35 ? 'Delivery in motion' : 'Early delivery stage',
+    };
+  }, [loadedProjects]);
+
+  const handleSearchQueryChange = useCallback((event) => {
+    setSearchQuery(event.target.value);
+    setProjectPage(1);
+    setProjectPages([]);
+  }, []);
+
+  const handleFilterStatusChange = useCallback((nextStatus) => {
+    setFilterStatus(nextStatus);
+    setProjectPage(1);
+    setProjectPages([]);
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setSearchQuery('');
+    setFilterStatus('all');
+    setProjectPage(1);
+    setProjectPages([]);
+  }, []);
+
+  const handleToggleProjectMenu = useCallback((projectId) => {
+    setMenuOpenProjectId((current) => (current === projectId ? null : projectId));
+  }, []);
+
+  const handleOpenBoard = useCallback((projectId) => {
+    if (!projectId) return;
+    setProjectId(projectId);
+    navigate(`/projects/${projectId}/board`);
+  }, [navigate, setProjectId]);
+
+  const loadMoreProjects = useCallback(() => {
+    if (projectsQuery.isFetching || !hasMoreProjects) return;
+    setProjectPage((current) => current + 1);
+  }, [hasMoreProjects, projectsQuery.isFetching]);
+
+  const handleExportProjects = useCallback((format) => {
+    exportRows({
+      rows: filteredProjects,
+      format,
+      filename: `projects-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Projects Export',
+      columns: [
+        { header: 'Project', value: (row) => row.name || 'Untitled project' },
+        { header: 'Status', value: (row) => row.status || 'active' },
+        { header: 'Client', value: (row) => row.clientName || 'No client' },
+        { header: 'Members', value: (row) => row.memberCount || 0 },
+        { header: 'Progress', value: (row) => `${Math.max(0, Math.min(100, Number(row.progress || 0)))}%` },
+        { header: 'Start Date', value: (row) => fmtShortDate(row.startDate) || '-' },
+        { header: 'End Date', value: (row) => fmtShortDate(row.endDate) || '-' },
+      ],
+    });
+  }, [filteredProjects]);
 
   function openCreateModal() {
     if (!canCreateProject) return;
@@ -389,12 +731,15 @@ export default function ProjectsPage() {
     );
   }
 
-  if (projectsQuery.isLoading) {
+  if (projectsQuery.isLoading && !loadedProjects.length) {
     return (
       <div className="sv-projects-page sv-projects-state-wrap">
-        <div className="sv-projects-state-card">
-          <div className="sv-projects-spinner" />
-          <p className="sv-projects-state-text">Loading projects...</p>
+        <div className="sv-card sv-projects-state-card">
+          <div className="sv-projects-state-icon sv-projects-state-icon--loading">
+            <div className="sv-projects-spinner" />
+          </div>
+          <h2 className="sv-projects-state-title sv-heading">Loading projects</h2>
+          <p className="sv-projects-state-text">Fetching the latest workspace projects and access data.</p>
         </div>
       </div>
     );
@@ -403,10 +748,11 @@ export default function ProjectsPage() {
   if (projectsQuery.error) {
     return (
       <div className="sv-projects-page sv-projects-state-wrap">
-        <div className="sv-projects-state-card sv-projects-state-card-error">
+        <div className="sv-card sv-projects-state-card sv-projects-state-card-error">
           <div className="sv-projects-state-icon sv-projects-state-icon-error">
             <Icon name="error_outline" className="text-2xl" />
           </div>
+          <h2 className="sv-projects-state-title sv-heading">Could not load projects</h2>
           <p className="sv-projects-error-text">{projectsQuery.error.message || 'Failed to load projects.'}</p>
         </div>
       </div>
@@ -418,18 +764,40 @@ export default function ProjectsPage() {
       <div className="sv-projects-stack">
         <header className="sv-card sv-projects-header">
           <div className="sv-projects-header-main">
-            <div className="sv-mytasks-icon-chip d-inline-flex align-items-center justify-content-center rounded-3">
-              <Icon name="folder" className="text-2xl" />
+            <div className="sv-projects-hero-icon" aria-hidden="true">
+              <Icon name="folder_managed" className="text-2xl" />
             </div>
-            <div>
+            <div className="sv-projects-hero-copy">
+              <span className="sv-projects-eyebrow"><Icon name="hub" className="text-sm" /> Workspace hub</span>
               <h1 className="sv-projects-title sv-heading">Projects</h1>
               <p className="sv-projects-subtitle">
-                {filteredProjects.length} of {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-                {searchQuery || filterStatus !== 'all' ? ' (filtered)' : ''}
+                {filteredProjects.length} shown of {projectsTotal || filteredProjects.length} {projectsTotal === 1 ? 'project' : 'projects'}
+                {hasActiveFilters ? ' with active filters applied' : ' across the current workspace'}
               </p>
+              <div className="sv-projects-summary-chips" aria-label="Project summary">
+                {summaryCards.map((item) => (
+                  <div key={item.label} className={`sv-projects-summary-chip is-${item.tone}`}>
+                    <strong>{item.value}</strong>
+                    <span>
+                      <em>{item.label}</em>
+                      {item.hint ? <small>{item.hint}</small> : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="sv-projects-pulse-card">
+            <span>Delivery Pulse</span>
+            <strong>{projectPulse.average}%</strong>
+            <p>{projectPulse.label}</p>
+            <div>
+              <small>{projectPulse.readyCount} near completion</small>
+              <small>{projectPulse.plannedCount} planned</small>
             </div>
           </div>
           <div className="sv-projects-actions">
+            <ExportMenu onExport={handleExportProjects} label="Export" disabled={!filteredProjects.length} />
             {canCreateProject ? (
               <button
                 type="button"
@@ -447,35 +815,33 @@ export default function ProjectsPage() {
           </div>
         </header>
 
-        {projects.length > 0 && (
+        {(loadedProjects.length > 0 || projectSearchParam || filterStatus !== 'all') && (
           <div className="sv-card sv-projects-toolbar">
-            <div className="sv-projects-search-wrap">
-              <Icon name="search" className="sv-projects-search-icon" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="form-control form-control-sm sv-ctl-input sv-projects-search-input"
-              />
-            </div>
-            <div className="sv-projects-filter-wrap">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="form-select form-select-sm sv-ctl-select sv-projects-filter-select"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-                <option value="on_hold">On Hold</option>
-                <option value="planned">Planned</option>
-              </select>
+            <div className="sv-projects-toolbar-main">
+              <div className="sv-projects-search-wrap">
+                <Icon name="search" className="sv-projects-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={handleSearchQueryChange}
+                  className="form-control form-control-sm sv-ctl-input sv-projects-search-input"
+                  aria-label="Search projects"
+                />
+              </div>
+              <div className="sv-projects-filter-wrap">
+                <ProjectDropdown
+                  value={filterStatus}
+                  options={PROJECT_FILTER_OPTIONS}
+                  onChange={handleFilterStatusChange}
+                  className="sv-projects-dropdown--filter"
+                />
+              </div>
             </div>
           </div>
         )}
 
-        {!projects.length ? (
+        {!loadedProjects.length && !projectSearchParam && filterStatus === 'all' && !projectsQuery.isFetching ? (
           <div className="sv-card sv-projects-empty-card">
             <div className="sv-projects-empty-icon">
               <Icon name="folder_open" className="text-5xl" />
@@ -497,102 +863,64 @@ export default function ProjectsPage() {
               </DeniedActionButton>
             )}
           </div>
-        ) : !filteredProjects.length ? (
+        ) : !filteredProjects.length && !projectsQuery.isFetching ? (
           <div className="sv-card sv-projects-empty-card">
             <div className="sv-projects-state-icon">
               <Icon name="search_off" className="text-3xl" />
             </div>
             <h3 className="sv-projects-empty-title">No projects found</h3>
-            <p className="sv-projects-empty-text">Try adjusting your search or filter</p>
+            <p className="sv-projects-empty-text">Try adjusting your search or clearing the active filters.</p>
+            {hasActiveFilters ? (
+              <button type="button" className="btn btn-outline-primary btn-sm sv-ctl-btn sv-projects-create-btn" onClick={handleClearFilters}>
+                Reset view
+              </button>
+            ) : null}
           </div>
         ) : (
-          <div className="sv-projects-list">
-            <ul className="sv-projects-grid is-three-col">
-              {filteredProjects.map((project) => {
-                const id = String(project._id || project.id || '');
-                const statusBadge = getStatusBadge(project.status);
-                return (
-                  <li key={id} className="sv-card sv-projects-card group">
-                    <div className="sv-projects-card-body">
-                      <div className="sv-projects-card-top">
-                        <div className="sv-projects-card-icon">
-                          <Icon name="folder" className="text-2xl" />
-                        </div>
-                        <div className="sv-projects-card-top-actions">
-                          <span className={`sv-projects-status-chip ${statusBadge.className}`}>{statusBadge.label}</span>
-                          <div className="relative project-menu-container">
-                            <button
-                              type="button"
-                              onClick={() => setMenuOpenProjectId(menuOpenProjectId === id ? null : id)}
-                              className="sv-projects-menu-btn"
-                              title="Project options"
-                            >
-                              <Icon name="more_vert" className="text-lg" />
-                            </button>
-                            {menuOpenProjectId === id && (
-                              <div className="sv-projects-menu-popover">
-                                {canUpdateProject ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditModal(project)}
-                                    className="sv-projects-menu-item"
-                                  >
-                                    <Icon name="edit" className="text-sm" />
-                                    Edit
-                                  </button>
-                                ) : (
-                                  <DeniedActionButton role={role} actionLabel="edit projects" className="sv-projects-menu-item">
-                                    Edit
-                                  </DeniedActionButton>
-                                )}
-                                {canDeleteProject ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenDeleteConfirm(id)}
-                                    className="sv-projects-menu-item is-danger"
-                                  >
-                                    <Icon name="delete" className="text-sm" />
-                                    Delete
-                                  </button>
-                                ) : (
-                                  <DeniedActionButton role={role} actionLabel="delete projects" className="sv-projects-menu-item is-danger">
-                                    Delete
-                                  </DeniedActionButton>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <h3 className="sv-projects-card-title">{project.name || 'Untitled project'}</h3>
-                      <div className="sv-projects-card-meta">
-                        <div className="sv-projects-meta-item">
-                          <Icon name="people" className="text-sm" />
-                          <span>{project.memberCount || 0} members</span>
-                        </div>
-                        {project.clientName ? (
-                          <div className="sv-projects-meta-item">
-                            <Icon name="business" className="text-sm" />
-                            <span>{project.clientName}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary sv-ctl-btn sv-projects-open-btn"
-                        onClick={() => {
-                          if (!id) return;
-                          setProjectId(id);
-                          navigate(`/projects/${id}/board`);
-                        }}
-                      >
-                        <Icon name="open_in_new" className="text-base" />
-                        Open board
-                      </button>
-                    </div>
+          <div className="sv-card sv-projects-table-panel">
+            <div className="sv-projects-table-head" aria-hidden="true">
+              <span>Project</span>
+              <span>Members</span>
+              <span>Client</span>
+              <span>Status</span>
+              <span>Progress</span>
+              <span>Actions</span>
+            </div>
+            <div className="sv-projects-table-body">
+              <ul className="sv-projects-rows">
+                {filteredProjects.map((project) => {
+                  const id = String(project._id || project.id || '');
+                  const statusBadge = getStatusBadge(project.status);
+                  return (
+                    <ProjectListRow
+                      key={id}
+                      project={project}
+                      statusBadge={statusBadge}
+                      menuOpen={menuOpenProjectId === id}
+                      canUpdateProject={canUpdateProject}
+                      canDeleteProject={canDeleteProject}
+                      role={role}
+                      onToggleMenu={handleToggleProjectMenu}
+                      onEdit={handleOpenEditModal}
+                      onDelete={handleOpenDeleteConfirm}
+                      onOpenBoard={handleOpenBoard}
+                    />
+                  );
+                })}
+                {hasMoreProjects ? (
+                  <li className="sv-projects-load-more-row">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm sv-ctl-btn sv-projects-load-more-btn"
+                      onClick={loadMoreProjects}
+                      disabled={projectsQuery.isFetching}
+                    >
+                      {projectsQuery.isFetching ? 'Loading...' : `Load More (${loadedProjects.length}/${projectsTotal || 'more'})`}
+                    </button>
                   </li>
-                );
-              })}
-            </ul>
+                ) : null}
+              </ul>
+            </div>
           </div>
         )}
       </div>
@@ -617,157 +945,151 @@ export default function ProjectsPage() {
               </button>
             </div>
             <form onSubmit={handleCreate} className="sv-projects-create-form">
-              <div className="sv-projects-form-grid">
-                <div className="sv-projects-span-2">
-                  <label className="sv-projects-label">
-                    Project Name <span className="text-error">*</span>
-                  </label>
-                  <input
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                    placeholder="Enter project name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </div>
+              <p className="sv-projects-form-intro">Start with a clear name and owner, then add optional delivery details.</p>
 
-                <div>
-                  <label className="sv-projects-label">Status</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                  >
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="planned">Planned</option>
-                  </select>
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Core details</h3>
+                  <span>Required fields first</span>
                 </div>
-
-                <div>
-                  <label className="sv-projects-label">Progress ({progress}%)</label>
-                  <div className="sv-projects-progress-row">
+                <div className="sv-projects-form-grid">
+                  <div className="sv-projects-span-2">
+                    <label className="sv-projects-label">
+                      Project Name <span className="text-error">*</span>
+                    </label>
                     <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={progress}
-                      onChange={(e) => setProgress(Number(e.target.value))}
-                      className="sv-projects-progress-slider"
+                      className="form-control form-control-sm sv-ctl-input sv-projects-field"
+                      placeholder="Enter project name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
                     />
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={progress}
-                      onChange={(e) => setProgress(Math.min(100, Math.max(0, Number(e.target.value))))}
-                      className="form-control form-control-sm sv-ctl-input sv-projects-progress-input"
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Status</label>
+                    <ProjectDropdown
+                      value={status}
+                      options={PROJECT_STATUS_OPTIONS}
+                      onChange={setStatus}
+                      className="sv-projects-dropdown--form"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Progress ({progress}%)</label>
+                    <div className="sv-projects-progress-row">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={progress}
+                        onChange={(e) => setProgress(Number(e.target.value))}
+                        className="sv-projects-progress-slider"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={progress}
+                        onChange={(e) => setProgress(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="form-control form-control-sm sv-ctl-input sv-projects-progress-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Assignment</h3>
+                  <span>Ownership and collaboration</span>
+                </div>
+                <div className="sv-projects-form-grid">
+                  <div>
+                    <label className="sv-projects-label">
+                      Owner <span className="text-error">*</span>
+                    </label>
+                    <ProjectDropdown
+                      value={ownerId}
+                      options={ownerOptions}
+                      onChange={setOwnerId}
+                      className="sv-projects-dropdown--form"
+                      disabled={usersQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Lead (Optional)</label>
+                    <ProjectDropdown
+                      value={leadId}
+                      options={optionalUserOptions}
+                      onChange={setLeadId}
+                      className="sv-projects-dropdown--form"
+                      disabled={usersQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Team (Optional)</label>
+                    <ProjectDropdown
+                      value={teamId}
+                      options={teamOptions}
+                      onChange={setTeamId}
+                      className="sv-projects-dropdown--form"
+                      disabled={teamsQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Client (Optional)</label>
+                    <ProjectDropdown
+                      value={clientId}
+                      options={clientOptions}
+                      onChange={setClientId}
+                      className="sv-projects-dropdown--form"
+                      disabled={clientsQuery.isLoading}
                     />
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="sv-projects-label">
-                    Owner <span className="text-error">*</span>
-                  </label>
-                  <select
-                    value={ownerId}
-                    onChange={(e) => setOwnerId(e.target.value)}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={usersQuery.isLoading}
-                  >
-                    <option value="">Select owner</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.displayName || u.email || 'Unknown'}
-                      </option>
-                    ))}
-                  </select>
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Timeline and details</h3>
+                  <span>Optional planning context</span>
                 </div>
+                <div className="sv-projects-form-grid">
+                  <div>
+                    <label className="sv-projects-label">Start Date (Optional)</label>
+                    <ProjectDatePicker
+                      value={startDate}
+                      onChange={setStartDate}
+                      className="sv-projects-date--form"
+                    />
+                  </div>
 
-                <div>
-                  <label className="sv-projects-label">Lead (Optional)</label>
-                  <select
-                    value={leadId}
-                    onChange={(e) => setLeadId(e.target.value)}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={usersQuery.isLoading}
-                  >
-                    <option value="">Select lead</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.displayName || u.email || 'Unknown'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="sv-projects-label">End Date (Optional)</label>
+                    <ProjectDatePicker
+                      value={endDate}
+                      onChange={setEndDate}
+                      className="sv-projects-date--form"
+                    />
+                  </div>
 
-                <div>
-                  <label className="sv-projects-label">Team (Optional)</label>
-                  <select
-                    value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={teamsQuery.isLoading}
-                  >
-                    <option value="">Select team</option>
-                    {teams.map((t) => (
-                      <option key={t._id} value={t._id}>
-                        {t.name || 'Unknown Team'}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="sv-projects-span-2">
+                    <label className="sv-projects-label">Metadata (Optional)</label>
+                    <p className="sv-projects-help-text">Format: key1:value1, key2:value2</p>
+                    <textarea
+                      value={metadata}
+                      onChange={(e) => setMetadata(e.target.value)}
+                      placeholder="e.g., priority:high, category:marketing"
+                      className="form-control form-control-sm sv-ctl-input sv-projects-field sv-projects-textarea"
+                      rows={3}
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="sv-projects-label">Client (Optional)</label>
-                  <select
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={clientsQuery.isLoading}
-                  >
-                    <option value="">Select client</option>
-                    {clients.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name || 'Unknown Client'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="sv-projects-label">Start Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                  />
-                </div>
-
-                <div>
-                  <label className="sv-projects-label">End Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                  />
-                </div>
-
-                <div className="sv-projects-span-2">
-                  <label className="sv-projects-label">Metadata (Optional)</label>
-                  <p className="sv-projects-help-text">Format: key1:value1, key2:value2</p>
-                  <textarea
-                    value={metadata}
-                    onChange={(e) => setMetadata(e.target.value)}
-                    placeholder="e.g., priority:high, category:marketing"
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field sv-projects-textarea"
-                    rows={3}
-                  />
-                </div>
-              </div>
+              </section>
 
               {error ? <div className="sv-projects-inline-error">{error}</div> : null}
 
@@ -808,158 +1130,152 @@ export default function ProjectsPage() {
               </button>
             </div>
             <form onSubmit={handleUpdateProject} className="sv-projects-edit-form">
-              <div className="sv-projects-form-grid">
-                <div className="sv-projects-span-2">
-                  <label className="sv-projects-label">
-                    Project Name <span className="text-error">*</span>
-                  </label>
-                  <input
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                    value={editProjectData.name}
-                    onChange={(event) => setEditProjectData((current) => ({ ...current, name: event.target.value }))}
-                  />
-                </div>
+              <p className="sv-projects-form-intro">Update the project without losing the key ownership and schedule details.</p>
 
-                <div>
-                  <label className="sv-projects-label">Status</label>
-                  <select
-                    value={editProjectData.status}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, status: e.target.value }))}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                  >
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="planned">Planned</option>
-                  </select>
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Core details</h3>
+                  <span>Required fields first</span>
                 </div>
-
-                <div>
-                  <label className="sv-projects-label">
-                    Progress ({editProjectData.progress}%)
-                  </label>
-                  <div className="sv-projects-progress-row">
+                <div className="sv-projects-form-grid">
+                  <div className="sv-projects-span-2">
+                    <label className="sv-projects-label">
+                      Project Name <span className="text-error">*</span>
+                    </label>
                     <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={editProjectData.progress}
-                      onChange={(e) => setEditProjectData((current) => ({ ...current, progress: Number(e.target.value) }))}
-                      className="sv-projects-progress-slider"
+                      className="form-control form-control-sm sv-ctl-input sv-projects-field"
+                      value={editProjectData.name}
+                      onChange={(event) => setEditProjectData((current) => ({ ...current, name: event.target.value }))}
                     />
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={editProjectData.progress}
-                      onChange={(e) => setEditProjectData((current) => ({ ...current, progress: Math.min(100, Math.max(0, Number(e.target.value))) }))}
-                      className="form-control form-control-sm sv-ctl-input sv-projects-progress-input"
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Status</label>
+                    <ProjectDropdown
+                      value={editProjectData.status}
+                      options={PROJECT_STATUS_OPTIONS}
+                      onChange={(nextStatus) => setEditProjectData((current) => ({ ...current, status: nextStatus }))}
+                      className="sv-projects-dropdown--form"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">
+                      Progress ({editProjectData.progress}%)
+                    </label>
+                    <div className="sv-projects-progress-row">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={editProjectData.progress}
+                        onChange={(e) => setEditProjectData((current) => ({ ...current, progress: Number(e.target.value) }))}
+                        className="sv-projects-progress-slider"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editProjectData.progress}
+                        onChange={(e) => setEditProjectData((current) => ({ ...current, progress: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                        className="form-control form-control-sm sv-ctl-input sv-projects-progress-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Assignment</h3>
+                  <span>Ownership and collaboration</span>
+                </div>
+                <div className="sv-projects-form-grid">
+                  <div>
+                    <label className="sv-projects-label">
+                      Owner <span className="text-error">*</span>
+                    </label>
+                    <ProjectDropdown
+                      value={editProjectData.ownerId}
+                      options={ownerOptions}
+                      onChange={(nextOwnerId) => setEditProjectData((current) => ({ ...current, ownerId: nextOwnerId }))}
+                      className="sv-projects-dropdown--form"
+                      disabled={usersQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Lead (Optional)</label>
+                    <ProjectDropdown
+                      value={editProjectData.leadId}
+                      options={optionalUserOptions}
+                      onChange={(nextLeadId) => setEditProjectData((current) => ({ ...current, leadId: nextLeadId }))}
+                      className="sv-projects-dropdown--form"
+                      disabled={usersQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Team (Optional)</label>
+                    <ProjectDropdown
+                      value={editProjectData.teamId}
+                      options={teamOptions}
+                      onChange={(nextTeamId) => setEditProjectData((current) => ({ ...current, teamId: nextTeamId }))}
+                      className="sv-projects-dropdown--form"
+                      disabled={teamsQuery.isLoading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="sv-projects-label">Client (Optional)</label>
+                    <ProjectDropdown
+                      value={editProjectData.clientId}
+                      options={clientOptions}
+                      onChange={(nextClientId) => setEditProjectData((current) => ({ ...current, clientId: nextClientId }))}
+                      className="sv-projects-dropdown--form"
+                      disabled={clientsQuery.isLoading}
                     />
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="sv-projects-label">
-                    Owner <span className="text-error">*</span>
-                  </label>
-                  <select
-                    value={editProjectData.ownerId}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, ownerId: e.target.value }))}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={usersQuery.isLoading}
-                  >
-                    <option value="">Select owner</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.displayName || u.email || 'Unknown'}
-                      </option>
-                    ))}
-                  </select>
+              <section className="sv-projects-form-section">
+                <div className="sv-projects-form-section-head">
+                  <h3>Timeline and details</h3>
+                  <span>Optional planning context</span>
                 </div>
+                <div className="sv-projects-form-grid">
+                  <div>
+                    <label className="sv-projects-label">Start Date (Optional)</label>
+                    <ProjectDatePicker
+                      value={editProjectData.startDate}
+                      onChange={(nextStartDate) => setEditProjectData((current) => ({ ...current, startDate: nextStartDate }))}
+                      className="sv-projects-date--form"
+                    />
+                  </div>
 
-                <div>
-                  <label className="sv-projects-label">Lead (Optional)</label>
-                  <select
-                    value={editProjectData.leadId}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, leadId: e.target.value }))}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={usersQuery.isLoading}
-                  >
-                    <option value="">Select lead</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.displayName || u.email || 'Unknown'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="sv-projects-label">End Date (Optional)</label>
+                    <ProjectDatePicker
+                      value={editProjectData.endDate}
+                      onChange={(nextEndDate) => setEditProjectData((current) => ({ ...current, endDate: nextEndDate }))}
+                      className="sv-projects-date--form"
+                    />
+                  </div>
 
-                <div>
-                  <label className="sv-projects-label">Team (Optional)</label>
-                  <select
-                    value={editProjectData.teamId}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, teamId: e.target.value }))}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={teamsQuery.isLoading}
-                  >
-                    <option value="">Select team</option>
-                    {teams.map((t) => (
-                      <option key={t._id} value={t._id}>
-                        {t.name || 'Unknown Team'}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="sv-projects-span-2">
+                    <label className="sv-projects-label">Metadata (Optional)</label>
+                    <p className="sv-projects-help-text">Format: key1:value1, key2:value2</p>
+                    <textarea
+                      value={editProjectData.metadata}
+                      onChange={(e) => setEditProjectData((current) => ({ ...current, metadata: e.target.value }))}
+                      placeholder="e.g., priority:high, category:marketing"
+                      className="form-control form-control-sm sv-ctl-input sv-projects-field sv-projects-textarea"
+                      rows={3}
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="sv-projects-label">Client (Optional)</label>
-                  <select
-                    value={editProjectData.clientId}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, clientId: e.target.value }))}
-                    className="form-select form-select-sm sv-ctl-select sv-projects-field"
-                    disabled={clientsQuery.isLoading}
-                  >
-                    <option value="">Select client</option>
-                    {clients.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name || 'Unknown Client'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="sv-projects-label">Start Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={editProjectData.startDate}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, startDate: e.target.value }))}
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                  />
-                </div>
-
-                <div>
-                  <label className="sv-projects-label">End Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={editProjectData.endDate}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, endDate: e.target.value }))}
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field"
-                  />
-                </div>
-
-                <div className="sv-projects-span-2">
-                  <label className="sv-projects-label">Metadata (Optional)</label>
-                  <p className="sv-projects-help-text">Format: key1:value1, key2:value2</p>
-                  <textarea
-                    value={editProjectData.metadata}
-                    onChange={(e) => setEditProjectData((current) => ({ ...current, metadata: e.target.value }))}
-                    placeholder="e.g., priority:high, category:marketing"
-                    className="form-control form-control-sm sv-ctl-input sv-projects-field sv-projects-textarea"
-                    rows={3}
-                  />
-                </div>
-              </div>
+              </section>
 
               {editProjectError ? <div className="sv-projects-inline-error">{editProjectError}</div> : null}
 

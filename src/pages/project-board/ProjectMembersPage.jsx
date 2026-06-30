@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useProjectMembers } from '../../hooks/useProjectMembers';
 import { useProjectRouteSync } from '../../hooks/useProjectRouteSync';
 import ProjectTabs from './ProjectTabs';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import Icon from '../../components/ui/Icon';
 import DeniedActionButton from '../../components/ui/DeniedActionButton';
 import { usePermission } from '../../hooks/usePermission';
@@ -22,6 +24,17 @@ const inviteSchema = z.object({
 function RoleBadge({ role }) {
   const normalized = String(role || 'member').toLowerCase();
   return <span className={`sv-members-role-badge is-${normalized}`}>{normalized}</span>;
+}
+
+function projectMemberTimestamp(item) {
+  const value = item?.updatedAt || item?.createdAt || item?.joinedAt || item?.invitedAt;
+  const parsed = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function percent(done, total) {
+  const value = total ? (Number(done || 0) / Number(total || 0)) * 100 : 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function ProjectMembersPage() {
@@ -75,7 +88,7 @@ function ProjectMembersPage() {
       if (!query) return true;
       const haystack = `${member.name || ''} ${member.email || ''} ${role}`.toLowerCase();
       return haystack.includes(query);
-    });
+    }).sort((a, b) => projectMemberTimestamp(b) - projectMemberTimestamp(a));
   }, [rows, searchQuery, roleFilter]);
 
   const filteredInvites = useMemo(() => {
@@ -86,7 +99,7 @@ function ProjectMembersPage() {
       if (normalizedRole !== 'all' && role !== normalizedRole) return false;
       if (!query) return true;
       return String(invite.email || '').toLowerCase().includes(query);
-    });
+    }).sort((a, b) => projectMemberTimestamp(b) - projectMemberTimestamp(a));
   }, [pendingInvites, searchQuery, roleFilter]);
 
   const roleOptions = isMembersView
@@ -102,6 +115,11 @@ function ProjectMembersPage() {
       { value: 'member', label: 'Member' },
       { value: 'viewer', label: 'Viewer' },
     ];
+  const leadCount = rows.filter((member) => String(member.role || '').toLowerCase() === 'lead').length;
+  const assignedTotal = rows.reduce((sum, member) => sum + Number(member.tasksInProject || 0), 0);
+  const completedTotal = rows.reduce((sum, member) => sum + Number(member.completedInProject || 0), 0);
+  const completionRate = percent(completedTotal, assignedTotal);
+  const visibleCount = isMembersView ? filteredRows.length : filteredInvites.length;
 
   async function submitAddMember(values) {
     if (!canManageMembers) return;
@@ -140,7 +158,11 @@ function ProjectMembersPage() {
       <ProjectTabs projectId={projectId} />
       <div className="sv-members-stack">
         <section className="sv-card sv-members-header">
-          <h1 className="sv-members-title">Project Members</h1>
+          <div className="sv-members-hero-copy">
+            <span className="sv-members-eyebrow">Access and ownership</span>
+            <h1 className="sv-members-title">Project Members</h1>
+            <p className="sv-members-subtitle">Manage who can collaborate on this project, track contribution, and follow pending invites.</p>
+          </div>
           <div className="sv-members-controls">
             <div className="sv-members-search-wrap">
               <Icon name="search" className="sv-members-search-icon" />
@@ -152,26 +174,24 @@ function ProjectMembersPage() {
                 className="form-control form-control-sm sv-ctl-input sv-members-search"
               />
             </div>
-            <select
+            <SelectDropdown
               value={viewFilter}
-              onChange={(event) => {
-                setViewFilter(event.target.value);
+              onChange={(nextValue) => {
+                setViewFilter(nextValue);
                 setRoleFilter('all');
               }}
-              className="form-select form-select-sm sv-ctl-select sv-members-filter"
-            >
-              <option value="members">Members</option>
-              <option value="pending">Pending Invites</option>
-            </select>
-            <select
+              options={[
+                { value: 'members', label: 'Members' },
+                { value: 'pending', label: 'Pending Invites' },
+              ]}
+              className="sv-members-filter"
+            />
+            <SelectDropdown
               value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-              className="form-select form-select-sm sv-ctl-select sv-members-filter"
-            >
-              {roleOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              onChange={setRoleFilter}
+              options={roleOptions}
+              className="sv-members-filter"
+            />
             {canManageMembers ? (
               <button type="button" className="btn btn-primary btn-sm sv-ctl-btn sv-members-add-btn" onClick={openAddModal}>
                 Add User
@@ -184,134 +204,114 @@ function ProjectMembersPage() {
           </div>
         </section>
 
+        <section className="sv-members-stats" aria-label="Project member summary">
+          <article className="sv-card sv-members-stat-card">
+            <span>Total members</span>
+            <strong>{rows.length}</strong>
+          </article>
+          <article className="sv-card sv-members-stat-card">
+            <span>Project leads</span>
+            <strong>{leadCount}</strong>
+          </article>
+          <article className="sv-card sv-members-stat-card">
+            <span>Pending invites</span>
+            <strong>{pendingInvites.length}</strong>
+          </article>
+          <article className="sv-card sv-members-stat-card">
+            <span>Completion</span>
+            <strong>{completionRate}%</strong>
+          </article>
+        </section>
+
         {isMembersView && loading ? <p className="sv-members-message">Loading members...</p> : null}
         {isMembersView && error ? <p className="sv-members-message is-error">{error}</p> : null}
         {!isMembersView && invitesLoading ? <p className="sv-members-message">Loading invites...</p> : null}
         {!isMembersView && inviteError ? <p className="sv-members-message is-error">{inviteError}</p> : null}
 
         <section className="sv-card sv-members-table-card">
-          <div className="sv-members-table-wrap">
-            <table className="sv-members-table">
-              <thead>
-                {isMembersView ? (
-                  <tr>
-                    <th>Member</th>
-                    <th>Role</th>
-                    <th className="sv-members-col-metric">Assigned</th>
-                    <th className="sv-members-col-metric">Completed</th>
-                    <th className="is-right">Actions</th>
-                  </tr>
-                ) : (
-                  <tr>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Invited / Expires</th>
-                    <th className="is-right">Actions</th>
-                  </tr>
-                )}
-              </thead>
-              {isMembersView ? (
-                <tbody>
-                  {filteredRows.map((member) => (
-                    <tr key={member.userId}>
-                      <td>
+          <div className="sv-members-list-head">
+            <div>
+              <h2>{isMembersView ? 'Active collaborators' : 'Pending invitations'}</h2>
+              <p>{visibleCount} visible {isMembersView ? 'member' : 'invite'}{visibleCount === 1 ? '' : 's'}</p>
+            </div>
+            <span>{isMembersView ? `${assignedTotal} assigned tasks` : `${pendingInvites.length} pending`}</span>
+          </div>
+          <div className="sv-members-card-grid sv-list-scroll">
+            {isMembersView ? (
+              <>
+                {filteredRows.map((member) => {
+                  const completion = percent(member.completedInProject, member.tasksInProject);
+                  return (
+                    <article key={member.userId} className="sv-members-person-card">
+                      <div className="sv-members-person-top">
                         <div className="sv-members-member-cell">
-                          <span className="sv-members-avatar">
-                            {String(member.name || 'U').slice(0, 1).toUpperCase()}
-                          </span>
+                          <span className="sv-members-avatar">{String(member.name || 'U').slice(0, 1).toUpperCase()}</span>
                           <div>
                             <p className="sv-members-member-name">{member.name || 'Unknown'}</p>
-                            <p className="sv-members-member-date">{member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'N/A'}</p>
+                            <p className="sv-members-member-date">Joined {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'N/A'}</p>
                           </div>
                         </div>
-                      </td>
-                      <td>
-                        <div className="sv-members-role-cell">
-                          <RoleBadge role={member.role || 'member'} />
-                          {canManageMembers ? (
-                            <select
-                              className="form-select form-select-sm sv-ctl-select sv-members-role-edit"
-                              value={member.role || 'member'}
-                              onChange={(event) => updateRole({ userId: member.userId, role: event.target.value })}
-                              disabled={updateRoleState.isPending}
-                            >
-                              <option value="lead">Lead</option>
-                              <option value="member">Member</option>
-                              <option value="viewer">Viewer</option>
-                            </select>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="sv-members-col-metric">{member.tasksInProject || 0}</td>
-                      <td className="sv-members-col-metric">{member.completedInProject || 0}</td>
-                      <td className="is-right">
+                        <RoleBadge role={member.role || 'member'} />
+                      </div>
+                      <div className="sv-members-card-metrics">
+                        <span><strong>{member.tasksInProject || 0}</strong> assigned</span>
+                        <span><strong>{member.completedInProject || 0}</strong> completed</span>
+                        <span><strong>{completion}%</strong> done</span>
+                      </div>
+                      <div className="sv-members-progress"><span style={{ width: `${completion}%` }} /></div>
+                      <div className="sv-members-card-actions">
                         {canManageMembers ? (
-                          <button
-                            type="button"
-                            className="btn btn-sm sv-ctl-btn sv-members-remove-btn"
-                            onClick={() => removeMember({ userId: member.userId })}
-                            disabled={removeMemberState.isPending}
-                          >
+                          <SelectDropdown
+                            value={member.role || 'member'}
+                            onChange={(nextValue) => updateRole({ userId: member.userId, role: nextValue })}
+                            options={[
+                              { value: 'lead', label: 'Lead' },
+                              { value: 'member', label: 'Member' },
+                              { value: 'viewer', label: 'Viewer' },
+                            ]}
+                            className="sv-members-role-edit"
+                            disabled={updateRoleState.isPending}
+                          />
+                        ) : null}
+                        {canManageMembers ? (
+                          <button type="button" className="btn btn-sm sv-ctl-btn sv-members-remove-btn" onClick={() => removeMember({ userId: member.userId })} disabled={removeMemberState.isPending}>
                             Remove
                           </button>
                         ) : (
-                          <DeniedActionButton role={role} actionLabel="remove project members" className="btn btn-sm sv-ctl-btn sv-members-remove-btn">
-                            Remove
-                          </DeniedActionButton>
+                          <DeniedActionButton role={role} actionLabel="remove project members" className="btn btn-sm sv-ctl-btn sv-members-remove-btn">Remove</DeniedActionButton>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                  {!filteredRows.length && !loading ? (
-                    <tr>
-                      <td colSpan={5} className="sv-members-empty-cell">
-                        No members found for this project.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              ) : (
-                <tbody>
-                  {filteredInvites.map((invite) => (
-                    <tr key={invite._id || invite.id}>
-                      <td>
+                      </div>
+                    </article>
+                  );
+                })}
+                {!filteredRows.length && !loading ? <p className="sv-members-empty-cell">No members found for this project.</p> : null}
+              </>
+            ) : (
+              <>
+                {filteredInvites.map((invite) => (
+                  <article key={invite._id || invite.id} className="sv-members-person-card sv-members-invite-card">
+                    <div className="sv-members-person-top">
+                      <div>
                         <p className="sv-members-invite-email">{invite.email || 'Unknown email'}</p>
-                      </td>
-                      <td>
-                        <RoleBadge role={invite.role || 'member'} />
-                      </td>
-                      <td>
-                        <p className="sv-members-invite-date">Invited: {formatDate(invite.createdAt || invite.invitedAt)}</p>
-                        <p className="sv-members-invite-date">Expires: {formatDate(invite.expiresAt)}</p>
-                      </td>
-                      <td className="is-right">
-                        {canManageMembers ? (
-                          <button
-                            type="button"
-                            className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn"
-                            onClick={() => revokeInvite({ inviteId: invite._id || invite.id })}
-                            disabled={revokeInviteState.isPending}
-                          >
-                            Revoke
-                          </button>
-                        ) : (
-                          <DeniedActionButton role={role} actionLabel="revoke project invites" className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn">
-                            Revoke
-                          </DeniedActionButton>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {!filteredInvites.length && !invitesLoading ? (
-                    <tr>
-                      <td colSpan={4} className="sv-members-empty-cell">
-                        No pending invites.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              )}
-            </table>
+                        <p className="sv-members-invite-date">Invited {formatDate(invite.createdAt || invite.invitedAt)}</p>
+                      </div>
+                      <RoleBadge role={invite.role || 'member'} />
+                    </div>
+                    <p className="sv-members-invite-date">Expires {formatDate(invite.expiresAt)}</p>
+                    <div className="sv-members-card-actions is-end">
+                      {canManageMembers ? (
+                        <button type="button" className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn" onClick={() => revokeInvite({ inviteId: invite._id || invite.id })} disabled={revokeInviteState.isPending}>
+                          Revoke
+                        </button>
+                      ) : (
+                        <DeniedActionButton role={role} actionLabel="revoke project invites" className="btn btn-light btn-sm sv-ctl-btn sv-members-revoke-btn">Revoke</DeniedActionButton>
+                      )}
+                    </div>
+                  </article>
+                ))}
+                {!filteredInvites.length && !invitesLoading ? <p className="sv-members-empty-cell">No pending invites.</p> : null}
+              </>
+            )}
           </div>
         </section>
       </div>
@@ -355,19 +355,42 @@ function ProjectMembersPage() {
 
             {addMode === 'existing' ? (
               <form className="sv-members-form" onSubmit={addMemberForm.handleSubmit(submitAddMember)}>
-                <select className="form-select form-select-sm sv-ctl-select sv-members-field" {...addMemberForm.register('userId')}>
-                  <option value="">Select user</option>
-                  {availableUsers.map((user) => (
-                    <option key={user._id} value={user._id}>{user.displayName} ({user.role})</option>
-                  ))}
-                </select>
+                <Controller
+                  control={addMemberForm.control}
+                  name="userId"
+                  render={({ field }) => (
+                    <SelectDropdown
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={[
+                        { value: '', label: 'Select user' },
+                        ...availableUsers.map((user) => ({
+                          value: user._id,
+                          label: `${user.displayName} (${user.role})`,
+                        })),
+                      ]}
+                      className="sv-members-field"
+                    />
+                  )}
+                />
                 <p className="sv-members-field-error">{addMemberForm.formState.errors.userId?.message || ''}</p>
                 <div className="sv-members-inline-actions">
-                  <select className="form-select form-select-sm sv-ctl-select sv-members-role-select" {...addMemberForm.register('role')}>
-                    <option value="lead">Lead</option>
-                    <option value="member">Member</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                  <Controller
+                    control={addMemberForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <SelectDropdown
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: 'lead', label: 'Lead' },
+                          { value: 'member', label: 'Member' },
+                          { value: 'viewer', label: 'Viewer' },
+                        ]}
+                        className="sv-members-role-select"
+                      />
+                    )}
+                  />
                   <button type="submit" className="btn btn-primary btn-sm sv-ctl-btn sv-members-action-btn" disabled={addMemberState.isPending}>
                     {addMemberState.isPending ? 'Adding...' : 'Add Member'}
                   </button>
@@ -378,11 +401,22 @@ function ProjectMembersPage() {
                 <input className="form-control form-control-sm sv-ctl-input sv-members-field" placeholder="user@company.com" {...inviteForm.register('email')} />
                 <p className="sv-members-field-error">{inviteForm.formState.errors.email?.message || inviteError || ''}</p>
                 <div className="sv-members-inline-actions">
-                  <select className="form-select form-select-sm sv-ctl-select sv-members-role-select" {...inviteForm.register('role')}>
-                    <option value="admin">Admin</option>
-                    <option value="member">Member</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                  <Controller
+                    control={inviteForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <SelectDropdown
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: 'admin', label: 'Admin' },
+                          { value: 'member', label: 'Member' },
+                          { value: 'viewer', label: 'Viewer' },
+                        ]}
+                        className="sv-members-role-select"
+                      />
+                    )}
+                  />
                   <button type="submit" className="btn btn-primary btn-sm sv-ctl-btn sv-members-action-btn" disabled={createInviteState.isPending}>
                     {createInviteState.isPending ? 'Sending...' : 'Send Invite'}
                   </button>

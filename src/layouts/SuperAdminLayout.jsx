@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import AppFooter from '../components/layout/AppFooter';
 import Sidebar from '../components/layout/Sidebar';
@@ -7,18 +7,32 @@ import ThemeModeToggle from '../components/ui/ThemeModeToggle';
 import { useAuth } from '../contexts/AuthContext';
 
 function SuperAdminLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 991.98px)').matches : false,
+  );
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 991.98px)');
+    const syncSidebar = (event) => {
+      setSidebarCollapsed(event.matches);
+    };
+    syncSidebar(query);
+    query.addEventListener('change', syncSidebar);
+    return () => query.removeEventListener('change', syncSidebar);
+  }, []);
 
   return (
     <div className="sv-app-shell">
       <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} superAdmin />
+      <button
+        type="button"
+        className={`sv-sidebar-backdrop ${sidebarCollapsed ? '' : 'is-open'}`}
+        aria-label="Close sidebar"
+        onClick={() => setSidebarCollapsed(true)}
+      />
       <main
-        className="sv-main-content min-h-screen d-flex flex-column"
-        style={{
-          marginLeft: sidebarCollapsed ? '4rem' : '15rem',
-          transition: 'margin-left 0.24s ease-in-out',
-        }}
+        className={`sv-main-content ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'} min-h-screen d-flex flex-column`}
       >
         <header className={`sv-topbar ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'} d-flex align-items-center justify-content-between px-3 px-lg-4`}>
           <div className="d-flex align-items-center gap-3" style={{ maxWidth: 480 }}>

@@ -272,7 +272,6 @@ export function useNotifications(userIdArg) {
       meta,
       bootstrapLoading,
       initialNotificationLoading,
-      notificationsQuery.isLoading,
       notificationsQuery.error?.message,
       notificationsQuery.hasNextPage,
       notificationsQuery.isFetchingNextPage,

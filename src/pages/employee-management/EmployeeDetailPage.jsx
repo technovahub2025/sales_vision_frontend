@@ -9,6 +9,19 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { employeesApi } from '../../api';
 import { ROUTES } from '../../routes/routePaths';
 import Icon from '../../components/ui/Icon';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+
+const EMPLOYEE_STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+  { value: 'archived', label: 'Archived' },
+];
+const AVAILABILITY_OPTIONS = [
+  { value: 'available', label: 'Available' },
+  { value: 'busy', label: 'Busy' },
+  { value: 'ooo', label: 'Out Of Office' },
+  { value: 'leave', label: 'Leave' },
+];
 
 function EmployeeDetailPage() {
   const navigate = useNavigate();
@@ -292,43 +305,38 @@ function EmployeeDetailPage() {
 
               <input value={form.employeeCode} onChange={(e) => setForm((prev) => ({ ...prev, employeeCode: e.target.value }))} placeholder="Employee Code" className="sv-ctl-input sv-employees-field" />
 
-              <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))} className="sv-ctl-select sv-employees-field">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="archived">Archived</option>
-              </select>
+              <SelectDropdown value={form.status} onChange={(nextValue) => setForm((prev) => ({ ...prev, status: nextValue }))} options={EMPLOYEE_STATUS_OPTIONS} triggerClassName="sv-employees-field" />
 
-              <select value={form.availabilityStatus} onChange={(e) => setForm((prev) => ({ ...prev, availabilityStatus: e.target.value }))} className="sv-ctl-select sv-employees-field">
-                <option value="available">Available</option>
-                <option value="busy">Busy</option>
-                <option value="ooo">Out Of Office</option>
-                <option value="leave">Leave</option>
-              </select>
+              <SelectDropdown value={form.availabilityStatus} onChange={(nextValue) => setForm((prev) => ({ ...prev, availabilityStatus: nextValue }))} options={AVAILABILITY_OPTIONS} triggerClassName="sv-employees-field" />
 
               <input type="number" min="1" value={form.hoursPerWeek} onChange={(e) => setForm((prev) => ({ ...prev, hoursPerWeek: e.target.value }))} placeholder="Hours per week" className="sv-ctl-input sv-employees-field" />
               <input type="number" min="0" value={form.velocity} onChange={(e) => setForm((prev) => ({ ...prev, velocity: e.target.value }))} placeholder="Velocity" className="sv-ctl-input sv-employees-field" />
 
-              <select
+              <SelectDropdown
                 value={form.managerId}
-                onChange={(e) => {
-                  const managerId = e.target.value;
+                onChange={(managerId) => {
                   const manager = managerOptions.find((item) => String(item._id) === String(managerId));
                   setForm((prev) => ({ ...prev, managerId, managerName: manager?.name || '' }));
                 }}
-                className="sv-ctl-select sv-employees-field"
-              >
-                <option value="">No manager</option>
-                {managerOptions.map((employee) => (
-                  <option key={employee._id} value={employee._id}>{employee.name || 'Unnamed'}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'No manager' },
+                  ...managerOptions.map((employee) => ({ value: employee._id, label: employee.name || 'Unnamed' })),
+                ]}
+                triggerClassName="sv-employees-field"
+              />
 
-              <select value={form.contactId} onChange={(e) => setForm((prev) => ({ ...prev, contactId: e.target.value }))} className="sv-ctl-select sv-employees-field">
-                <option value="">No linked contact</option>
-                {contacts.map((contact) => (
-                  <option key={contact._id} value={contact._id}>{contact.name || 'Unnamed'}{contact.email ? ` (${contact.email})` : ''}</option>
-                ))}
-              </select>
+              <SelectDropdown
+                value={form.contactId}
+                onChange={(nextValue) => setForm((prev) => ({ ...prev, contactId: nextValue }))}
+                options={[
+                  { value: '', label: 'No linked contact' },
+                  ...contacts.map((contact) => ({
+                    value: contact._id,
+                    label: `${contact.name || 'Unnamed'}${contact.email ? ` (${contact.email})` : ''}`,
+                  })),
+                ]}
+                triggerClassName="sv-employees-field"
+              />
 
               <textarea value={form.bio} onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))} placeholder="Bio" className="md:col-span-2 sv-ctl-input sv-employees-field" rows={3} />
 

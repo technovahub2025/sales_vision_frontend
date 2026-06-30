@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Icon from '../../components/ui/Icon';
+import RowActionMenu from '../../components/ui/RowActionMenu';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import { superAdminApi } from '../../api/superAdmin.api';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
 import { ROUTES } from '../../routes/routePaths';
 import {
   AdminKpiCard,
@@ -21,6 +24,11 @@ const HEALTH_OPTIONS = [
   ['inactive', 'Inactive'],
   ['invite_pending', 'Invite pending'],
 ];
+const PLAN_OPTIONS = [
+  { value: 'free', label: 'Free' },
+  { value: 'pro', label: 'Pro' },
+  { value: 'enterprise', label: 'Enterprise' },
+];
 
 function formatDate(value) {
   if (!value) return '-';
@@ -36,25 +44,22 @@ function firstInitial(value) {
   return String(value || '?').slice(0, 1).toUpperCase();
 }
 
-function Pagination({ meta, page, setPage }) {
-  const pages = Number(meta?.pages || 1);
-  return (
-    <div className="sv-userdatas-pagination">
-      <span>{formatAdminNumber(meta?.total || 0)} workspaces</span>
-      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
-      <span>{page} / {pages}</span>
-      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-    </div>
-  );
+function getNextPageParam(lastPage, allPages) {
+  const meta = lastPage?.meta || {};
+  const page = Number(meta.page) || allPages.length;
+  const total = Number(meta.total) || 0;
+  const limit = Number(meta.limit) || 100;
+  return total > page * limit ? page + 1 : undefined;
 }
 
 export default function SuperAdminWorkspacesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [health, setHealth] = useState('');
-  const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
+  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState('');
   const [planError, setPlanError] = useState('');
+  const listScrollRef = useRef(null);
 
   const updatePlanMutation = useMutation({
     mutationFn: ({ workspaceId, plan }) => superAdminApi.updatePlan(workspaceId, plan),
@@ -68,14 +73,23 @@ export default function SuperAdminWorkspacesPage() {
     },
   });
 
-  const workspacesQuery = useQuery({
-    queryKey: ['super-admin', 'workspace-health', page, search, health],
-    queryFn: ({ signal }) => superAdminApi.workspaceHealth({ page, limit: 25, search: search || undefined, health: health || undefined }, signal),
+  const workspacesQuery = useInfiniteQuery({
+    queryKey: ['super-admin', 'workspace-health', search, health],
+    queryFn: ({ pageParam = 1, signal }) => superAdminApi.workspaceHealth({ page: pageParam, limit: 100, search: search || undefined, health: health || undefined }, signal),
+    getNextPageParam,
+    initialPageParam: 1,
     retry: false,
   });
 
-  const rows = workspacesQuery.data?.data || [];
-  const meta = workspacesQuery.data?.meta || {};
+  const rows = useMemo(() => (workspacesQuery.data?.pages || []).flatMap((pageItem) => pageItem?.data || []), [workspacesQuery.data?.pages]);
+  const meta = workspacesQuery.data?.pages?.at(-1)?.meta || {};
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (workspacesQuery.hasNextPage && !workspacesQuery.isFetchingNextPage) void workspacesQuery.fetchNextPage();
+    },
+    disabled: !workspacesQuery.hasNextPage || workspacesQuery.isFetchingNextPage,
+  });
   const totals = useMemo(() => rows.reduce(
     (acc, row) => ({
       users: acc.users + Number(row.userCount || 0),
@@ -86,10 +100,10 @@ export default function SuperAdminWorkspacesPage() {
     { users: 0, tasks: 0, overdue: 0, activeProjects: 0 },
   ), [rows]);
 
-  function resetPage(setter) {
+  function resetList(setter) {
     return (event) => {
       setter(event.target.value);
-      setPage(1);
+      listScrollRef.current?.scrollTo({ top: 0 });
     };
   }
 
@@ -116,11 +130,17 @@ export default function SuperAdminWorkspacesPage() {
       <section className="sv-userdatas-topbar" aria-label="Workspace filters">
         <label className="sv-userdatas-search">
           <Icon name="search" />
-          <input className="form-control" value={search} onChange={resetPage(setSearch)} placeholder="Search workspace or slug..." />
+          <input className="form-control" value={search} onChange={resetList(setSearch)} placeholder="Search workspace or slug..." />
         </label>
-        <select className="form-select sv-admin-filter-select" value={health} onChange={resetPage(setHealth)}>
-          {HEALTH_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{label}</option>)}
-        </select>
+        <SelectDropdown
+          value={health}
+          onChange={(nextValue) => {
+            setHealth(nextValue);
+            listScrollRef.current?.scrollTo({ top: 0 });
+          }}
+          options={HEALTH_OPTIONS.map(([value, label]) => ({ value, label }))}
+          triggerClassName="form-select sv-admin-filter-select"
+        />
       </section>
 
       <section className="sv-userdatas-table-card" aria-label="Workspaces">
@@ -131,7 +151,7 @@ export default function SuperAdminWorkspacesPage() {
           </div>
           <span>{workspacesQuery.isLoading ? 'Loading' : `${formatAdminNumber(meta.total || 0)} records`}</span>
         </div>
-        <div className="sv-userdatas-table-wrap">
+        <div className="sv-userdatas-table-wrap sv-list-scroll" ref={listScrollRef}>
           <table className="sv-userdatas-table sv-admin-workspace-table">
             <thead>
               <tr>
@@ -158,18 +178,35 @@ export default function SuperAdminWorkspacesPage() {
                   <td>{formatAdminNumber(row.openTasks)} open / {formatAdminNumber(row.overdueTasks)} overdue</td>
                   <td>{formatDate(row.lastActivityAt)}</td>
                   <td className="sv-userdatas-action-cell">
-                    <button type="button" className="sv-userdatas-action-trigger" aria-label={`View ${row.name}`} onClick={() => setDetail(row)}>
-                      <Icon name="visibility" />
-                    </button>
+                    <RowActionMenu
+                      open={openWorkspaceMenuId === row.id}
+                      onTrigger={() => setOpenWorkspaceMenuId((current) => (current === row.id ? '' : row.id))}
+                      onClose={() => setOpenWorkspaceMenuId('')}
+                      ariaLabel={`Actions for ${row.name || 'workspace'}`}
+                      items={[
+                        {
+                          key: 'view',
+                          label: 'View details',
+                          icon: 'visibility',
+                          onClick: () => setDetail(row),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
+              {!workspacesQuery.isLoading && rows.length ? (
+                <tr>
+                  <td colSpan="8" className="sv-list-sentinel-cell">
+                    <span ref={loadMoreRef} className="sv-list-sentinel" />
+                    {workspacesQuery.isFetchingNextPage ? 'Loading more workspaces...' : workspacesQuery.hasNextPage ? 'Scroll for more' : 'End of list'}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
       </section>
-
-      <Pagination meta={meta} page={page} setPage={setPage} />
 
       {detail ? (
         <div className="sv-userdatas-drawer-layer" role="presentation">
@@ -196,18 +233,13 @@ export default function SuperAdminWorkspacesPage() {
               <div className="sv-userdatas-drawer-row">
                 <label><Icon name="workspace_premium" />Plan</label>
                 <div className="d-flex align-items-center gap-2">
-                  <select
-                    className="form-select form-select-sm"
+                  <SelectDropdown
                     value={String(detail.plan || 'free')}
-                    onChange={(event) => {
-                      const nextPlan = event.target.value;
-                      updatePlanMutation.mutate({ workspaceId: detail.id, plan: nextPlan });
-                    }}
+                    onChange={(nextPlan) => updatePlanMutation.mutate({ workspaceId: detail.id, plan: nextPlan })}
                     disabled={updatePlanMutation.isPending}
-                  >
-                    <option value="free">Free</option>
-                    <option value="pro">Pro</option>
-                  </select>
+                    options={PLAN_OPTIONS}
+                    triggerClassName="form-select form-select-sm"
+                  />
                   {updatePlanMutation.isPending ? <small>Saving...</small> : null}
                 </div>
               </div>

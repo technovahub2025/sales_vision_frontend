@@ -1,5 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import DatePicker from '../../components/ui/DatePicker';
 import Icon from '../../components/ui/Icon';
 import DeniedActionButton from '../../components/ui/DeniedActionButton';
 import { useNewTask } from '../../hooks/useNewTask';
@@ -58,7 +60,7 @@ function SearchableSinglePicker({
               className={`sv-newtask-picker-item ${active ? 'is-active' : ''}`}
               onClick={() => onChange(itemId)}
             >
-              <span className="sv-newtask-picker-radio">{active ? '?' : '?'}</span>
+              <span className="sv-newtask-picker-radio" aria-hidden="true" />
               <span className="text-truncate">{getDisplayName(item, 'User')}</span>
             </button>
           );
@@ -271,8 +273,8 @@ function NewTaskPage() {
 
   return (
     <main className="sv-newtask-page" aria-label="Create new task">
-      <form className="sv-newtask-form d-grid" style={{ gridTemplateColumns: 'minmax(0,1fr) 380px', gap: '0.85rem' }} onSubmit={onSubmit}>
-        <section className="d-grid" style={{ gap: '0.85rem' }}>
+      <form className="sv-newtask-form d-grid" onSubmit={onSubmit}>
+        <section className="sv-newtask-main-column d-grid">
           <article className="sv-card sv-newtask-card">
             <label className="sv-newtask-section-label text-uppercase fw-semibold small" htmlFor="new-task-title">Task title</label>
             <input
@@ -331,7 +333,7 @@ function NewTaskPage() {
           </article>
         </section>
 
-        <aside className="d-grid" style={{ gap: '0.75rem', alignContent: 'start' }}>
+        <aside className="sv-newtask-side-column d-grid">
           <article className="sv-card sv-newtask-card">
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">People</p>
 
@@ -407,15 +409,16 @@ function NewTaskPage() {
 
           <article className="sv-card sv-newtask-card">
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">Timeline</p>
-            <input
-              type="date"
+            <DatePicker
               value={draft.dueDate || ''}
-              onChange={(event) => setField('dueDate', event.target.value)}
-              className="form-control sv-newtask-field mb-2"
+              onChange={(nextValue) => setField('dueDate', nextValue)}
+              className="mb-2"
+              triggerClassName="form-control sv-newtask-field"
+              placeholder="Due date"
             />
 
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-2">Priority</p>
-            <div className="d-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.42rem' }}>
+            <div className="sv-newtask-priority-grid d-grid">
               {PRIORITIES.map((priority) => (
                 <button
                   key={priority}
@@ -431,39 +434,34 @@ function NewTaskPage() {
 
           <article className="sv-card sv-newtask-card">
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Project</p>
-            <select
+            <SelectDropdown
               value={draft.projectId || ''}
-              onChange={(event) => setField('projectId', event.target.value)}
-              className="form-select sv-newtask-field mb-2"
-            >
-              <option value="">Select project</option>
-              {projects.map((project) => (
-                <option key={project._id} value={project._id}>{project.name || 'Project'}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setField('projectId', nextValue)}
+              options={[
+                { value: '', label: 'Select project' },
+                ...projects.map((project) => ({ value: project._id, label: project.name || 'Project' })),
+              ]}
+              className="mb-2 w-full"
+            />
 
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Issue Type</p>
-            <select
+            <SelectDropdown
               value={draft.issueType || 'task'}
-              onChange={(event) => setField('issueType', event.target.value)}
-              className="form-select sv-newtask-field mb-2"
-            >
-              {ISSUE_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setField('issueType', nextValue)}
+              options={ISSUE_TYPES}
+              className="mb-2 w-full"
+            />
 
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Parent</p>
-            <select
+            <SelectDropdown
               value={draft.parentTaskId || ''}
-              onChange={(event) => setField('parentTaskId', event.target.value)}
-              className="form-select sv-newtask-field mb-2"
-            >
-              <option value="">No parent</option>
-              {parentTasks.map((task) => (
-                <option key={task._id} value={task._id}>{task.title || 'Task'}</option>
-              ))}
-            </select>
+              onChange={(nextValue) => setField('parentTaskId', nextValue)}
+              options={[
+                { value: '', label: 'No parent' },
+                ...parentTasks.map((task) => ({ value: task._id, label: task.title || 'Task' })),
+              ]}
+              className="mb-2 w-full"
+            />
 
             <p className="sv-newtask-section-label text-uppercase fw-semibold small mb-1">Tags</p>
             <div className="sv-newtask-tag-list mb-2">
@@ -473,7 +471,7 @@ function NewTaskPage() {
                 </button>
               ))}
             </div>
-            <div className="d-flex gap-2">
+            <div className="sv-newtask-tag-entry d-flex gap-2">
               <input
                 value={draft.tagsInput || ''}
                 onChange={(event) => setField('tagsInput', event.target.value)}
@@ -485,7 +483,7 @@ function NewTaskPage() {
 
             {error ? <p className="sv-newtask-error small mt-2 mb-0">{error}</p> : null}
 
-            <div className="sv-newtask-actions d-grid mt-3" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.55rem' }}>
+            <div className="sv-newtask-actions d-grid mt-3">
               <button type="button" className="btn btn-outline-secondary sv-ctl-btn" onClick={() => navigate(-1)}>Cancel</button>
               <button type="submit" className="btn btn-primary sv-ctl-btn" disabled={submitting}>{submitting ? 'Creating...' : 'Create Task'}</button>
             </div>

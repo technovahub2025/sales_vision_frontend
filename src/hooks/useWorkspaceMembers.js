@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invitesApi, workspacesApi } from '../api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { usePermission } from './usePermission';
@@ -14,6 +14,26 @@ function toQueryMeta(meta = {}, fallbackPage, fallbackLimit) {
   return { page, limit, total, pages };
 }
 
+function nextPageParam(lastPage, allPages) {
+  const meta = lastPage?.meta || {};
+  const page = Number(meta.page) || allPages.length;
+  const pages = Number(meta.pages) || 0;
+  if (pages > 0) return page < pages ? page + 1 : undefined;
+  const total = Number(meta.total) || 0;
+  const loaded = allPages.reduce((sum, pageItem) => sum + (pageItem?.items?.length || 0), 0);
+  return total > loaded ? page + 1 : undefined;
+}
+
+function flattenPages(data) {
+  const seen = new Set();
+  return (data?.pages || []).flatMap((page) => page?.items || []).filter((item) => {
+    const key = String(item?._id || item?.id || item?.userId || item?.email || '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function useWorkspaceMembers(options = {}) {
   const queryClient = useQueryClient();
   const { workspaceId } = useWorkspace();
@@ -21,49 +41,50 @@ export function useWorkspaceMembers(options = {}) {
   const canManageMembers = hasAnyRole(['owner', 'admin']);
 
   const view = options.view === 'invites' ? 'invites' : 'members';
-  const page = Math.max(Number(options.page) || 1, 1);
   const limit = Math.min(Math.max(Number(options.limit) || 8, 1), 100);
   const search = String(options.search || '').trim();
   const role = String(options.role || 'all');
 
   const membersParams = useMemo(() => {
-    const params = { page, limit };
+    const params = { limit, sort: 'newest' };
     if (search) params.search = search;
     if (role !== 'all') params.role = role;
     return params;
-  }, [limit, page, role, search]);
+  }, [limit, role, search]);
 
   const invitesParams = useMemo(() => {
-    const params = { status: 'pending', page, limit };
+    const params = { status: 'pending', limit, sort: 'newest' };
     if (search) params.search = search;
     if (role !== 'all' && role !== 'owner') params.role = role;
     return params;
-  }, [limit, page, role, search]);
+  }, [limit, role, search]);
 
-  const membersQuery = useQuery({
+  const membersQuery = useInfiniteQuery({
     queryKey: ['workspace', workspaceId, 'members', membersParams],
-    queryFn: ({ signal }) =>
-      workspacesApi.members(workspaceId, membersParams, signal).then((payload) => ({
+    queryFn: ({ pageParam = 1, signal }) =>
+      workspacesApi.members(workspaceId, { ...membersParams, page: pageParam }, signal).then((payload) => ({
         items: payload.data || [],
-        meta: toQueryMeta(payload.meta, page, limit),
+        meta: toQueryMeta(payload.meta, pageParam, limit),
       })),
+    getNextPageParam: nextPageParam,
     enabled: Boolean(workspaceId),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
-    initialData: { items: [], meta: { ...DEFAULT_META } },
+    initialPageParam: 1,
   });
 
-  const invitesQuery = useQuery({
+  const invitesQuery = useInfiniteQuery({
     queryKey: ['workspace', workspaceId, 'invites', invitesParams],
-    queryFn: ({ signal }) =>
-      invitesApi.list(workspaceId, invitesParams, signal).then((payload) => ({
+    queryFn: ({ pageParam = 1, signal }) =>
+      invitesApi.list(workspaceId, { ...invitesParams, page: pageParam }, signal).then((payload) => ({
         items: payload.data || [],
-        meta: toQueryMeta(payload.meta, page, limit),
+        meta: toQueryMeta(payload.meta, pageParam, limit),
       })),
+    getNextPageParam: nextPageParam,
     enabled: Boolean(workspaceId) && canManageMembers,
     staleTime: 30_000,
     gcTime: 5 * 60_000,
-    initialData: { items: [], meta: { ...DEFAULT_META } },
+    initialPageParam: 1,
   });
 
   const inviteMutation = useMutation({
@@ -99,15 +120,19 @@ export function useWorkspaceMembers(options = {}) {
   });
 
   const activeQuery = view === 'invites' ? invitesQuery : membersQuery;
+  const activeMeta = activeQuery.data?.pages?.at(-1)?.meta || { ...DEFAULT_META, limit };
 
   return {
-    members: membersQuery.data?.items || [],
-    invites: invitesQuery.data?.items || [],
-    listItems: activeQuery.data?.items || [],
-    listMeta: activeQuery.data?.meta || { ...DEFAULT_META, page, limit },
-    loadingMembers: membersQuery.isLoading || membersQuery.isFetching,
-    loadingInvites: invitesQuery.isLoading || invitesQuery.isFetching,
-    loadingList: activeQuery.isLoading || activeQuery.isFetching,
+    members: flattenPages(membersQuery.data),
+    invites: flattenPages(invitesQuery.data),
+    listItems: flattenPages(activeQuery.data),
+    listMeta: activeMeta,
+    loadingMembers: membersQuery.isLoading,
+    loadingInvites: invitesQuery.isLoading,
+    loadingList: activeQuery.isLoading,
+    loadingMoreList: activeQuery.isFetchingNextPage,
+    hasMoreList: Boolean(activeQuery.hasNextPage),
+    loadMoreList: activeQuery.fetchNextPage,
     membersError: membersQuery.error?.message || '',
     invitesError: invitesQuery.error?.message || '',
     listError: activeQuery.error?.message || '',

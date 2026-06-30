@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { workspacesApi } from '../../api';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import Icon from '../../components/ui/Icon';
 import DeniedActionButton from '../../components/ui/DeniedActionButton';
 import { useSettings } from '../../hooks/useSettings';
 import { usePermission } from '../../hooks/usePermission';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
 import SettingsTabs from './SettingsTabs';
 
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
 const SORT_OPTIONS = [
-  { value: 'recent', label: 'Recently updated' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
   { value: 'name_asc', label: 'Name (A-Z)' },
   { value: 'name_desc', label: 'Name (Z-A)' },
 ];
@@ -29,6 +31,16 @@ function normalizeWorkspaceListPayload(payload) {
   const total = Number(metaRaw.total) || 0;
   const pages = Number(metaRaw.pages) || Math.max(1, Math.ceil(total / limit));
   return { items, meta: { page, limit, total, pages } };
+}
+
+function getNextPageParam(lastPage, allPages) {
+  const meta = lastPage?.meta || {};
+  const page = Number(meta.page) || allPages.length;
+  const pages = Number(meta.pages) || 0;
+  if (pages > 0) return page < pages ? page + 1 : undefined;
+  const total = Number(meta.total) || 0;
+  const limit = Number(meta.limit) || 100;
+  return total > page * limit ? page + 1 : undefined;
 }
 
 function SettingsWorkspacePage() {
@@ -53,9 +65,9 @@ function SettingsWorkspacePage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
-  const [sort, setSort] = useState('recent');
-  const [limit, setLimit] = useState(8);
-  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState('newest');
+  const [limit] = useState(100);
+  const listScrollRef = useRef(null);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -76,34 +88,32 @@ function SettingsWorkspacePage() {
   }, [isCreateModalOpen]);
 
   const queryParams = useMemo(() => {
-    const params = { page, limit, sort };
+    const params = { limit, sort };
     if (search) params.search = search;
     if (status !== 'all') params.status = status;
     return params;
-  }, [limit, page, search, sort, status]);
+  }, [limit, search, sort, status]);
 
-  const workspaceQuery = useQuery({
+  const workspaceQuery = useInfiniteQuery({
     queryKey: ['settings-workspaces', queryParams],
-    queryFn: ({ signal: abortSignal }) =>
-      workspacesApi.list(queryParams, abortSignal).then((response) => normalizeWorkspaceListPayload(response || {})),
+    queryFn: ({ pageParam = 1, signal: abortSignal }) =>
+      workspacesApi.list({ ...queryParams, page: pageParam }, abortSignal).then((response) => normalizeWorkspaceListPayload(response || {})),
+    getNextPageParam,
+    initialPageParam: 1,
     staleTime: 20_000,
     gcTime: 5 * 60_000,
-    initialData: { items: [], meta: { ...DEFAULT_META } },
   });
 
-  const items = useMemo(() => workspaceQuery.data?.items || [], [workspaceQuery.data?.items]);
-  const meta = workspaceQuery.data?.meta || DEFAULT_META;
-  const totalPages = Math.max(meta.pages || 1, 1);
-  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const items = useMemo(() => (workspaceQuery.data?.pages || []).flatMap((pageItem) => pageItem?.items || []), [workspaceQuery.data?.pages]);
+  const meta = workspaceQuery.data?.pages?.at(-1)?.meta || DEFAULT_META;
   const totalItems = meta.total || 0;
-  const startIndex = totalItems > 0 ? (currentPage - 1) * limit + 1 : 0;
-  const endIndex = totalItems > 0 ? Math.min((currentPage - 1) * limit + items.length, totalItems) : 0;
-
-  const paginationNumbers = useMemo(() => {
-    if (totalPages <= 1) return [1];
-    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-    return [...pages].filter((num) => num >= 1 && num <= totalPages).sort((a, b) => a - b);
-  }, [currentPage, totalPages]);
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (workspaceQuery.hasNextPage && !workspaceQuery.isFetchingNextPage) void workspaceQuery.fetchNextPage();
+    },
+    disabled: !workspaceQuery.hasNextPage || workspaceQuery.isFetchingNextPage,
+  });
 
   const rows = useMemo(
     () =>
@@ -128,7 +138,7 @@ function SettingsWorkspacePage() {
       await createWorkspace({ name: newWorkspaceName.trim() });
       setNewWorkspaceName('');
       setIsCreateModalOpen(false);
-      setPage(1);
+      listScrollRef.current?.scrollTo({ top: 0 });
       await refetchList();
     } catch (nextError) {
       setActionError(nextError.message || 'Failed to create workspace');
@@ -175,9 +185,8 @@ function SettingsWorkspacePage() {
     setSearchInput('');
     setSearch('');
     setStatus('all');
-    setSort('recent');
-    setLimit(8);
-    setPage(1);
+    setSort('newest');
+    listScrollRef.current?.scrollTo({ top: 0 });
   };
 
   return (
@@ -232,7 +241,7 @@ function SettingsWorkspacePage() {
                   value={searchInput}
                   onChange={(event) => {
                     setSearchInput(event.target.value);
-                    setPage(1);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                   placeholder="Search workspace name..."
                   className="sv-settings-input"
@@ -240,54 +249,27 @@ function SettingsWorkspacePage() {
               </label>
               <label className="sv-settings-field">
                 <span className="sv-settings-label">Status</span>
-                <select
+                <SelectDropdown
                   value={status}
                   onChange={(event) => {
-                    setStatus(event.target.value);
-                    setPage(1);
+                    setStatus(event);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                   className="sv-settings-input"
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  options={STATUS_OPTIONS}
+                />
               </label>
               <label className="sv-settings-field">
                 <span className="sv-settings-label">Sort</span>
-                <select
+                <SelectDropdown
                   value={sort}
                   onChange={(event) => {
-                    setSort(event.target.value);
-                    setPage(1);
+                    setSort(event);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                   className="sv-settings-input"
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="sv-settings-field">
-                <span className="sv-settings-label">Rows per page</span>
-                <select
-                  value={limit}
-                  onChange={(event) => {
-                    setLimit(Number(event.target.value) || 8);
-                    setPage(1);
-                  }}
-                  className="sv-settings-input"
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
+                  options={SORT_OPTIONS}
+                />
               </label>
             </div>
             <div className="sv-settings-members-filter-bottom">
@@ -301,7 +283,7 @@ function SettingsWorkspacePage() {
         </section>
 
         <section className="sv-settings-card">
-          <div className="space-y-3">
+          <div className="space-y-3 sv-list-scroll" ref={listScrollRef}>
             {workspaceQuery.isLoading || workspaceQuery.isFetching ? (
               <>
                 <div className="h-14 animate-pulse rounded-lg bg-surface-container" />
@@ -384,41 +366,14 @@ function SettingsWorkspacePage() {
             ) : (
               <p className="sv-settings-note">No workspaces found for the current filters.</p>
             )}
+            {!workspaceQuery.isLoading && rows.length ? (
+              <div className="sv-list-sentinel-cell">
+                <span ref={loadMoreRef} className="sv-list-sentinel" />
+                {workspaceQuery.isFetchingNextPage ? 'Loading more workspaces...' : workspaceQuery.hasNextPage ? 'Scroll for more' : 'End of list'}
+              </div>
+            ) : null}
           </div>
 
-          <div className="sv-settings-members-pagination">
-            <div className="sv-settings-members-pagination-meta">
-              Showing {startIndex}-{endIndex} of {totalItems}
-            </div>
-            <div className="sv-settings-members-pagination-controls">
-              <button
-                type="button"
-                className="sv-settings-btn sv-settings-btn-neutral"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              >
-                Prev
-              </button>
-              {paginationNumbers.map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  className={`sv-settings-btn sv-settings-btn-neutral ${num === currentPage ? 'is-active' : ''}`}
-                  onClick={() => setPage(num)}
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="sv-settings-btn sv-settings-btn-neutral"
-                disabled={currentPage >= totalPages}
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </section>
 
         {isCreateModalOpen ? (

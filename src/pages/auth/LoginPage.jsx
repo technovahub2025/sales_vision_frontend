@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { useEffect } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +7,6 @@ import { FormAlert, TextField } from '../../components/auth/AuthFormControls';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRetryCountdown } from '../../hooks/auth/useRetryCountdown';
 import { ROUTES } from '../../routes/routePaths';
-import { setThemeMode } from '../../lib/theme';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -27,10 +25,6 @@ export default function LoginPage() {
   });
 
   const countdown = useRetryCountdown(loginState.error?.retryAfterSeconds || 0);
-
-  useEffect(() => {
-    setThemeMode('system');
-  }, []);
 
   if (isAuthenticated) {
     return <Navigate replace to={ROUTES.dashboard} />;

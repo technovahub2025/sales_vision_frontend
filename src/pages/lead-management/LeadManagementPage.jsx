@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
+import DatePicker from '../../components/ui/DatePicker';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import ExportMenu from '../../components/ui/ExportMenu';
 import { useLeads } from '../../hooks/useLeads';
 import { useClients } from '../../hooks/useClients';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { clientsApi, leadsApi } from '../../api';
 import { ROUTES } from '../../routes/routePaths';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
+import { exportRows } from '../../lib/exportData';
 
 const STAGES = [
   { statusId: 'new', title: 'New' },
@@ -19,8 +24,13 @@ const STAGES = [
 const STAGE_IDS = new Set(STAGES.map((s) => s.statusId));
 const PRIORITY_VALUES = ['cold', 'warm', 'hot'];
 const SOURCE_VALUES = ['organic', 'referral', 'cold', 'paid', 'event'];
-const DEFAULT_PAGE_SIZE = 8;
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
+const LEAD_TYPE_OPTIONS = [
+  { value: 'company', label: 'Company' },
+  { value: 'person', label: 'Person' },
+];
+const STAGE_OPTIONS = STAGES.map((stage) => ({ value: stage.statusId, label: stage.title }));
+const PRIORITY_OPTIONS = PRIORITY_VALUES.map((priority) => ({ value: priority, label: priority[0].toUpperCase() + priority.slice(1) }));
+const SOURCE_OPTIONS = SOURCE_VALUES.map((source) => ({ value: source, label: source[0].toUpperCase() + source.slice(1) }));
 const EMPTY_DETAIL_FIELDS = {
   leadType: 'company',
   contactName: '',
@@ -156,10 +166,12 @@ function DetailFields({ form, setForm }) {
   return (
     <>
       <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
-        <select value={form.leadType} onChange={(e) => set('leadType', e.target.value)} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">
-          <option value="company">Company</option>
-          <option value="person">Person</option>
-        </select>
+        <SelectDropdown
+          value={form.leadType}
+          onChange={(nextValue) => set('leadType', nextValue)}
+          options={LEAD_TYPE_OPTIONS}
+          triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm"
+        />
         <input value={form.contactName} onChange={(e) => set('contactName', e.target.value)} placeholder="Contact Name" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
       </div>
       <div className="sv-leads-detail-row grid grid-cols-2 gap-2">
@@ -188,42 +200,6 @@ function DetailFields({ form, setForm }) {
   );
 }
 
-function PaginationControls({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) {
-  if (totalItems <= 0) return null;
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const startItem = (safePage - 1) * pageSize + 1;
-  const endItem = Math.min(totalItems, safePage * pageSize);
-  const pages = Array.from({ length: totalPages }, (_, idx) => idx + 1);
-  return (
-    <div className="sv-leads-pagination">
-      <div className="sv-leads-pagination-meta">
-        <span className="sv-leads-pagination-text">Showing {startItem}–{endItem} of {totalItems}</span>
-        <label className="sv-leads-pagination-size">
-          <span>Rows per page</span>
-          <select className="form-select form-select-sm sv-ctl-select sv-leads-page-size" value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))}>
-            {PAGE_SIZE_OPTIONS.map((size) => <option key={`size-${size}`} value={size}>{size}</option>)}
-          </select>
-        </label>
-      </div>
-      <div className="sv-leads-pagination-controls">
-        <button type="button" className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1}>
-          Prev
-        </button>
-        <div className="sv-leads-page-list">
-          {pages.map((p) => (
-            <button key={`page-${p}`} type="button" className={`btn btn-sm sv-ctl-btn sv-leads-page-btn ${p === page ? 'is-active' : ''}`} onClick={() => onPageChange(p)}>
-              {p}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
-          Next
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function LeadManagementPage() {
   const navigate = useNavigate();
   const { workspaceId } = useWorkspace();
@@ -242,10 +218,6 @@ function LeadManagementPage() {
   const [clientFilters, setClientFilters] = useState({ search: '', archiveScope: 'all' });
   const [isLeadFilterOpen, setIsLeadFilterOpen] = useState(false);
   const [isClientFilterOpen, setIsClientFilterOpen] = useState(false);
-  const [leadsPage, setLeadsPage] = useState(1);
-  const [clientsPage, setClientsPage] = useState(1);
-  const [leadsPageSize, setLeadsPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [clientsPageSize, setClientsPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [openRowMenuId, setOpenRowMenuId] = useState('');
   const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
   const [openRowMenuContext, setOpenRowMenuContext] = useState(null);
@@ -253,9 +225,44 @@ function LeadManagementPage() {
   const [editForm, setEditForm] = useState(editDefaults);
   const [clientForm, setClientForm] = useState(CLIENT_FORM_DEFAULTS);
   const rowMenuRef = useRef(null);
+  const leadsScrollRef = useRef(null);
+  const clientsScrollRef = useRef(null);
 
-  const { items: leads, loading: leadsLoading, error: leadsError, refresh: refreshLeads, createItem, updateItem } = useLeads();
-  const { clients, loading: clientsLoading, createClient, list: listClients } = useClients();
+  const {
+    items: leads,
+    loading: leadsLoading,
+    loadingMore: leadsLoadingMore,
+    hasMore: leadsHasMore,
+    loadMore: loadMoreLeads,
+    error: leadsError,
+    refresh: refreshLeads,
+    createItem,
+    updateItem,
+  } = useLeads();
+  const {
+    clients,
+    loading: clientsLoading,
+    loadingMore: clientsLoadingMore,
+    hasMore: clientsHasMore,
+    loadMore: loadMoreClients,
+    createClient,
+    list: listClients,
+  } = useClients();
+
+  const leadSentinelRef = useInfiniteScrollTrigger({
+    rootRef: leadsScrollRef,
+    onIntersect: () => {
+      if (leadsHasMore && !leadsLoadingMore) void loadMoreLeads();
+    },
+    disabled: !leadsHasMore || leadsLoadingMore,
+  });
+  const clientSentinelRef = useInfiniteScrollTrigger({
+    rootRef: clientsScrollRef,
+    onIntersect: () => {
+      if (clientsHasMore && !clientsLoadingMore) void loadMoreClients();
+    },
+    disabled: !clientsHasMore || clientsLoadingMore,
+  });
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -274,6 +281,16 @@ function LeadManagementPage() {
     [leads],
   );
   const clientLookup = useMemo(() => new Map((clients || []).map((c) => [String(c._id), c])), [clients]);
+  const clientOptions = useMemo(
+    () => [
+      { value: '', label: 'No Client' },
+      ...(clients || []).map((client) => ({
+        value: String(client._id),
+        label: client.company || client.name || `Client ${client._id}`,
+      })),
+    ],
+    [clients],
+  );
 
   const filtered = useMemo(
     () =>
@@ -302,19 +319,35 @@ function LeadManagementPage() {
       }),
     [clients, clientFilters],
   );
-
-  const leadsTotalPages = Math.max(1, Math.ceil(filtered.length / leadsPageSize));
-  const clientsTotalPages = Math.max(1, Math.ceil(filteredClients.length / clientsPageSize));
-
-  const pagedLeads = useMemo(() => {
-    const start = (leadsPage - 1) * leadsPageSize;
-    return filtered.slice(start, start + leadsPageSize);
-  }, [filtered, leadsPage, leadsPageSize]);
-
-  const pagedClients = useMemo(() => {
-    const start = (clientsPage - 1) * clientsPageSize;
-    return filteredClients.slice(start, start + clientsPageSize);
-  }, [filteredClients, clientsPage, clientsPageSize]);
+  const leadInsights = useMemo(() => {
+    const visible = filtered || [];
+    const active = (rows || []).filter((lead) => !lead?.isArchived);
+    const totalValue = visible.reduce((sum, lead) => sum + Number(lead?.value || 0), 0);
+    const won = visible.filter((lead) => normStage(lead?.statusId || lead?.stage) === 'won').length;
+    const hot = visible.filter((lead) => nPriority(lead?.priority) === 'hot').length;
+    const archived = (rows || []).filter((lead) => lead?.isArchived).length;
+    return {
+      activeCount: active.length,
+      visibleCount: visible.length,
+      totalValue,
+      won,
+      hot,
+      archived,
+    };
+  }, [filtered, rows]);
+  const clientInsights = useMemo(() => {
+    const visible = filteredClients || [];
+    const companies = new Set(visible.map((client) => String(client?.company || '').trim()).filter(Boolean)).size;
+    const withPhone = visible.filter((client) => String(client?.phone || '').trim()).length;
+    const archived = (clients || []).filter((client) => client?.isArchived).length;
+    return {
+      visibleCount: visible.length,
+      totalCount: (clients || []).filter((client) => !client?.isArchived).length,
+      companies,
+      withPhone,
+      archived,
+    };
+  }, [clients, filteredClients]);
 
   const selected = useMemo(() => {
     if (!selectedLead) return null;
@@ -333,28 +366,12 @@ function LeadManagementPage() {
   const resetClientFilters = useCallback(() => setClientFilters({ search: '', archiveScope: 'all' }), []);
 
   useEffect(() => {
-    setLeadsPage(1);
+    leadsScrollRef.current?.scrollTo({ top: 0 });
   }, [filters.search, filters.status, filters.priority, filters.source, filters.archiveScope]);
 
   useEffect(() => {
-    setClientsPage(1);
+    clientsScrollRef.current?.scrollTo({ top: 0 });
   }, [clientFilters.search, clientFilters.archiveScope]);
-
-  useEffect(() => {
-    setLeadsPage(1);
-  }, [leadsPageSize]);
-
-  useEffect(() => {
-    setClientsPage(1);
-  }, [clientsPageSize]);
-
-  useEffect(() => {
-    if (leadsPage > leadsTotalPages) setLeadsPage(leadsTotalPages);
-  }, [leadsPage, leadsTotalPages]);
-
-  useEffect(() => {
-    if (clientsPage > clientsTotalPages) setClientsPage(clientsTotalPages);
-  }, [clientsPage, clientsTotalPages]);
 
   const closeRowMenu = useCallback(() => {
     setOpenRowMenuId('');
@@ -597,22 +614,93 @@ function LeadManagementPage() {
 
   const selectedClient = selected?.clientId ? clientLookup.get(String(selected.clientId)) : null;
   const selectedCustom = extractDetails(selected?.customFields);
+  const isLeadTab = tab === 'list';
+  const heroTitle = isLeadTab ? 'Lead Pipeline' : 'Client Directory';
+  const heroSubtitle = isLeadTab
+    ? 'Track opportunity value, stage movement, and priority from one focused workspace.'
+    : 'Manage client records, contact details, and archive state without leaving the list.';
+  const statCards = isLeadTab
+    ? [
+        { label: 'Visible Leads', value: leadInsights.visibleCount, hint: `${leadInsights.activeCount} active total`, tone: 'blue' },
+        { label: 'Pipeline Value', value: fmtInr(leadInsights.totalValue), hint: 'Filtered value', tone: 'green' },
+        { label: 'Won Deals', value: leadInsights.won, hint: 'Current view', tone: 'amber' },
+        { label: 'Hot Leads', value: leadInsights.hot, hint: `${leadInsights.archived} archived`, tone: 'red' },
+      ]
+    : [
+        { label: 'Visible Clients', value: clientInsights.visibleCount, hint: `${clientInsights.totalCount} active total`, tone: 'blue' },
+        { label: 'Companies', value: clientInsights.companies, hint: 'Unique names', tone: 'green' },
+        { label: 'Phone Contacts', value: clientInsights.withPhone, hint: 'Ready to call', tone: 'amber' },
+        { label: 'Archived', value: clientInsights.archived, hint: 'Hidden by default', tone: 'red' },
+      ];
+  const handleExportCurrent = useCallback((format) => {
+    if (isLeadTab) {
+      exportRows({
+        rows: filtered,
+        format,
+        filename: `leads-${new Date().toISOString().slice(0, 10)}`,
+        title: 'Leads Export',
+        columns: [
+          { header: 'Lead', value: (row) => row.title || '-' },
+          { header: 'Status', value: (row) => stageTitle(row.statusId || row.stage) },
+          { header: 'Priority', value: (row) => nPriority(row.priority) },
+          { header: 'Source', value: (row) => nSource(row.source) },
+          { header: 'Value', value: (row) => Number(row.value || 0) },
+          { header: 'Archived', value: (row) => (row.isArchived ? 'Yes' : 'No') },
+        ],
+      });
+      return;
+    }
+    exportRows({
+      rows: filteredClients,
+      format,
+      filename: `clients-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Clients Export',
+      columns: [
+        { header: 'Client', value: (row) => row.name || '-' },
+        { header: 'Company', value: (row) => row.company || '-' },
+        { header: 'Email', value: (row) => row.email || '-' },
+        { header: 'Phone', value: (row) => row.phone || '-' },
+        { header: 'Archived', value: (row) => (row.isArchived ? 'Yes' : 'No') },
+      ],
+    });
+  }, [filtered, filteredClients, isLeadTab]);
 
   return (
     <main className="sv-leads-page relative flex min-h-screen flex-col">
       <div className="sv-leads-stack flex-1 space-y-5 overflow-y-auto p-6">
-        <section className="sv-leads-toolbar flex flex-wrap items-center justify-between gap-3">
-          <div className="sv-leads-tabs inline-flex rounded-lg border border-outline-variant/20 bg-surface-container p-1">
-            <button type="button" onClick={() => setTab('list')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'list' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Leads</button>
-            <button type="button" onClick={() => setTab('clients')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'clients' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Clients</button>
+        <section className="sv-card sv-leads-hero">
+          <div className="sv-leads-hero-main">
+            <div className="sv-leads-eyebrow">
+              <Icon name={isLeadTab ? 'monitoring' : 'groups'} className="text-base" />
+              <span>{isLeadTab ? 'Sales workspace' : 'Customer workspace'}</span>
+            </div>
+            <h1>{heroTitle}</h1>
+            <p>{heroSubtitle}</p>
           </div>
-          {tab === 'list' ? <button type="button" onClick={beginCreate} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white">New Lead</button> : null}
-          {tab === 'clients' ? <button type="button" onClick={beginCreateClient} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white">New Client</button> : null}
+          <div className="sv-leads-hero-side">
+            <div className="sv-leads-tabs inline-flex rounded-lg border border-outline-variant/20 bg-surface-container p-1">
+              <button type="button" onClick={() => setTab('list')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'list' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Leads</button>
+              <button type="button" onClick={() => setTab('clients')} className={`sv-leads-tab-btn rounded-md px-4 py-2 text-sm font-semibold ${tab === 'clients' ? 'is-active bg-primary text-white' : 'text-on-surface-variant'}`}>Clients</button>
+            </div>
+            <ExportMenu onExport={handleExportCurrent} label="Export" disabled={isLeadTab ? !filtered.length : !filteredClients.length} />
+            {isLeadTab ? <button type="button" onClick={beginCreate} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white"><Icon name="add" className="text-base" />New Lead</button> : null}
+            {!isLeadTab ? <button type="button" onClick={beginCreateClient} className="btn btn-primary sv-ctl-btn sv-leads-primary-btn rounded-lg px-4 py-2 text-sm font-semibold text-white"><Icon name="person_add" className="text-base" />New Client</button> : null}
+          </div>
         </section>
 
-        {tab === 'list' ? (
+        <section className="sv-leads-insights" aria-label={`${heroTitle} metrics`}>
+          {statCards.map((card) => (
+            <article key={card.label} className={`sv-leads-insight-card is-${card.tone}`}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.hint}</small>
+            </article>
+          ))}
+        </section>
+
+        {isLeadTab ? (
           <>
-            <section className="sv-leads-filter-bar grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+            <section className="sv-leads-filter-bar sv-card grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
               <input value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search lead title..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
               <button
                 type="button"
@@ -626,29 +714,17 @@ function LeadManagementPage() {
             </section>
             {isLeadFilterOpen ? (
               <section className="sv-leads-filters sv-leads-filters-panel grid grid-cols-1 gap-2 md:grid-cols-[170px_170px_170px_170px_auto]">
-                <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                  <option value="all">All Status</option>
-                  {STAGES.map((stage) => <option key={stage.statusId} value={stage.statusId}>{stage.title}</option>)}
-                </select>
-                <select value={filters.priority} onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                  <option value="all">All Priority</option>
-                  {PRIORITY_VALUES.map((priority) => <option key={priority} value={priority}>{priority[0].toUpperCase() + priority.slice(1)}</option>)}
-                </select>
-                <select value={filters.source} onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                  <option value="all">All Source</option>
-                  {SOURCE_VALUES.map((source) => <option key={source} value={source}>{source[0].toUpperCase() + source.slice(1)}</option>)}
-                </select>
-                <select value={filters.archiveScope} onChange={(e) => setFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                  <option value="all">All (Active)</option>
-                  <option value="archived">Archived Only</option>
-                </select>
+                <SelectDropdown value={filters.status} onChange={(nextValue) => setFilters((p) => ({ ...p, status: nextValue }))} options={[{ value: 'all', label: 'All Status' }, ...STAGE_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+                <SelectDropdown value={filters.priority} onChange={(nextValue) => setFilters((p) => ({ ...p, priority: nextValue }))} options={[{ value: 'all', label: 'All Priority' }, ...PRIORITY_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+                <SelectDropdown value={filters.source} onChange={(nextValue) => setFilters((p) => ({ ...p, source: nextValue }))} options={[{ value: 'all', label: 'All Source' }, ...SOURCE_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+                <SelectDropdown value={filters.archiveScope} onChange={(nextValue) => setFilters((p) => ({ ...p, archiveScope: nextValue }))} options={[{ value: 'all', label: 'All (Active)' }, { value: 'archived', label: 'Archived Only' }]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
                 <button type="button" onClick={resetFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
               </section>
             ) : null}
 
             {leadsError ? <div className="sv-leads-alert rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{leadsError}</div> : null}
 
-            <section className="sv-card sv-leads-table-card overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
+            <section className="sv-card sv-leads-table-card sv-list-scroll rounded-xl border border-outline-variant/10 bg-surface-container-lowest" ref={leadsScrollRef}>
               <table className="sv-leads-table w-full min-w-[1150px] text-left">
                 <thead>
                   <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
@@ -658,7 +734,7 @@ function LeadManagementPage() {
                     <th className="px-3 py-3">Priority</th>
                     <th className="px-3 py-3">Source</th>
                     <th className="px-3 py-3">Value</th>
-                    <th className="px-3 py-3 text-right sv-leads-actions-cell">Action</th>
+                    <th className="px-3 py-3 sv-row-action-heading sv-leads-actions-cell">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,27 +743,25 @@ function LeadManagementPage() {
                       <td colSpan={7} className="px-3 py-4"><div className="h-8 animate-pulse rounded bg-surface-container-high" /></td>
                     </tr>
                   )) : null}
-                  {!leadsLoading && pagedLeads.map((lead) => {
+                  {!leadsLoading && filtered.map((lead) => {
                     const id = leadId(lead);
                     const currentStatus = normStage(lead.statusId || lead.stage);
                     return (
                       <tr key={id} className="sv-leads-row border-b border-outline-variant/10">
                         <td className="px-3 py-3 text-sm font-semibold text-on-surface">
                           <div className="inline-flex items-center gap-2">
-                            <span>{lead.title || '-'}</span>
+                            <button type="button" className="sv-name-open-btn" onClick={() => setSelectedLead(lead)}>{lead.title || '-'}</button>
                             {lead.isArchived ? <span className="sv-leads-archive-pill rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
                           </div>
                         </td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{stageTitle(currentStatus)}</td>
                         <td className="px-3 py-3">
-                          <select value={currentStatus} onChange={(e) => openMove(lead, e.target.value)} className="form-select form-select-sm sv-ctl-select sv-leads-move-select rounded-lg border border-outline-variant/20 bg-surface px-2 py-1 text-sm">
-                            {STAGES.map((stage) => <option key={`${id}-${stage.statusId}`} value={stage.statusId}>{stage.title}</option>)}
-                          </select>
+                          <SelectDropdown value={currentStatus} onChange={(nextValue) => openMove(lead, nextValue)} options={STAGE_OPTIONS} triggerClassName="sv-leads-move-select rounded-lg border border-outline-variant/20 bg-surface px-2 py-1 text-sm" />
                         </td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nPriority(lead.priority)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nSource(lead.source)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{fmtInr(lead.value)}</td>
-                        <td className="px-3 py-3 text-right sv-leads-actions-cell">
+                        <td className="px-3 py-3 sv-row-action-cell sv-leads-actions-cell">
                           <div className="sv-row-menu-container">
                             <button
                               type="button"
@@ -709,21 +783,21 @@ function LeadManagementPage() {
                       <td colSpan={7} className="px-3 py-10 text-center text-sm text-on-surface-variant">{(rows || []).length ? 'No leads match current filters.' : 'No leads yet. Create your first lead to get started.'}</td>
                     </tr>
                   ) : null}
+                  {!leadsLoading && filtered.length ? (
+                    <tr>
+                      <td colSpan={7} className="sv-list-sentinel-cell">
+                        <span ref={leadSentinelRef} className="sv-list-sentinel" />
+                        {leadsLoadingMore ? 'Loading more leads...' : leadsHasMore ? 'Scroll for more' : 'End of list'}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </section>
-            <PaginationControls
-              page={leadsPage}
-              totalPages={leadsTotalPages}
-              totalItems={filtered.length}
-              pageSize={leadsPageSize}
-              onPageChange={setLeadsPage}
-              onPageSizeChange={setLeadsPageSize}
-            />
           </>
         ) : (
           <>
-            <section className="sv-leads-filter-bar grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+            <section className="sv-leads-filter-bar sv-card grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
               <input value={clientFilters.search} onChange={(e) => setClientFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Search client name, company, email..." className="form-control form-control-sm sv-ctl-input sv-leads-filter-input rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
               <button
                 type="button"
@@ -737,15 +811,20 @@ function LeadManagementPage() {
             </section>
             {isClientFilterOpen ? (
               <section className="sv-leads-filters sv-leads-filters-panel grid grid-cols-1 gap-2 md:grid-cols-[190px_auto]">
-                <select value={clientFilters.archiveScope} onChange={(e) => setClientFilters((p) => ({ ...p, archiveScope: e.target.value }))} className="form-select form-select-sm sv-ctl-select sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">
-                  <option value="all">All (Active)</option>
-                  <option value="archived">Archived Only</option>
-                  <option value="with-archived">With Archived</option>
-                </select>
+                <SelectDropdown
+                  value={clientFilters.archiveScope}
+                  onChange={(nextValue) => setClientFilters((p) => ({ ...p, archiveScope: nextValue }))}
+                  options={[
+                    { value: 'all', label: 'All (Active)' },
+                    { value: 'archived', label: 'Archived Only' },
+                    { value: 'with-archived', label: 'With Archived' },
+                  ]}
+                  triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm"
+                />
                 <button type="button" onClick={resetClientFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
               </section>
             ) : null}
-            <section className="sv-card sv-leads-table-card overflow-x-auto rounded-xl border border-outline-variant/10 bg-surface-container-lowest">
+            <section className="sv-card sv-leads-table-card sv-list-scroll rounded-xl border border-outline-variant/10 bg-surface-container-lowest" ref={clientsScrollRef}>
               <table className="sv-leads-table w-full min-w-[700px] text-left">
                 <thead>
                   <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
@@ -753,7 +832,7 @@ function LeadManagementPage() {
                     <th className="px-3 py-3">Company</th>
                     <th className="px-3 py-3">Email</th>
                     <th className="px-3 py-3">Phone</th>
-                    <th className="px-3 py-3 text-right sv-leads-actions-cell">Action</th>
+                    <th className="px-3 py-3 sv-row-action-heading sv-leads-actions-cell">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -762,18 +841,18 @@ function LeadManagementPage() {
                       <td colSpan={5} className="px-3 py-4"><div className="h-7 animate-pulse rounded bg-surface-container-high" /></td>
                     </tr>
                   )) : null}
-                  {!clientsLoading && pagedClients.map((client) => (
+                  {!clientsLoading && filteredClients.map((client) => (
                     <tr key={`client-row-${client._id}`} className="sv-leads-row border-b border-outline-variant/10">
                       <td className="px-3 py-3 text-sm font-semibold text-on-surface">
                         <div className="inline-flex items-center gap-2">
-                          <span>{client.name || '-'}</span>
+                          <button type="button" className="sv-name-open-btn" onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', String(client._id)))}>{client.name || '-'}</button>
                           {client?.isArchived ? <span className="sv-leads-archive-pill rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
                         </div>
                       </td>
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.company || '-'}</td>
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.email || '-'}</td>
                       <td className="px-3 py-3 text-sm text-on-surface-variant">{client.phone || '-'}</td>
-                      <td className="px-3 py-3 text-right sv-leads-actions-cell">
+                      <td className="px-3 py-3 sv-row-action-cell sv-leads-actions-cell">
                         <div className="sv-row-menu-container">
                           <button
                             type="button"
@@ -792,17 +871,17 @@ function LeadManagementPage() {
                   {!clientsLoading && !filteredClients.length ? (
                     <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-on-surface-variant">{(clients || []).length ? 'No clients match current filters.' : 'No clients found.'}</td></tr>
                   ) : null}
+                  {!clientsLoading && filteredClients.length ? (
+                    <tr>
+                      <td colSpan={5} className="sv-list-sentinel-cell">
+                        <span ref={clientSentinelRef} className="sv-list-sentinel" />
+                        {clientsLoadingMore ? 'Loading more clients...' : clientsHasMore ? 'Scroll for more' : 'End of list'}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </section>
-            <PaginationControls
-              page={clientsPage}
-              totalPages={clientsTotalPages}
-              totalItems={filteredClients.length}
-              pageSize={clientsPageSize}
-              onPageChange={setClientsPage}
-              onPageSizeChange={setClientsPageSize}
-            />
           </>
         )}
       </div>
@@ -973,19 +1052,16 @@ function LeadManagementPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input value={createForm.title} onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
-              <select value={createForm.statusId} onChange={(e) => setCreateForm((p) => ({ ...p, statusId: normStage(e.target.value) }))} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">{STAGES.map((s) => <option key={`create-stage-${s.statusId}`} value={s.statusId}>{s.title}</option>)}</select>
+              <SelectDropdown value={createForm.statusId} onChange={(nextValue) => setCreateForm((p) => ({ ...p, statusId: normStage(nextValue) }))} options={STAGE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <input value={createForm.value} onChange={(e) => setCreateForm((p) => ({ ...p, value: e.target.value }))} type="number" min="0" placeholder="Value (INR)" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
-              <input value={createForm.expectedCloseDate} onChange={(e) => setCreateForm((p) => ({ ...p, expectedCloseDate: e.target.value }))} type="date" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+              <DatePicker value={createForm.expectedCloseDate} onChange={(nextValue) => setCreateForm((p) => ({ ...p, expectedCloseDate: nextValue }))} className="w-full" triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" placeholder="Expected close" />
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              <select value={createForm.priority} onChange={(e) => setCreateForm((p) => ({ ...p, priority: nPriority(e.target.value) }))} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">{PRIORITY_VALUES.map((x) => <option key={`create-priority-${x}`} value={x}>{x[0].toUpperCase() + x.slice(1)}</option>)}</select>
-              <select value={createForm.source} onChange={(e) => setCreateForm((p) => ({ ...p, source: nSource(e.target.value) }))} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">{SOURCE_VALUES.map((x) => <option key={`create-source-${x}`} value={x}>{x[0].toUpperCase() + x.slice(1)}</option>)}</select>
-              <select value={createForm.clientId} onChange={(e) => handleCreateClientChange(e.target.value)} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">
-                <option value="">No Client</option>
-                {(clients || []).map((client) => <option key={`create-client-${client._id}`} value={String(client._id)}>{client.company || client.name || `Client ${client._id}`}</option>)}
-              </select>
+              <SelectDropdown value={createForm.priority} onChange={(nextValue) => setCreateForm((p) => ({ ...p, priority: nPriority(nextValue) }))} options={PRIORITY_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+              <SelectDropdown value={createForm.source} onChange={(nextValue) => setCreateForm((p) => ({ ...p, source: nSource(nextValue) }))} options={SOURCE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+              <SelectDropdown value={createForm.clientId} onChange={handleCreateClientChange} options={clientOptions} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
             <div className="sv-leads-profile-block mt-3">
               <h4 className="text-sm font-semibold text-on-surface-variant">Profile Details</h4>
@@ -1010,18 +1086,15 @@ function LeadManagementPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input value={editForm.title} onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
-              <input value={editForm.expectedCloseDate} onChange={(e) => setEditForm((p) => ({ ...p, expectedCloseDate: e.target.value }))} type="date" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+              <DatePicker value={editForm.expectedCloseDate} onChange={(nextValue) => setEditForm((p) => ({ ...p, expectedCloseDate: nextValue }))} className="w-full" triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" placeholder="Expected close" />
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
               <input value={editForm.value} onChange={(e) => setEditForm((p) => ({ ...p, value: e.target.value }))} type="number" min="0" placeholder="Value (INR)" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
-              <select value={editForm.priority} onChange={(e) => setEditForm((p) => ({ ...p, priority: nPriority(e.target.value) }))} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">{PRIORITY_VALUES.map((x) => <option key={`edit-priority-${x}`} value={x}>{x[0].toUpperCase() + x.slice(1)}</option>)}</select>
-              <select value={editForm.source} onChange={(e) => setEditForm((p) => ({ ...p, source: nSource(e.target.value) }))} className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">{SOURCE_VALUES.map((x) => <option key={`edit-source-${x}`} value={x}>{x[0].toUpperCase() + x.slice(1)}</option>)}</select>
+              <SelectDropdown value={editForm.priority} onChange={(nextValue) => setEditForm((p) => ({ ...p, priority: nPriority(nextValue) }))} options={PRIORITY_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+              <SelectDropdown value={editForm.source} onChange={(nextValue) => setEditForm((p) => ({ ...p, source: nSource(nextValue) }))} options={SOURCE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
             <div className="mt-2">
-              <select value={editForm.clientId} onChange={(e) => handleEditClientChange(e.target.value)} className="w-full rounded-lg border border-outline-variant/20 px-3 py-2 text-sm">
-                <option value="">No Client</option>
-                {(clients || []).map((client) => <option key={`edit-client-${client._id}`} value={String(client._id)}>{client.company || client.name || `Client ${client._id}`}</option>)}
-              </select>
+              <SelectDropdown value={editForm.clientId} onChange={handleEditClientChange} options={clientOptions} triggerClassName="w-full rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
             <div className="sv-leads-profile-block mt-3">
               <h4 className="text-sm font-semibold text-on-surface-variant">Profile Details</h4>

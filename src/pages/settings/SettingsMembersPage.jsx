@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '../../components/ui/Icon';
 import DeniedActionButton from '../../components/ui/DeniedActionButton';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import { useWorkspaceMembers } from '../../hooks/useWorkspaceMembers';
 import { usePermission } from '../../hooks/usePermission';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
 import SettingsTabs from './SettingsTabs';
 
 const ROLE_OPTIONS = ['owner', 'admin', 'member', 'viewer'];
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
+const ROLE_DROPDOWN_OPTIONS = ROLE_OPTIONS.map((role) => ({ value: role, label: role }));
 
 function SettingsMembersPage() {
   const { role } = usePermission();
@@ -18,13 +20,16 @@ function SettingsMembersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(8);
+  const [limit] = useState(100);
+  const listScrollRef = useRef(null);
 
   const {
     listItems,
     listMeta,
     loadingList,
+    loadingMoreList,
+    hasMoreList,
+    loadMoreList,
     listError,
     canManageMembers,
     inviteMember,
@@ -36,7 +41,6 @@ function SettingsMembersPage() {
     removeMemberState,
   } = useWorkspaceMembers({
     view,
-    page,
     limit,
     search,
     role: roleFilter,
@@ -44,16 +48,13 @@ function SettingsMembersPage() {
 
   const isInvitesView = view === 'invites';
   const totalItems = listMeta.total || 0;
-  const totalPages = Math.max(listMeta.pages || 1, 1);
-  const currentPage = Math.min(Math.max(page, 1), totalPages);
-  const startIndex = totalItems > 0 ? (currentPage - 1) * limit + 1 : 0;
-  const endIndex = totalItems > 0 ? Math.min((currentPage - 1) * limit + listItems.length, totalItems) : 0;
-
-  const paginationNumbers = useMemo(() => {
-    if (totalPages <= 1) return [1];
-    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-    return [...pages].filter((num) => num >= 1 && num <= totalPages).sort((a, b) => a - b);
-  }, [currentPage, totalPages]);
+  const listSentinelRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (hasMoreList && !loadingMoreList) void loadMoreList();
+    },
+    disabled: !hasMoreList || loadingMoreList,
+  });
 
   useEffect(() => {
     const timeout = setTimeout(() => setSearch(searchInput.trim()), 250);
@@ -100,9 +101,6 @@ function SettingsMembersPage() {
     setActionError('');
     try {
       await removeMember(userId);
-      if (listItems.length === 1 && page > 1) {
-        setPage((prev) => Math.max(1, prev - 1));
-      }
     } catch (error) {
       setActionError(error.message || 'Failed to remove member');
     }
@@ -112,9 +110,6 @@ function SettingsMembersPage() {
     setActionError('');
     try {
       await revokeInvite(inviteId);
-      if (listItems.length === 1 && page > 1) {
-        setPage((prev) => Math.max(1, prev - 1));
-      }
     } catch (error) {
       setActionError(error.message || 'Failed to revoke invite');
     }
@@ -125,8 +120,6 @@ function SettingsMembersPage() {
     setSearch('');
     setRoleFilter('all');
     setView('members');
-    setLimit(8);
-    setPage(1);
   };
 
   return (
@@ -183,7 +176,7 @@ function SettingsMembersPage() {
                   value={searchInput}
                   onChange={(event) => {
                     setSearchInput(event.target.value);
-                    setPage(1);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                   placeholder={isInvitesView ? 'Search pending invites...' : 'Search workspace members...'}
                   className="sv-settings-input"
@@ -191,38 +184,15 @@ function SettingsMembersPage() {
               </label>
               <label className="sv-settings-field">
                 <span className="sv-settings-label">Role</span>
-                <select
+                <SelectDropdown
                   value={roleFilter}
-                  onChange={(event) => {
-                    setRoleFilter(event.target.value);
-                    setPage(1);
+                  onChange={(nextValue) => {
+                    setRoleFilter(nextValue);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
-                  className="sv-settings-input capitalize"
-                >
-                  <option value="all">All roles</option>
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role} value={role} className="capitalize">
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="sv-settings-field">
-                <span className="sv-settings-label">Rows per page</span>
-                <select
-                  value={limit}
-                  onChange={(event) => {
-                    setLimit(Number(event.target.value) || 8);
-                    setPage(1);
-                  }}
-                  className="sv-settings-input"
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: 'all', label: 'All roles' }, ...ROLE_DROPDOWN_OPTIONS]}
+                  triggerClassName="sv-settings-input capitalize"
+                />
               </label>
             </div>
 
@@ -235,7 +205,7 @@ function SettingsMembersPage() {
                   aria-selected={!isInvitesView}
                   onClick={() => {
                     setView('members');
-                    setPage(1);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                 >
                   Members
@@ -250,7 +220,7 @@ function SettingsMembersPage() {
                   onClick={() => {
                     if (!canManageMembers) return;
                     setView('invites');
-                    setPage(1);
+                    listScrollRef.current?.scrollTo({ top: 0 });
                   }}
                 >
                   Pending Invites
@@ -277,7 +247,7 @@ function SettingsMembersPage() {
               <div className="h-10 animate-pulse rounded-lg bg-surface-container" />
             </div>
           ) : listItems.length ? (
-            <div className="sv-settings-table-wrap">
+            <div className="sv-settings-table-wrap sv-list-scroll" ref={listScrollRef}>
               <table className="sv-settings-table">
                 {!isInvitesView ? (
                   <>
@@ -297,18 +267,13 @@ function SettingsMembersPage() {
                           <td className="text-sm text-on-surface-variant">{member.email}</td>
                           <td>
                             {canManageMembers ? (
-                              <select
+                              <SelectDropdown
                                 value={member.role}
-                                onChange={(event) => handleRoleChange(member.userId, event.target.value)}
+                                onChange={(nextValue) => handleRoleChange(member.userId, nextValue)}
                                 disabled={updateRoleState.isPending}
-                                className="sv-settings-table-select capitalize"
-                              >
-                                {ROLE_OPTIONS.map((role) => (
-                                  <option key={role} value={role} className="capitalize">
-                                    {role}
-                                  </option>
-                                ))}
-                              </select>
+                                options={ROLE_DROPDOWN_OPTIONS}
+                                triggerClassName="sv-settings-table-select capitalize"
+                              />
                             ) : (
                               <span className="inline-flex rounded-full bg-surface-container px-2 py-1 text-xs capitalize">{member.role}</span>
                             )}
@@ -335,6 +300,12 @@ function SettingsMembersPage() {
                           </td>
                         </tr>
                       ))}
+                      <tr>
+                        <td colSpan={5} className="sv-list-sentinel-cell">
+                          <span ref={listSentinelRef} className="sv-list-sentinel" />
+                          {loadingMoreList ? 'Loading more members...' : hasMoreList ? 'Scroll for more' : 'End of list'}
+                        </td>
+                      </tr>
                     </tbody>
                   </>
                 ) : (
@@ -377,6 +348,12 @@ function SettingsMembersPage() {
                           </td>
                         </tr>
                       ))}
+                      <tr>
+                        <td colSpan={5} className="sv-list-sentinel-cell">
+                          <span ref={listSentinelRef} className="sv-list-sentinel" />
+                          {loadingMoreList ? 'Loading more invites...' : hasMoreList ? 'Scroll for more' : 'End of list'}
+                        </td>
+                      </tr>
                     </tbody>
                   </>
                 )}
@@ -388,39 +365,6 @@ function SettingsMembersPage() {
             </p>
           )}
 
-          <div className="sv-settings-members-pagination">
-            <div className="sv-settings-members-pagination-meta">
-              Showing {startIndex}-{endIndex} of {totalItems}
-            </div>
-            <div className="sv-settings-members-pagination-controls">
-              <button
-                type="button"
-                className="sv-settings-btn sv-settings-btn-neutral"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              >
-                Prev
-              </button>
-              {paginationNumbers.map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  className={`sv-settings-btn sv-settings-btn-neutral ${num === currentPage ? 'is-active' : ''}`}
-                  onClick={() => setPage(num)}
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="sv-settings-btn sv-settings-btn-neutral"
-                disabled={currentPage >= totalPages}
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </section>
 
         {isInviteModalOpen ? (
@@ -465,17 +409,12 @@ function SettingsMembersPage() {
                       </label>
                       <label className="sv-settings-field">
                         <span className="sv-settings-label">Role</span>
-                        <select
+                        <SelectDropdown
                           value={inviteForm.role}
-                          onChange={(event) => setInviteForm((prev) => ({ ...prev, role: event.target.value }))}
-                          className="sv-settings-input capitalize"
-                        >
-                          {ROLE_OPTIONS.map((role) => (
-                            <option key={role} value={role} className="capitalize">
-                              {role}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(nextValue) => setInviteForm((prev) => ({ ...prev, role: nextValue }))}
+                          options={ROLE_DROPDOWN_OPTIONS}
+                          triggerClassName="sv-settings-input capitalize"
+                        />
                       </label>
                     </div>
                     <div className="sv-settings-form-actions justify-content-end mt-3">

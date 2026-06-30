@@ -2,21 +2,68 @@
 .sv-analytics-page {
   width: 100%;
   padding-top: 0.24rem;
+  background:
+    radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--color-accent) 11%, transparent), transparent 30rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 52%, transparent), transparent 28rem);
 }
 
 .sv-analytics-container {
-  width: min(1480px, 100%);
-  padding: 0.72rem 0.78rem 0.9rem;
+  width: min(1500px, 100%);
+  padding: 1rem 1.15rem 1.15rem;
 }
 
 .sv-analytics-header {
+  position: relative;
+  overflow: hidden;
   margin-bottom: 0.1rem;
+  padding: 1.18rem !important;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  border-radius: 1.08rem !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 68%, white)),
+    radial-gradient(circle at 94% 0%, color-mix(in srgb, var(--color-accent) 17%, transparent), transparent 19rem);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.075);
+}
+
+.sv-analytics-header::after {
+  content: "";
+  position: absolute;
+  right: -4rem;
+  top: -4.7rem;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  pointer-events: none;
+}
+
+.sv-analytics-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sv-analytics-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.38rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 20%, var(--color-border));
+  border-radius: 999px;
+  padding: 0.3rem 0.62rem;
+  background: color-mix(in srgb, var(--color-accent) 9%, transparent);
+  color: var(--color-accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
 }
 
 .sv-analytics-title {
-  margin: 0;
-  font-size: clamp(1.9rem, 2.8vw, 2.75rem);
-  line-height: 1.05;
+  margin: 0.42rem 0 0;
+  font-size: clamp(2.05rem, 3.35vw, 3.55rem);
+  line-height: 0.98;
+  font-weight: 900;
+  letter-spacing: -0.06em;
 }
 
 .sv-analytics-subtitle {
@@ -27,6 +74,7 @@
 .sv-analytics-actions {
   align-items: center;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .sv-analytics-filter-toggle {
@@ -59,8 +107,12 @@
 }
 
 .sv-analytics-filters {
-  padding: 0.86rem;
-  border-radius: 0.88rem !important;
+  padding: 0.92rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 76%, white) !important;
+  border-radius: 1rem !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 70%, white));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
   overflow: hidden;
   transform-origin: top;
   transition:
@@ -114,25 +166,89 @@
 }
 
 .sv-analytics-kpi {
+  position: relative;
+  overflow: hidden;
   min-height: 176px;
-  padding: 0.9rem 0.95rem;
-  border-radius: 0.9rem !important;
+  padding: 1rem 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white) !important;
+  border-radius: 1.05rem !important;
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent) !important;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07) !important;
+}
+
+.sv-analytics-kpi::after {
+  content: "";
+  position: absolute;
+  right: -2.9rem;
+  bottom: -3.9rem;
+  width: 8.8rem;
+  height: 8.8rem;
+  border-radius: 999px;
+  opacity: 0.16;
+  background: var(--analytics-kpi-tone, var(--color-accent));
+}
+
+.sv-analytics-kpi.is-blue { --analytics-kpi-tone: #2563eb; }
+.sv-analytics-kpi.is-green { --analytics-kpi-tone: #059669; }
+.sv-analytics-kpi.is-amber { --analytics-kpi-tone: #d97706; }
+.sv-analytics-kpi.is-purple { --analytics-kpi-tone: #7c3aed; }
+
+.sv-analytics-kpi-icon {
+  position: absolute;
+  right: 0.95rem;
+  top: 0.9rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 0.76rem;
+  background: color-mix(in srgb, var(--analytics-kpi-tone, var(--color-accent)) 12%, transparent);
+  color: var(--analytics-kpi-tone, var(--color-accent));
+}
+
+.sv-analytics-kpi > :not(.sv-analytics-kpi-icon) {
+  position: relative;
+  z-index: 1;
 }
 
 .sv-analytics-kpi-label {
-  font-size: 0.78rem;
+  max-width: calc(100% - 2.8rem);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
 }
 
 .sv-analytics-kpi-value {
-  margin: 0.34rem 0 0;
-  font-size: clamp(1.9rem, 2.6vw, 2.35rem);
-  line-height: 1.06;
+  max-width: 100%;
+  margin: 0.44rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(1.72rem, 2.55vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.sv-analytics-kpi-hint {
+  margin: 0.52rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .sv-analytics-kpi-link {
   display: inline-flex;
   align-items: center;
+  gap: 0.26rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  padding: 0;
   font-size: 0.78rem;
+  font-weight: 850;
 }
 
 .sv-analytics-grid {
@@ -140,8 +256,12 @@
 }
 
 .sv-analytics-chart-panel {
-  padding: 0.88rem;
-  border-radius: 0.9rem !important;
+  overflow: hidden;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white) !important;
+  border-radius: 1.05rem !important;
+  background: color-mix(in srgb, var(--color-surface) 98%, transparent) !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07) !important;
 }
 
 .sv-analytics-chart-head {
@@ -150,7 +270,9 @@
 
 .sv-analytics-chart-title {
   margin: 0;
-  font-size: clamp(1.02rem, 1.8vw, 1.34rem);
+  font-size: clamp(1.18rem, 1.8vw, 1.55rem);
+  font-weight: 900;
+  letter-spacing: -0.035em;
 }
 
 .sv-analytics-chart-subtitle {
@@ -161,8 +283,11 @@
 .sv-analytics-chart-wrap {
   width: 100%;
   background:
-    linear-gradient(to bottom, color-mix(in srgb, var(--color-accent) 4%, transparent), transparent 36%);
-  border-radius: 0.72rem;
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 78%, white), color-mix(in srgb, var(--color-surface) 95%, white)),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 50%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  border-radius: 0.92rem;
+  padding: 0.55rem;
 }
 
 .sv-analytics-chart-empty,
@@ -171,11 +296,18 @@
 }
 
 .sv-analytics-inline-link {
-  font-size: 0.76rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 850;
 }
 
 .sv-analytics-mini-table {
-  border-radius: 0.72rem !important;
+  border-color: color-mix(in srgb, var(--color-border) 74%, white) !important;
+  border-radius: 0.82rem !important;
+  background: var(--color-surface);
 }
 
 .sv-analytics-mini-table table {
@@ -183,14 +315,22 @@
 }
 
 .sv-analytics-mini-table thead th {
-  font-size: 0.68rem;
-  letter-spacing: 0.03em;
+  padding: 0.68rem 0.78rem !important;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
 .sv-analytics-mini-table tbody td {
-  font-size: 0.74rem;
+  padding: 0.68rem 0.78rem !important;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 58%, transparent);
+  font-size: 0.78rem;
   line-height: 1.35;
+}
+
+.sv-analytics-mini-table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
 }
 
 .sv-analytics-mini-btn {
@@ -206,12 +346,16 @@
 
 .sv-analytics-mini-stat {
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, white);
-  border-radius: 0.62rem !important;
+  border-radius: 0.72rem !important;
+  background: color-mix(in srgb, var(--color-surface-muted) 82%, white) !important;
 }
 
 .sv-analytics-campaigns {
-  padding: 0.9rem;
-  border-radius: 0.9rem !important;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white) !important;
+  border-radius: 1.05rem !important;
+  background: color-mix(in srgb, var(--color-surface) 98%, transparent) !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07) !important;
 }
 
 .sv-analytics-campaigns-head {
@@ -220,21 +364,74 @@
 
 .sv-analytics-section-title {
   margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.85rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
 .sv-analytics-campaign-card {
-  border-radius: 0.72rem !important;
-  padding: 0.62rem 0.68rem;
+  position: relative;
+  overflow: hidden;
+  min-height: 7.1rem;
+  border-color: color-mix(in srgb, var(--color-border) 76%, white) !important;
+  border-radius: 0.9rem !important;
+  padding: 0.8rem 0.88rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface-muted) 72%, white)) !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
+}
+
+.sv-analytics-campaign-card::after {
+  content: "";
+  position: absolute;
+  right: -2.5rem;
+  bottom: -3rem;
+  width: 6.6rem;
+  height: 6.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 9%, transparent);
+}
+
+.sv-analytics-campaign-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sv-analytics-campaign-card:hover,
+.sv-analytics-campaign-card:focus-visible {
+  outline: 0;
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-border)) !important;
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.085);
+  transform: translateY(-1px);
+}
+
+.sv-analytics-campaign-status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  min-height: 1.38rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  border-radius: 999px;
+  padding: 0.14rem 0.48rem;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  color: var(--color-accent);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }
 
 .sv-analytics-campaign-title {
-  font-size: 0.9rem;
+  margin: 0.58rem 0 0;
+  font-size: 0.95rem;
   line-height: 1.25;
 }
 
 .sv-analytics-campaign-meta,
 .sv-analytics-campaign-stats {
-  font-size: 0.73rem;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .sv-analytics-empty-note {
@@ -273,6 +470,7 @@
 
 html[data-theme='dark'] .sv-analytics-chart-panel,
 html[data-theme='dark'] .sv-analytics-kpi,
+html[data-theme='dark'] .sv-analytics-header,
 html[data-theme='dark'] .sv-analytics-filters,
 html[data-theme='dark'] .sv-analytics-campaigns,
 html[data-theme='dark'] .sv-analytics-mini-stat,
@@ -321,6 +519,7 @@ html[data-theme='dark'] .sv-analytics-filter-toggle.is-active {
 
   .sv-analytics-actions {
     justify-content: flex-start;
+    width: 100%;
   }
 
   .sv-analytics-filters-row {
@@ -344,7 +543,7 @@ html[data-theme='dark'] .sv-analytics-filter-toggle.is-active {
   }
 
   .sv-analytics-title {
-    font-size: clamp(1.5rem, 8vw, 2rem);
+    font-size: clamp(1.82rem, 8vw, 2.35rem);
   }
 
   .sv-analytics-actions {

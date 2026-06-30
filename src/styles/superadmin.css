@@ -862,13 +862,15 @@
 .sv-main-content .sv-userdatas-action-heading,
 .sv-main-content .sv-userdatas-action-cell {
   width: 5.5rem;
-  text-align: right !important;
+  text-align: center !important;
+  vertical-align: middle;
 }
 
 .sv-main-content .sv-userdatas-action-menu {
   position: relative;
   display: inline-flex;
-  justify-content: flex-end;
+  justify-content: center;
+  width: 100%;
 }
 
 .sv-main-content .sv-userdatas-action-trigger {

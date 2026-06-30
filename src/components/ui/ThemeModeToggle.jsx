@@ -1,23 +1,20 @@
 import useThemeMode from '../../hooks/useThemeMode';
 
 function ThemeModeToggle({ className = '' }) {
-  const { mode, setMode } = useThemeMode();
+  const { effectiveTheme, setMode } = useThemeMode();
   
-  // Toggle between light and dark
   const toggleTheme = () => {
-    setMode(mode === 'light' ? 'dark' : 'light');
+    setMode(effectiveTheme === 'dark' ? 'light' : 'dark');
   };
   
-  // Show the icon for the theme we would switch TO
-  const nextThemeIcon = mode === 'light' ? 'bi-moon-stars' : 'bi-sun';
-  const nextThemeLabel = mode === 'light' ? 'Dark' : 'Light';
+  const nextThemeIcon = effectiveTheme === 'dark' ? 'bi-sun' : 'bi-moon-stars';
+  const nextThemeLabel = effectiveTheme === 'dark' ? 'Light' : 'Dark';
 
   return (
     <button
       type="button"
-      className={`btn btn-sm btn-outline-secondary sv-focus-ring d-flex align-items-center justify-content-center ${className}`.trim()}
+      className={`btn btn-sm btn-outline-secondary sv-focus-ring sv-theme-toggle-btn d-flex align-items-center justify-content-center ${className}`.trim()}
       onClick={toggleTheme}
-      style={{ width: 38, height: 38, padding: 0 }}
       title={`Switch to ${nextThemeLabel.toLowerCase()} mode`}
       aria-label={`Switch to ${nextThemeLabel.toLowerCase()} mode`}
     >
@@ -27,4 +24,3 @@ function ThemeModeToggle({ className = '' }) {
 }
 
 export default ThemeModeToggle;
-

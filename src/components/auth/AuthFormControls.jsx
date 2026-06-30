@@ -34,17 +34,49 @@ export function TextField({
   if (!floating) {
     return (
       <div className="sv-input-field position-relative">
+        <div className={`sv-field-control ${canTogglePassword ? 'has-password-toggle' : ''}`}>
+          <input
+            id={id}
+            type={inputType}
+            className={`form-control ${error ? 'is-invalid' : ''}`}
+            placeholder={placeholder || label}
+            autoComplete={autoComplete}
+            aria-label={label}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            {...register}
+          />
+          {canTogglePassword ? (
+            <button
+              type="button"
+              className="btn btn-sm sv-password-toggle"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
+            >
+              <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <FieldError id={errorId} error={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="form-floating sv-floating-field">
+      <div className={`sv-field-control ${canTogglePassword ? 'has-password-toggle' : ''}`}>
         <input
           id={id}
           type={inputType}
-          className={`form-control ${error ? 'is-invalid' : ''} ${canTogglePassword ? 'pe-5' : ''}`}
+          className={`form-control ${error ? 'is-invalid' : ''}`}
           placeholder={placeholder || label}
           autoComplete={autoComplete}
-          aria-label={label}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
           {...register}
         />
+        <label htmlFor={id}>{label}</label>
         {canTogglePassword ? (
           <button
             type="button"
@@ -56,35 +88,7 @@ export function TextField({
             <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
           </button>
         ) : null}
-        <FieldError id={errorId} error={error} />
       </div>
-    );
-  }
-
-  return (
-    <div className="form-floating sv-floating-field">
-      <input
-        id={id}
-        type={inputType}
-        className={`form-control ${error ? 'is-invalid' : ''} ${canTogglePassword ? 'pe-5' : ''}`}
-        placeholder={placeholder || label}
-        autoComplete={autoComplete}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? errorId : undefined}
-        {...register}
-      />
-      <label htmlFor={id}>{label}</label>
-      {canTogglePassword ? (
-        <button
-          type="button"
-          className="btn btn-sm sv-password-toggle"
-          onClick={() => setShowPassword((prev) => !prev)}
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
-          aria-pressed={showPassword}
-        >
-          <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true" />
-        </button>
-      ) : null}
       <FieldError id={errorId} error={error} />
     </div>
   );

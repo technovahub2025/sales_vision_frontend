@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { invitesApi, projectsApi, settingsApi, tasksApi } from '../../api';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { ROUTES } from '../../routes/routePaths';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 
 const STORAGE_KEY = 'salevision:onboarding:v1';
 
@@ -18,6 +19,11 @@ const inviteSchema = z.object({
   email: z.string().trim().email('Enter a valid email'),
   role: z.enum(['admin', 'member', 'viewer']),
 });
+const INVITE_ROLE_OPTIONS = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: 'Member' },
+  { value: 'viewer', label: 'Viewer' },
+];
 
 const projectSchema = z.object({
   name: z.string().trim().min(2, 'Project name is required').max(120),
@@ -211,11 +217,18 @@ export default function OnboardingPage() {
         <div className="space-y-4">
           <form className="grid gap-3 md:grid-cols-[1fr_auto_auto]" onSubmit={inviteForm.handleSubmit(submitInvite)}>
             <input className="rounded-xl border border-outline-variant px-3 py-2" placeholder="colleague@company.com" {...inviteForm.register('email')} />
-            <select className="rounded-xl border border-outline-variant px-3 py-2" {...inviteForm.register('role')}>
-              <option value="admin">Admin</option>
-              <option value="member">Member</option>
-              <option value="viewer">Viewer</option>
-            </select>
+            <Controller
+              control={inviteForm.control}
+              name="role"
+              render={({ field }) => (
+                <SelectDropdown
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={INVITE_ROLE_OPTIONS}
+                  triggerClassName="rounded-xl border border-outline-variant px-3 py-2"
+                />
+              )}
+            />
             <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary" disabled={createInviteMutation.isPending}>
               Send invite
             </button>

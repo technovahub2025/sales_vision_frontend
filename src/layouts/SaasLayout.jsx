@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import AppFooter from '../components/layout/AppFooter';
 import Sidebar from '../components/layout/Sidebar';
@@ -7,7 +7,19 @@ import { useWorkspace } from '../contexts/WorkspaceContext';
 
 function SaasLayout() {
   const { bootstrapStatus, bootstrapError } = useWorkspace();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 991.98px)').matches : false,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 991.98px)');
+    const syncSidebar = (event) => {
+      setSidebarCollapsed(event.matches);
+    };
+    syncSidebar(query);
+    query.addEventListener('change', syncSidebar);
+    return () => query.removeEventListener('change', syncSidebar);
+  }, []);
 
   if (bootstrapStatus === 'booting') {
     return (
@@ -36,15 +48,17 @@ function SaasLayout() {
   return (
     <div className="sv-app-shell">
       <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+      <button
+        type="button"
+        className={`sv-sidebar-backdrop ${sidebarCollapsed ? '' : 'is-open'}`}
+        aria-label="Close sidebar"
+        onClick={() => setSidebarCollapsed(true)}
+      />
       <main 
-        className="sv-main-content min-h-screen d-flex flex-column"
-        style={{ 
-          marginLeft: sidebarCollapsed ? '4rem' : '15rem',
-          transition: 'margin-left 0.24s ease-in-out'
-        }}
+        className={`sv-main-content ${sidebarCollapsed ? 'is-collapsed' : 'is-expanded'} min-h-screen d-flex flex-column`}
       >
         <Topbar collapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className="flex-grow-1 px-3 px-md-4 px-xl-5 pb-5 pb-lg-6">
+        <div className="sv-content-shell flex-grow-1 px-3 px-md-4 px-xl-5 pb-5 pb-lg-6">
           <Outlet />
         </div>
         <AppFooter />

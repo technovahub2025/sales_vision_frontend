@@ -202,18 +202,31 @@ export function useMyTasks() {
   const currentGroupBy = resolveGroupBy(query.groupBy);
   const lastQueryRef = useRef(query);
 
-  const queryKey = [
-    'myTasks',
-    workspaceId,
-    userId,
-    query.filter,
-    query.sort,
-    query.view,
-    currentGroupBy,
-    query.issueType || 'all',
-    query.includeArchived || 'false',
-    query.onlyArchived || 'false',
-  ];
+  const queryKey = useMemo(
+    () => [
+      'myTasks',
+      workspaceId,
+      userId,
+      query.filter,
+      query.sort,
+      query.view,
+      currentGroupBy,
+      query.issueType || 'all',
+      query.includeArchived || 'false',
+      query.onlyArchived || 'false',
+    ],
+    [
+      currentGroupBy,
+      query.filter,
+      query.includeArchived,
+      query.issueType,
+      query.onlyArchived,
+      query.sort,
+      query.view,
+      userId,
+      workspaceId,
+    ],
+  );
 
   const tasksQuery = useQuery({
     queryKey,
@@ -399,6 +412,7 @@ export function useMyTasks() {
     socket.on(EVENTS.TIMER_RESUMED, onTimerResumed);
     socket.on(EVENTS.TIMER_STOPPED, onTimerStopped);
 
+    const timerEventTimeouts = timerEventTimeoutsRef.current;
     return () => {
       socket.off(EVENTS.TASK_ASSIGNED, onAssigned);
       socket.off(EVENTS.TASK_UPDATED, onUpdated);
@@ -408,10 +422,10 @@ export function useMyTasks() {
       socket.off(EVENTS.TIMER_PAUSED, onTimerPaused);
       socket.off(EVENTS.TIMER_RESUMED, onTimerResumed);
       socket.off(EVENTS.TIMER_STOPPED, onTimerStopped);
-      for (const timeoutId of timerEventTimeoutsRef.current.values()) {
+      for (const timeoutId of timerEventTimeouts.values()) {
         window.clearTimeout(timeoutId);
       }
-      timerEventTimeoutsRef.current.clear();
+      timerEventTimeouts.clear();
     };
   }, [socket, workspaceId, userId, joinWorkspace, queryClient, queryKey, currentGroupBy]);
 

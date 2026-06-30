@@ -81,7 +81,7 @@ axiosClient.interceptors.response.use(
       try {
         await refreshPromise;
         return axiosClient(originalRequest);
-      } catch (refreshError) {
+      } catch {
         window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
         window.localStorage.removeItem(SUPER_ADMIN_ACCESS_TOKEN_STORAGE_KEY);
         unauthorizedHandler();

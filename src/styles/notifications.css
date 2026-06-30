@@ -1,53 +1,139 @@
 /* Notifications Drawer */
+.sv-notifications-layer {
+  pointer-events: auto;
+}
+
 .sv-notifications-drawer {
-  width: clamp(340px, 28vw, 430px) !important;
+  width: clamp(380px, 31vw, 480px) !important;
   max-width: 96vw;
+  top: 18px !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  height: auto !important;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 1.45rem;
   border-left-color: color-mix(in srgb, var(--color-border) 76%, white) !important;
-  background: color-mix(in srgb, var(--color-surface) 98%, transparent) !important;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 18rem),
+    color-mix(in srgb, var(--color-surface) 98%, transparent) !important;
+  box-shadow:
+    0 28px 70px rgba(15, 23, 42, 0.18),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+  transform: translateX(18px);
+  opacity: 0;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.sv-notifications-layer.is-visible .sv-notifications-drawer {
+  transform: translateX(0);
+  opacity: 1;
 }
 
 .sv-notifications-backdrop {
   backdrop-filter: blur(1.8px);
+  opacity: 0;
+  transition: opacity 220ms ease, backdrop-filter 220ms ease;
+}
+
+.sv-notifications-layer.is-visible .sv-notifications-backdrop {
+  opacity: 1;
 }
 
 .sv-notifications-head {
-  padding-block: 0.72rem !important;
+  padding: 1.18rem 1.16rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 84%, white);
+  background:
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 15rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), color-mix(in srgb, var(--color-surface) 94%, transparent));
+}
+
+.sv-notifications-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .sv-notifications-title {
-  font-size: 1.72rem !important;
-  line-height: 1.06;
-  letter-spacing: -0.015em;
+  margin: 0;
+  font-size: 1.52rem !important;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 900;
 }
 
 .sv-notifications-head-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 0.18rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.82rem;
+  flex-wrap: wrap;
 }
 
 .sv-notifications-markall,
 .sv-notifications-clearall {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
   white-space: nowrap;
-  border: 0;
-  background: transparent;
-  padding: 0;
+  border: 1px solid transparent;
+  min-height: 2.28rem;
+  border-radius: 0.82rem;
+  padding: 0.48rem 0.82rem;
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .sv-notifications-clearall {
   color: var(--color-error);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-error) 9%, white), color-mix(in srgb, var(--color-error) 5%, white));
+  border-color: color-mix(in srgb, var(--color-error) 18%, var(--color-border));
+}
+
+.sv-notifications-markall:hover,
+.sv-notifications-markall:focus-visible,
+.sv-notifications-clearall:hover,
+.sv-notifications-clearall:focus-visible {
+  transform: translateY(-1px);
+}
+
+.sv-notifications-markall {
+  color: var(--color-primary);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 9%, white), color-mix(in srgb, var(--color-primary) 5%, white));
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+}
+
+.sv-notifications-clearall:hover,
+.sv-notifications-clearall:focus-visible {
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--color-error) 14%, transparent);
+}
+
+.sv-notifications-markall:hover,
+.sv-notifications-markall:focus-visible {
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--color-primary) 14%, transparent);
 }
 
 .sv-notifications-filters {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.46rem;
   overflow-x: auto;
   overflow-y: hidden;
   flex-wrap: nowrap;
+  padding: 0.82rem 1.04rem 0.78rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding-block: 0.52rem !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, white);
+  background: color-mix(in srgb, var(--color-surface-muted) 44%, var(--color-surface));
 }
 
 .sv-notifications-filters::-webkit-scrollbar {
@@ -56,53 +142,306 @@
 }
 
 .sv-notifications-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.72rem;
+  min-height: 2.16rem;
+  position: relative;
+  z-index: 1;
   white-space: nowrap;
-  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
-  font-size: 0.78rem !important;
-  line-height: 1.15;
-  padding: 0.38rem 0.72rem !important;
-  border-radius: 0.56rem !important;
-  background: color-mix(in srgb, var(--color-surface-muted) 84%, white);
+  border: 1px solid color-mix(in srgb, var(--color-border) 68%, white);
+  font-size: 0.81rem !important;
+  line-height: 1;
+  padding: 0.46rem 0.96rem !important;
+  border-radius: 0.84rem !important;
+  background: color-mix(in srgb, var(--color-surface) 94%, white);
+  transition: transform 180ms ease, color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .sv-notifications-filter-chip.is-active {
-  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  box-shadow: 0 8px 16px color-mix(in srgb, var(--color-accent) 24%, transparent);
+  color: var(--color-primary);
+  font-weight: 850;
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  box-shadow: none;
+}
+
+.sv-notifications-filter-chip:hover {
+  transform: translateY(-1px);
+}
+
+.sv-notifications-filter-indicator {
+  position: absolute;
+  left: 1.02rem;
+  top: 0.86rem;
+  height: calc(100% - 1.7rem);
+  border-radius: 0.84rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  opacity: 0;
+  transform: translateX(0);
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+  pointer-events: none;
+}
+
+.sv-notifications-filter-indicator.is-ready {
+  opacity: 0;
+}
+
+html[data-theme='dark'] .sv-notifications-filter-indicator {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-primary) 26%, #0f172a);
 }
 
 .sv-notifications-body {
   min-height: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .sv-notifications-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.6rem 0.5rem 0.8rem 0.55rem;
+  overflow: hidden;
+}
+
+.sv-notifications-list [role='list'] {
   height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  padding-right: 2px;
 }
 
-.sv-notifications-drawer article {
-  padding-block: 0.62rem !important;
-  gap: 0.58rem !important;
+.sv-notifications-list [role='list']::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
-.sv-notifications-drawer article p {
-  line-height: 1.24;
+.sv-notifications-loading,
+.sv-notifications-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  min-height: 220px;
+  padding: 1.5rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.sv-notifications-loading {
+  font-size: 0.88rem;
+}
+
+.sv-notifications-empty {
+  margin: auto;
+  width: min(292px, calc(100% - 2rem));
+  min-height: 248px;
+  gap: 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 74%, white);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 13rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 100%, white), color-mix(in srgb, var(--color-surface-muted) 38%, white));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 24px 46px rgba(15, 23, 42, 0.1);
+}
+
+.sv-notifications-empty p,
+.sv-notifications-loading p {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 900;
+}
+
+.sv-notifications-empty p {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.sv-notifications-empty small {
+  max-width: 13.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.sv-notifications-empty-icon {
+  display: inline-flex;
+  width: 3.15rem;
+  height: 3.15rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 1rem;
+  color: var(--color-primary);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 12%, white), color-mix(in srgb, var(--color-primary) 5%, white));
+  box-shadow: 0 14px 24px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.sv-notifications-empty span {
+  font-size: 0.82rem;
+}
+
+.sv-notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.86rem;
+  margin: 0 0.32rem 0.58rem 0.22rem;
+  padding: 0.94rem 0.95rem;
+  min-height: 104px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 74%, white);
+  border-radius: 1.05rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 99%, white), color-mix(in srgb, var(--color-surface-muted) 34%, white));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 3px 10px rgba(15, 23, 42, 0.045);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.sv-notification-item.is-unread {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 5%, var(--color-surface)), color-mix(in srgb, var(--color-surface-muted) 42%, white));
+}
+
+.sv-notification-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.sv-notification-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 0.78rem;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+}
+
+.sv-notification-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 0.2rem;
+}
+
+.sv-notification-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sv-notification-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.sv-notification-body {
+  margin: 0.32rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.sv-notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+}
+
+.sv-notification-time {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .sv-notification-remove-btn {
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
-  width: 1.45rem;
-  height: 1.45rem;
-  border-radius: 0.4rem;
+  width: 1.86rem;
+  height: 1.86rem;
+  border-radius: 0.64rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+}
+
+.sv-notification-dot {
+  flex: 0 0 auto;
+  width: 0.46rem;
+  height: 0.46rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .sv-notification-remove-btn:hover {
   color: var(--color-error);
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
+}
+
+.sv-notifications-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 0.82rem;
+  background: color-mix(in srgb, var(--color-surface-muted) 76%, white);
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+
+.sv-notifications-close:hover,
+.sv-notifications-close:focus-visible {
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+}
+
+.sv-notifications-section-header {
+  display: flex;
+  align-items: center;
+  padding: 0 0.98rem;
+  margin: 0.12rem 0.28rem 0.38rem;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--color-surface-muted) 64%, white);
 }
 
 html[data-theme='dark'] .sv-notifications-drawer {
@@ -112,17 +451,70 @@ html[data-theme='dark'] .sv-notifications-drawer {
 }
 
 html[data-theme='dark'] .sv-notifications-filter-chip {
-  background: color-mix(in srgb, var(--color-surface-muted) 72%, #0b1220);
+  color: color-mix(in srgb, var(--color-text) 92%, white);
+}
+
+html[data-theme='dark'] .sv-notifications-head {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 94%, #0b1220), color-mix(in srgb, var(--color-surface) 88%, #0b1220));
+  border-bottom-color: color-mix(in srgb, var(--color-border) 72%, #0b1220);
+}
+
+html[data-theme='dark'] .sv-notifications-filters {
+  background: color-mix(in srgb, var(--color-surface) 92%, #0b1220);
+  border-bottom-color: color-mix(in srgb, var(--color-border) 68%, #0b1220);
+}
+
+html[data-theme='dark'] .sv-notification-item {
+  background: color-mix(in srgb, var(--color-surface) 92%, #0b1220);
+  border-color: color-mix(in srgb, var(--color-border) 74%, #0b1220);
+}
+
+html[data-theme='dark'] .sv-notification-item.is-unread {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+html[data-theme='dark'] .sv-notifications-empty {
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 13rem),
+    color-mix(in srgb, var(--color-surface) 90%, #0b1220);
   border-color: color-mix(in srgb, var(--color-border) 72%, #0b1220);
+}
+
+html[data-theme='dark'] .sv-notifications-section-header {
+  background: color-mix(in srgb, var(--color-surface-muted) 32%, #0b1220);
 }
 
 @media (max-width: 767.98px) {
   .sv-notifications-drawer {
     width: 100% !important;
     max-width: 100%;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    border-radius: 0;
   }
 
   .sv-notifications-title {
     font-size: 1.46rem !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .sv-notifications-head {
+    padding-inline: 0.9rem;
+  }
+
+  .sv-notifications-filters {
+    padding-inline: 0.9rem;
+  }
+
+  .sv-notification-item {
+    margin-inline: 0.15rem;
+    min-height: 104px;
+  }
+
+  .sv-notifications-head-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }

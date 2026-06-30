@@ -5,7 +5,7 @@ const { Provider, useCollection } = createRealtimeCollectionContext({
   contextName: 'EmployeeContext',
   moduleName: 'employees',
   entityName: 'employee',
-  listFn: (workspaceId) => employeesApi.list(workspaceId, { page: 1, limit: 200 }),
+  listFn: (workspaceId, params = {}, signal) => employeesApi.list(workspaceId, { sort: 'newest', ...params }, signal),
   createFn: employeesApi.create,
   updateFn: employeesApi.update,
   removeFn: employeesApi.remove,

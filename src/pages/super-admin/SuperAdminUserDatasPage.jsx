@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Icon from '../../components/ui/Icon';
+import RowActionMenu from '../../components/ui/RowActionMenu';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import { superAdminApi } from '../../api/superAdmin.api';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
 import { useSocket } from '../../contexts/SocketContext';
 import { EVENTS } from '../../socket/events';
 import { AdminState, SuperAdminPageHeader } from './SuperAdminShared';
@@ -10,7 +13,8 @@ import '../../styles/superadmin.css';
 
 const ROLE_OPTIONS = ['owner', 'admin', 'member', 'viewer'];
 const STATUS_OPTIONS = ['active', 'pending', 'inactive'];
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const ROLE_DROPDOWN_OPTIONS = ROLE_OPTIONS.map((role) => ({ value: role, label: role }));
+const STATUS_DROPDOWN_OPTIONS = STATUS_OPTIONS.map((status) => ({ value: status, label: status }));
 
 function formatDate(value) {
   if (!value) return '-';
@@ -26,29 +30,12 @@ function getRowKey(item) {
   return `${item.workspaceId}:${item.userId}`;
 }
 
-function Pagination({ meta, limit, onLimit, onPage }) {
-  const page = Number(meta?.page || 1);
-  const pages = Number(meta?.pages || 1);
-  const total = Number(meta?.total || 0);
-  const start = total ? (page - 1) * limit + 1 : 0;
-  const end = Math.min(total, page * limit);
-
-  return (
-    <div className="sv-userdatas-pagination">
-      <span>{start}-{end} of {formatNumber(total)}</span>
-      <label>
-        Rows
-        <select className="form-select form-select-sm" value={limit} onChange={(event) => onLimit(Number(event.target.value))}>
-          {PAGE_SIZE_OPTIONS.map((size) => (
-            <option key={size} value={size}>{size}</option>
-          ))}
-        </select>
-      </label>
-      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>Prev</button>
-      <span>{page} / {pages}</span>
-      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
-    </div>
-  );
+function getNextPageParam(lastPage, allPages) {
+  const meta = lastPage?.meta || {};
+  const page = Number(meta.page) || allPages.length;
+  const total = Number(meta.total) || 0;
+  const limit = Number(meta.limit) || 100;
+  return total > page * limit ? page + 1 : undefined;
 }
 
 export default function SuperAdminUserDatasPage() {
@@ -60,8 +47,8 @@ export default function SuperAdminUserDatasPage() {
   const [workspaceId, setWorkspaceId] = useState(() => searchParams.get('workspaceId') || '');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(25);
+  const [limit] = useState(100);
+  const listScrollRef = useRef(null);
   const [toast, setToast] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -79,12 +66,12 @@ export default function SuperAdminUserDatasPage() {
     retry: false,
   });
 
-  const usersQuery = useQuery({
-    queryKey: ['super-admin', 'all-users', page, limit, search, workspaceId, role, status],
-    queryFn: ({ signal }) =>
+  const usersQuery = useInfiniteQuery({
+    queryKey: ['super-admin', 'all-users', limit, search, workspaceId, role, status],
+    queryFn: ({ pageParam = 1, signal }) =>
       superAdminApi.allUsers(
         {
-          page,
+          page: pageParam,
           limit,
           search: search || undefined,
           workspaceId: workspaceId || undefined,
@@ -93,16 +80,18 @@ export default function SuperAdminUserDatasPage() {
         },
         signal,
       ),
+    getNextPageParam,
+    initialPageParam: 1,
     retry: false,
   });
 
-  const refreshAdminData = async () => {
+  const refreshAdminData = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['super-admin', 'summary'] }),
       queryClient.invalidateQueries({ queryKey: ['super-admin', 'workspaces'] }),
       queryClient.invalidateQueries({ queryKey: ['super-admin', 'all-users'] }),
     ]);
-  };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -113,7 +102,7 @@ export default function SuperAdminUserDatasPage() {
     return () => {
       socket.off(EVENTS.SUPERADMIN_USERS_UPDATED, onUsersChanged);
     };
-  }, [socket, queryClient]);
+  }, [socket, refreshAdminData]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -126,7 +115,7 @@ export default function SuperAdminUserDatasPage() {
     setWorkspaceId((current) => (current === nextWorkspaceId ? current : nextWorkspaceId));
     if (nextWorkspaceId) {
       setFiltersOpen(true);
-      setPage(1);
+      listScrollRef.current?.scrollTo({ top: 0 });
     }
   }, [searchParams]);
 
@@ -184,9 +173,16 @@ export default function SuperAdminUserDatasPage() {
     onError: (error) => setToast({ type: 'error', message: error.message || 'Failed to delete selected users.' }),
   });
 
-  const users = usersQuery.data?.data || [];
-  const meta = usersQuery.data?.meta || {};
+  const users = useMemo(() => (usersQuery.data?.pages || []).flatMap((pageItem) => pageItem?.data || []), [usersQuery.data?.pages]);
+  const meta = usersQuery.data?.pages?.at(-1)?.meta || {};
   const workspaces = workspacesQuery.data?.data || [];
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (usersQuery.hasNextPage && !usersQuery.isFetchingNextPage) void usersQuery.fetchNextPage();
+    },
+    disabled: !usersQuery.hasNextPage || usersQuery.isFetchingNextPage,
+  });
   const visibleKeys = useMemo(() => users.map(getRowKey), [users]);
   const selectedItems = useMemo(() => users.filter((item) => selectedRows.has(getRowKey(item))), [selectedRows, users]);
   const allVisibleSelected = Boolean(visibleKeys.length) && visibleKeys.every((key) => selectedRows.has(key));
@@ -198,7 +194,7 @@ export default function SuperAdminUserDatasPage() {
     setOpenActionKey('');
     setSelectionMode(false);
     setDetailItem(null);
-  }, [page, limit, search, workspaceId, role, status]);
+  }, [limit, search, workspaceId, role, status]);
 
   useEffect(() => {
     setSelectedRows((current) => {
@@ -221,10 +217,10 @@ export default function SuperAdminUserDatasPage() {
     if (!exists) setDetailItem(null);
   }, [users, detailItem]);
 
-  function resetPage(setter) {
+  function resetList(setter) {
     return (event) => {
       setter(event.target.value);
-      setPage(1);
+      listScrollRef.current?.scrollTo({ top: 0 });
     };
   }
 
@@ -232,14 +228,14 @@ export default function SuperAdminUserDatasPage() {
     setWorkspaceId('');
     setRole('');
     setStatus('');
-    setPage(1);
+    listScrollRef.current?.scrollTo({ top: 0 });
   }
 
   function clearFilterChip(key) {
     if (key === 'workspace') setWorkspaceId('');
     if (key === 'role') setRole('');
     if (key === 'status') setStatus('');
-    setPage(1);
+    listScrollRef.current?.scrollTo({ top: 0 });
   }
 
   function clearSelection() {
@@ -374,7 +370,7 @@ export default function SuperAdminUserDatasPage() {
           <input
             className="form-control"
             value={search}
-            onChange={resetPage(setSearch)}
+            onChange={resetList(setSearch)}
             placeholder="Search name, email, workspace..."
           />
         </label>
@@ -408,30 +404,26 @@ export default function SuperAdminUserDatasPage() {
         <section className="sv-userdatas-filters" aria-label="User filters and bulk actions">
           <label>
             <span className="sv-userdatas-field-label"><Icon name="apartment" />Workspace</span>
-            <select className="form-select" value={workspaceId} onChange={resetPage(setWorkspaceId)}>
-              <option value="">All workspaces</option>
-              {workspaces.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
-              ))}
-            </select>
+            <SelectDropdown
+              value={workspaceId}
+              onChange={(nextValue) => {
+                setWorkspaceId(nextValue);
+                listScrollRef.current?.scrollTo({ top: 0 });
+              }}
+              options={[
+                { value: '', label: 'All workspaces' },
+                ...workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name })),
+              ]}
+              triggerClassName="form-select"
+            />
           </label>
           <label>
             <span className="sv-userdatas-field-label"><Icon name="manage_accounts" />Role</span>
-            <select className="form-select" value={role} onChange={resetPage(setRole)}>
-              <option value="">All roles</option>
-              {ROLE_OPTIONS.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+            <SelectDropdown value={role} onChange={(nextValue) => { setRole(nextValue); listScrollRef.current?.scrollTo({ top: 0 }); }} options={[{ value: '', label: 'All roles' }, ...ROLE_DROPDOWN_OPTIONS]} triggerClassName="form-select" />
           </label>
           <label>
             <span className="sv-userdatas-field-label"><Icon name="verified_user" />Status</span>
-            <select className="form-select" value={status} onChange={resetPage(setStatus)}>
-              <option value="">All statuses</option>
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+            <SelectDropdown value={status} onChange={(nextValue) => { setStatus(nextValue); listScrollRef.current?.scrollTo({ top: 0 }); }} options={[{ value: '', label: 'All statuses' }, ...STATUS_DROPDOWN_OPTIONS]} triggerClassName="form-select" />
           </label>
           <div className="sv-userdatas-filter-actions">
             <span className="sv-userdatas-selected-count"><Icon name="checklist" />{selectedRows.size} selected</span>
@@ -449,12 +441,7 @@ export default function SuperAdminUserDatasPage() {
               Delete
             </button>
             <div className="sv-userdatas-bulk-role">
-              <select className="form-select form-select-sm" value={bulkRole} onChange={(event) => setBulkRole(event.target.value)}>
-                <option value="">Change role</option>
-                {ROLE_OPTIONS.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
+              <SelectDropdown value={bulkRole} onChange={setBulkRole} options={[{ value: '', label: 'Change role' }, ...ROLE_DROPDOWN_OPTIONS]} triggerClassName="form-select form-select-sm" />
               <button type="button" className="btn btn-sm btn-outline-primary" disabled={!bulkRole || !selectedRows.size || Boolean(pendingRoleKey)} onClick={applyBulkRole}>
                 <Icon name="check" />
                 Apply
@@ -478,7 +465,7 @@ export default function SuperAdminUserDatasPage() {
           </div>
           <span>{formatNumber(meta.total || 0)} records</span>
         </div>
-        <div className="sv-userdatas-table-wrap">
+        <div className="sv-userdatas-table-wrap sv-list-scroll" ref={listScrollRef}>
           <table className="sv-userdatas-table">
             <thead>
               <tr>
@@ -556,41 +543,50 @@ export default function SuperAdminUserDatasPage() {
                     <td>{formatDate(item.joinedAt)}</td>
                     <td>{formatDate(item.lastLoginAt)}</td>
                     <td className="sv-userdatas-action-cell">
-                      <div className="sv-userdatas-action-menu">
-                        <button
-                          type="button"
-                          className="sv-userdatas-action-trigger"
-                          aria-label={`Actions for ${item.name || item.email}`}
-                          onClick={() => setOpenActionKey((current) => (current === key ? '' : key))}
-                        >
-                          <Icon name="more_vert" />
-                        </button>
-                        {openActionKey === key ? (
-                          <div className="sv-userdatas-action-popover">
-                            <button type="button" onClick={() => { setDetailItem(item); setOpenActionKey(''); }}><Icon name="visibility" />View details</button>
-                            <button type="button" onClick={() => selectSingleRow(item)}><Icon name="check_box" />Select row</button>
-                            <button type="button" className="is-danger" disabled={isDeleting} onClick={() => removeUser(item)} aria-label={`Remove ${item.name || item.email} from workspace`}><Icon name="person_remove" />Remove</button>
-                          </div>
-                        ) : null}
-                      </div>
+                      <RowActionMenu
+                        open={openActionKey === key}
+                        onTrigger={() => setOpenActionKey((current) => (current === key ? '' : key))}
+                        onClose={() => setOpenActionKey('')}
+                        ariaLabel={`Actions for ${item.name || item.email}`}
+                        items={[
+                          {
+                            key: 'details',
+                            label: 'View details',
+                            icon: 'visibility',
+                            onClick: () => setDetailItem(item),
+                          },
+                          {
+                            key: 'select',
+                            label: 'Select row',
+                            icon: 'check_box',
+                            onClick: () => selectSingleRow(item),
+                          },
+                          {
+                            key: 'remove',
+                            label: 'Remove',
+                            icon: 'person_remove',
+                            danger: true,
+                            disabled: isDeleting,
+                            onClick: () => removeUser(item),
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
               })}
+              {!usersQuery.isLoading && users.length ? (
+                <tr>
+                  <td colSpan={selectionMode ? 8 : 7} className="sv-list-sentinel-cell">
+                    <span ref={loadMoreRef} className="sv-list-sentinel" />
+                    {usersQuery.isFetchingNextPage ? 'Loading more users...' : usersQuery.hasNextPage ? 'Scroll for more' : 'End of list'}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
       </section>
-
-      <Pagination
-        meta={meta}
-        limit={limit}
-        onLimit={(nextLimit) => {
-          setLimit(nextLimit);
-          setPage(1);
-        }}
-        onPage={setPage}
-      />
 
       {detailItem ? (
         <div className="sv-userdatas-drawer-layer" role="presentation">
@@ -633,17 +629,14 @@ export default function SuperAdminUserDatasPage() {
               </div>
               <div className="sv-userdatas-drawer-row">
                 <label><Icon name="manage_accounts" />Role</label>
-                <select
-                  className="form-select"
+                <SelectDropdown
                   value={nextRoleByKey[getRowKey(detailItem)] || detailItem.role}
-                  onChange={(event) =>
-                    setNextRoleByKey((current) => ({ ...current, [getRowKey(detailItem)]: event.target.value }))
+                  onChange={(nextValue) =>
+                    setNextRoleByKey((current) => ({ ...current, [getRowKey(detailItem)]: nextValue }))
                   }
-                >
-                  {ROLE_OPTIONS.map((roleOption) => (
-                    <option key={roleOption} value={roleOption}>{roleOption}</option>
-                  ))}
-                </select>
+                  options={ROLE_DROPDOWN_OPTIONS}
+                  triggerClassName="form-select"
+                />
                 <button type="button" className="btn btn-primary" disabled={pendingRoleKey === getRowKey(detailItem)} onClick={() => applyRoleChange(detailItem)}>
                   Update role
                 </button>

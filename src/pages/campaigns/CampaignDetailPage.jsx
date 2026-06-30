@@ -1,6 +1,9 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
+import DatePicker from '../../components/ui/DatePicker';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import ExportMenu from '../../components/ui/ExportMenu';
 import { campaignsApi, usersApi } from '../../api';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLeads } from '../../hooks/useLeads';
@@ -9,6 +12,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import { EVENTS } from '../../socket/events';
 import { toRealtimeEvent } from '../../socket/realtime';
 import { ROUTES } from '../../routes/routePaths';
+import { exportRows } from '../../lib/exportData';
 
 const STATUS_FLOW = {
   draft: ['active'],
@@ -16,6 +20,7 @@ const STATUS_FLOW = {
   paused: ['active', 'completed'],
   completed: [],
 };
+const STATUS_OPTIONS = Object.keys(STATUS_FLOW).map((status) => ({ value: status, label: status }));
 
 function formatINR(value) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(
@@ -23,23 +28,24 @@ function formatINR(value) {
   );
 }
 
+function formatCompactMetric(value, suffix = '') {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return `0${suffix}`;
+  if (Math.abs(number) >= 1000) {
+    return `${new Intl.NumberFormat('en-IN', {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(number)}${suffix}`;
+  }
+  const decimals = Math.abs(number) >= 100 ? 0 : 1;
+  return `${number.toFixed(decimals)}${suffix}`;
+}
+
 function toDateInput(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toISOString().slice(0, 10);
-}
-
-function downloadJson(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 }
 
 function EditCampaignModal({ open, form, onChange, onToggleLead, onToggleClient, onClose, onSubmit, busy, users, leads, clients, error }) {
@@ -97,58 +103,56 @@ function EditCampaignModal({ open, form, onChange, onToggleLead, onToggleClient,
               <label className="sv-campaigndetail-label">
                 Owner/Lead <span className="text-error">*</span>
               </label>
-              <select
-                required
+              <SelectDropdown
                 value={form.ownerId}
-                onChange={(e) => {
-                  const selectedId = e.target.value;
+                onChange={(selectedId) => {
                   const selected = users.find((user) => String(user._id) === String(selectedId));
                   onChange('ownerId', selectedId);
                   onChange('owner', selected?.displayName || selected?.name || selected?.email || '');
                   onChange('lead', selected?.displayName || selected?.name || selected?.email || '');
                 }}
-                className="sv-ctl-select sv-campaigndetail-field"
-              >
-                <option value="">Select owner/lead</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>{user.displayName || user.name || user.email || 'Unknown'}</option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'Select owner/lead' },
+                  ...users.map((user) => ({
+                    value: user._id,
+                    label: user.displayName || user.name || user.email || 'Unknown',
+                  })),
+                ]}
+                triggerClassName="sv-campaigndetail-field"
+              />
             </div>
 
             <div>
               <label className="sv-campaigndetail-label">Status</label>
-              <select
+              <SelectDropdown
                 value={form.status}
-                onChange={(e) => onChange('status', e.target.value)}
-                className="sv-ctl-select sv-campaigndetail-field"
-              >
-                {Object.keys(STATUS_FLOW).map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
+                onChange={(nextValue) => onChange('status', nextValue)}
+                options={STATUS_OPTIONS}
+                triggerClassName="sv-campaigndetail-field"
+              />
             </div>
 
             <div>
               <label className="sv-campaigndetail-label">
                 Start Date <span className="text-error">*</span>
               </label>
-              <input
-                type="date"
-                required
+              <DatePicker
                 value={form.startDate}
-                onChange={(e) => onChange('startDate', e.target.value)}
-                className="sv-ctl-input sv-campaigndetail-field"
+                onChange={(nextValue) => onChange('startDate', nextValue)}
+                className="sv-campaigndetail-field"
+                triggerClassName="sv-ctl-input"
+                placeholder="Start date"
               />
             </div>
 
             <div>
               <label className="sv-campaigndetail-label">End Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.endDate}
-                onChange={(e) => onChange('endDate', e.target.value)}
-                className="sv-ctl-input sv-campaigndetail-field"
+                onChange={(nextValue) => onChange('endDate', nextValue)}
+                className="sv-campaigndetail-field"
+                triggerClassName="sv-ctl-input"
+                placeholder="End date"
               />
             </div>
 
@@ -527,15 +531,29 @@ function CampaignDetailPage() {
     }
   };
 
-  const handleExport = async () => {
-    if (!workspaceId || !campaignId) return;
-    try {
-      const report = await campaignsApi.exportReport(workspaceId, campaignId);
-      downloadJson(`campaign-${campaignId}-report.json`, report.data || report);
-      setToast({ tone: 'success', message: 'Campaign report exported' });
-    } catch (nextError) {
-      setToast({ tone: 'error', message: nextError.message || 'Export failed' });
-    }
+  const handleExport = (format) => {
+    if (!campaign) return;
+    exportRows({
+      rows: [
+        campaign,
+        ...linkedLeads.map((lead) => ({ ...lead, recordType: 'Lead' })),
+        ...linkedClients.map((client) => ({ ...client, recordType: 'Client' })),
+      ],
+      format,
+      filename: `campaign-${campaignId}-report`,
+      title: `Campaign Report - ${campaign.name || campaignId}`,
+      columns: [
+        { header: 'Type', value: (row) => row.recordType || 'Campaign' },
+        { header: 'Name', value: (row) => row.name || row.title || campaign.name || '-' },
+        { header: 'Status', value: (row) => row.status || row.statusId || '-' },
+        { header: 'Channel/Source', value: (row) => row.channel || row.source || '-' },
+        { header: 'Owner/Company', value: (row) => row.owner || row.lead || row.company || '-' },
+        { header: 'Spend/Value', value: (row) => Number(row.spend || row.value || 0) },
+        { header: 'Conversion', value: (row) => row.conversionRate ? `${Number(row.conversionRate).toFixed(1)}%` : '-' },
+        { header: 'ROI', value: (row) => row.roi ? `${Number(row.roi).toFixed(2)}x` : '-' },
+      ],
+    });
+    setToast({ tone: 'success', message: `${String(format).toUpperCase()} export ready` });
   };
 
   const handleDelete = async () => {
@@ -560,9 +578,15 @@ function CampaignDetailPage() {
       <div className="sv-campaigndetail-stack">
         <section className="sv-card sv-campaigndetail-hero">
           <div className="sv-campaigndetail-hero-main">
+            <span className="sv-campaigndetail-eyebrow"><Icon name="campaign" className="text-base" /> Campaign command</span>
             <h1 className="sv-campaigndetail-title">{campaign?.name || 'Campaign'}</h1>
             <p className="sv-campaigndetail-subtitle">{campaign?.channel || '-'} • {campaign?.status || 'draft'}</p>
             <p className="sv-campaigndetail-owner">{campaign?.owner || campaign?.lead || 'Unassigned owner'}</p>
+            <div className="sv-campaigndetail-hero-meta">
+              <span>{campaign?.startDate ? new Date(campaign.startDate).toLocaleDateString('en-IN') : 'No start date'}</span>
+              <span>{campaign?.endDate ? new Date(campaign.endDate).toLocaleDateString('en-IN') : 'No end date'}</span>
+              <span>{(campaign?.linkedLeadsCount || 0) + (campaign?.linkedClientsCount || 0)} linked records</span>
+            </div>
           </div>
 
           <div className="sv-campaigndetail-hero-actions">
@@ -588,10 +612,7 @@ function CampaignDetailPage() {
               <Icon name="edit" className="sv-campaigns-btn-icon" />
               <span>Edit</span>
             </button>
-            <button disabled={busyAction} onClick={handleExport} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
-              <Icon name="download" className="sv-campaigns-btn-icon" />
-              <span>Export</span>
-            </button>
+            <ExportMenu onExport={handleExport} label="Export" disabled={busyAction || !campaign} />
             <button disabled={busyAction} onClick={handleDelete} className="sv-ctl-btn btn-light sv-campaigns-icon-btn sv-campaigndetail-delete-btn">
               <Icon name="delete" className="sv-campaigns-btn-icon" />
               <span>Delete</span>
@@ -605,21 +626,25 @@ function CampaignDetailPage() {
         {campaign ? (
           <>
             <section className="sv-campaigndetail-kpis">
-              <article className="sv-card sv-campaigndetail-kpi-card">
+              <article className="sv-card sv-campaigndetail-kpi-card is-blue">
                 <p className="sv-campaigndetail-kpi-label">Spend</p>
                 <p className="sv-campaigndetail-kpi-value">{formatINR(campaign.spend || 0)}</p>
+                <p className="sv-campaigndetail-kpi-hint">Budget {formatINR(campaign.budget || 0)}</p>
               </article>
-              <article className="sv-card sv-campaigndetail-kpi-card">
+              <article className="sv-card sv-campaigndetail-kpi-card is-green">
                 <p className="sv-campaigndetail-kpi-label">ROI</p>
-                <p className="sv-campaigndetail-kpi-value">{Number(campaign.roi || 0).toFixed(2)}x</p>
+                <p className="sv-campaigndetail-kpi-value" title={`${Number(campaign.roi || 0).toFixed(2)}x`}>{formatCompactMetric(campaign.roi, 'x')}</p>
+                <p className="sv-campaigndetail-kpi-hint">Stored campaign ROI</p>
               </article>
-              <article className="sv-card sv-campaigndetail-kpi-card">
+              <article className="sv-card sv-campaigndetail-kpi-card is-amber">
                 <p className="sv-campaigndetail-kpi-label">Conversion</p>
-                <p className="sv-campaigndetail-kpi-value">{Number(campaign.conversionRate || 0).toFixed(1)}%</p>
+                <p className="sv-campaigndetail-kpi-value" title={`${Number(campaign.conversionRate || 0).toFixed(1)}%`}>{formatCompactMetric(campaign.conversionRate, '%')}</p>
+                <p className="sv-campaigndetail-kpi-hint">Stored conversion rate</p>
               </article>
-              <article className="sv-card sv-campaigndetail-kpi-card">
+              <article className="sv-card sv-campaigndetail-kpi-card is-red">
                 <p className="sv-campaigndetail-kpi-label">Linked</p>
                 <p className="sv-campaigndetail-kpi-value">{campaign.linkedLeadsCount || 0} Leads / {campaign.linkedClientsCount || 0} Clients</p>
+                <p className="sv-campaigndetail-kpi-hint">Relationship coverage</p>
               </article>
             </section>
 
@@ -630,7 +655,9 @@ function CampaignDetailPage() {
                   {linkedLeads.map((lead) => (
                     <div key={lead._id} className="sv-campaigndetail-list-item">
                       <div>
-                        <p className="sv-campaigndetail-item-title">{lead.title || 'Untitled lead'}</p>
+                        <button type="button" className="sv-campaigndetail-item-title sv-name-open-btn" onClick={() => navigate(ROUTES.leads)}>
+                          {lead.title || 'Untitled lead'}
+                        </button>
                         <p className="sv-campaigndetail-item-meta">{lead.source || '-'} • {lead.statusId || '-'}</p>
                       </div>
                       <button
@@ -652,7 +679,9 @@ function CampaignDetailPage() {
                 <div className="sv-campaigndetail-list">
                   {linkedClients.map((client) => (
                     <div key={client._id} className="sv-campaigndetail-client-item">
-                      <p className="sv-campaigndetail-item-title">{client.name || 'Unnamed client'}</p>
+                      <button type="button" className="sv-campaigndetail-item-title sv-name-open-btn" onClick={() => navigate(ROUTES.clientDetail.replace(':clientId', client._id))}>
+                        {client.name || 'Unnamed client'}
+                      </button>
                       <p className="sv-campaigndetail-item-meta">{client.company || '-'} • {client.email || '-'}</p>
                       <button
                         type="button"

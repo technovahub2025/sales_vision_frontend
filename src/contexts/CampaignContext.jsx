@@ -5,7 +5,7 @@ const { Provider, useCollection } = createRealtimeCollectionContext({
   contextName: 'CampaignContext',
   moduleName: 'campaigns',
   entityName: 'campaign',
-  listFn: (workspaceId) => campaignsApi.list(workspaceId, { page: 1, limit: 200, sort: 'recent', includeArchived: true }),
+  listFn: (workspaceId, params = {}, signal) => campaignsApi.list(workspaceId, { sort: 'newest', includeArchived: true, ...params }, signal),
   createFn: campaignsApi.create,
   updateFn: campaignsApi.update,
   removeFn: campaignsApi.remove,

@@ -441,7 +441,6 @@ export function NewTaskProvider({ children }) {
   return <NewTaskContext.Provider value={value}>{children}</NewTaskContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useNewTaskContext() {
   const context = useContext(NewTaskContext);
   if (!context) {

@@ -1,16 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import Icon from '../../components/ui/Icon';
+import {
+  Activity,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Gauge,
+  HeartPulse,
+  KanbanSquare,
+  LayoutGrid,
+  ListChecks,
+  LoaderCircle,
+  Zap,
+} from 'lucide-react';
 import { projectRoute, ROUTES } from '../../routes/routePaths';
 import { useDashboard } from '../../hooks/useDashboard';
 
 function TrendBadge({ value }) {
   const numeric = Number(value || 0);
   const isUp = numeric >= 0;
+  const TrendIcon = isUp ? ArrowUpRight : ArrowDownRight;
   return (
-    <span className={`badge rounded-pill ${isUp ? 'text-bg-success' : 'text-bg-danger'}`}>
-      <Icon name={isUp ? 'bi-arrow-up-right' : 'bi-arrow-down-right'} className="me-1" />
+    <span className={`sv-trend-badge ${isUp ? 'is-up' : 'is-down'}`}>
+      <TrendIcon size={13} strokeWidth={2.6} />
       {Math.abs(numeric)}%
     </span>
   );
@@ -30,7 +49,6 @@ function DashboardPage() {
     activity,
     activityHasMore,
     loadMoreActivity,
-    updateTaskStatus,
     actionsState,
     exportReport,
   } = useDashboard();
@@ -102,11 +120,13 @@ function DashboardPage() {
     return map;
   }, [teamWorkload.cells]);
 
+  const heatmapScale = ['#edf2fb', '#cfe3ff', '#8ccfff', '#41b6ff', '#1d9e75'];
+
   const kpis = [
-    { key: 'open', label: 'Open Tasks', value: Number(metrics.openTasks || 0), trend: 12, icon: 'bi-list-check' },
-    { key: 'overdue', label: 'Overdue', value: Number(metrics.overdueTasks || 0), trend: -7, icon: 'bi-clock-history' },
-    { key: 'closed', label: 'Closed This Week', value: Number(metrics.completedThisWeek || 0), trend: 18, icon: 'bi-check2-circle' },
-    { key: 'velocity', label: 'Sprint Velocity', value: Number(metrics.sprintVelocity || 0), trend: 6, icon: 'bi-graph-up-arrow', hint: velocityLabel },
+    { key: 'open', label: 'Open Tasks', value: Number(metrics.openTasks || 0), trend: 12, icon: ListChecks, tone: 'blue', hint: 'Tasks currently in the pipeline' },
+    { key: 'overdue', label: 'Overdue', value: Number(metrics.overdueTasks || 0), trend: -7, icon: Clock3, tone: 'rose', hint: 'Needs attention today' },
+    { key: 'closed', label: 'Closed This Week', value: Number(metrics.completedThisWeek || 0), trend: 18, icon: CheckCircle2, tone: 'green', hint: 'Completed in the last 7 days' },
+    { key: 'velocity', label: 'Sprint Velocity', value: Number(metrics.sprintVelocity || 0), trend: 6, icon: Gauge, tone: 'teal', hint: velocityLabel },
   ];
 
   async function handleExport(format) {
@@ -154,10 +174,14 @@ function DashboardPage() {
 
   return (
     <main className="container-fluid px-0 py-3 py-lg-4 sv-dashboard-page">
-      <section className="d-flex flex-wrap justify-content-between align-items-end gap-4 mb-4">
-        <div>
+      <section className="sv-dashboard-hero sv-dashboard-hero-shell">
+        <div className="sv-dashboard-hero-copy">
+          <div className="sv-dashboard-eyebrow">
+            <LayoutGrid size={15} />
+            Workspace summary
+          </div>
           <h1 className="h2 fw-bold mb-1 sv-heading">Dashboard Overview</h1>
-          <p className="mb-0" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="sv-dashboard-subtitle">
             Real-time view of opportunities, workload and execution velocity.
           </p>
         </div>
@@ -165,30 +189,36 @@ function DashboardPage() {
         <div className="btn-group sv-dashboard-actions" ref={actionMenuRef}>
           <button
             type="button"
-            className="btn btn-sm sv-btn-primary d-flex align-items-center gap-2 dropdown-toggle"
-            style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem' }}
+            className="btn btn-sm sv-btn-primary sv-export-trigger"
             aria-label="Open report actions"
             aria-expanded={actionMenuOpen}
             onClick={() => setActionMenuOpen((prev) => !prev)}
             disabled={actionsState.exporting}
           >
             {actionsState.exporting ? (
-              <span className="spinner-border spinner-border-sm" aria-hidden="true" />
+              <LoaderCircle className="sv-spin" size={16} aria-hidden="true" />
             ) : (
-              <Icon name="bi-download" />
+              <Download size={16} />
             )}
-            Export
+            <span>Export</span>
+            <ChevronDown className={`sv-export-chevron ${actionMenuOpen ? 'is-open' : ''}`} size={14} />
           </button>
-          <ul className={`dropdown-menu dropdown-menu-end ${actionMenuOpen ? 'show' : ''}`}>
+          <ul className={`sv-action-menu ${actionMenuOpen ? 'show' : ''}`}>
             <li>
-              <button type="button" className="dropdown-item" onClick={() => handleExport('pdf')}>
-                <Icon name="bi-file-earmark-pdf" className="me-2" />
+              <button type="button" className="sv-action-item" onClick={() => handleExport('pdf')}>
+                <FileText size={16} />
                 Export PDF
               </button>
             </li>
             <li>
-              <button type="button" className="dropdown-item" onClick={() => handleExport('csv')}>
-                <Icon name="bi-file-earmark-spreadsheet" className="me-2" />
+              <button type="button" className="sv-action-item" onClick={() => handleExport('excel')}>
+                <FileSpreadsheet size={16} />
+                Export Excel
+              </button>
+            </li>
+            <li>
+              <button type="button" className="sv-action-item" onClick={() => handleExport('csv')}>
+                <FileSpreadsheet size={16} />
                 Export CSV
               </button>
             </li>
@@ -205,24 +235,18 @@ function DashboardPage() {
       <section className="row g-3 mb-4">
         {kpis.map((kpi, idx) => (
           <div className="col-12 col-sm-6 col-xl-3" key={kpi.key}>
-            <article className={`sv-card sv-kpi-card sv-kpi-accent p-4 sv-reveal sv-reveal-delay-${Math.min(idx, 3)}`} style={{ borderRadius: '0.75rem' }}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <span className="d-inline-flex align-items-center justify-content-center rounded-3 sv-kpi-icon-chip">
-                  <Icon name={kpi.icon} />
+            <article className={`sv-card sv-kpi-card sv-kpi-${kpi.tone} sv-reveal sv-reveal-delay-${Math.min(idx, 3)}`}>
+              <div className="sv-kpi-topline">
+                <span className="sv-kpi-icon-chip">
+                  <kpi.icon size={18} strokeWidth={2.2} />
                 </span>
-                <span className="sv-kpi-trend-wrap">
-                  <TrendBadge value={kpi.trend} />
-                </span>
+                <TrendBadge value={kpi.trend} />
               </div>
-              <p className="mb-1 small text-uppercase fw-semibold" style={{ color: 'var(--color-text-muted)', letterSpacing: '.07em' }}>
-                {kpi.label}
-              </p>
-              <div className="sv-kpi-value" data-target={kpi.value}>{mounted ? '0' : kpi.value}</div>
-              {kpi.hint ? (
-                <p className="mb-0 small sv-kpi-foot" style={{ color: 'var(--color-text-muted)' }}>{kpi.hint}</p>
-              ) : (
-                <p className="mb-0 small sv-kpi-foot opacity-0">placeholder</p>
-              )}
+              <div className="sv-kpi-body">
+                <p className="sv-kpi-label">{kpi.label}</p>
+                <div className="sv-kpi-value" data-target={kpi.value}>{mounted ? '0' : kpi.value}</div>
+              </div>
+              <p className="sv-kpi-foot">{kpi.hint}</p>
             </article>
           </div>
         ))}
@@ -230,33 +254,29 @@ function DashboardPage() {
 
       <section className="row g-3 mb-4">
         <div className="col-12 col-xl-8">
-          <article className="sv-card p-4 sv-reveal" style={{ borderRadius: '0.75rem' }}>
+          <article className="sv-card p-4 sv-reveal">
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="h5 mb-0 sv-heading">
-                <Icon name="bi-kanban" className="me-2" />
+              <h2 className="h5 mb-0 sv-heading sv-section-title">
+                <KanbanSquare size={22} />
                 Task Overview
               </h2>
-              <button type="button" className="btn btn-sm btn-outline-secondary" style={{ padding: '0.35rem 0.85rem', borderRadius: '0.5rem' }} onClick={() => navigate(ROUTES.myTasks)}>
+              <button type="button" className="btn btn-sm btn-outline-secondary sv-soft-button" onClick={() => navigate(ROUTES.myTasks)}>
                 View All Tasks
+                <ArrowRight size={14} />
               </button>
             </div>
             <div className="row g-2">
               {myTasks.slice(0, 4).map((task) => (
                 <div className="col-12 col-md-6" key={task._id || task.id}>
-                  <div className="border rounded-3 p-2.5" style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface-muted)', transition: 'border-color 200ms ease, transform 200ms ease' }}>
+                  <div className="sv-task-tile">
                     <div className="d-flex flex-column gap-2">
                       <div className="d-flex justify-content-between align-items-start gap-2">
-                        <p className="mb-0 fw-semibold text-truncate flex-1" style={{ fontSize: '13px' }}>{task.title}</p>
-                        <span className="badge rounded-pill" style={{
-                          fontSize: '11px',
-                          padding: '0.25rem 0.6rem',
-                          backgroundColor: task.status === 'completed' ? '#dcfce7' : task.status === 'in_progress' ? '#dbeafe' : task.status === 'in_review' ? '#fef3c7' : '#f1f5f9',
-                          color: task.status === 'completed' ? '#166534' : task.status === 'in_progress' ? '#1e40af' : task.status === 'in_review' ? '#92400e' : '#475569'
-                        }}>
-                          {task.status.replace('_', ' ')}
+                        <p className="sv-task-title">{task.title}</p>
+                        <span className={`sv-status-chip status-${task.status || 'todo'}`}>
+                          {String(task.status || 'todo').replace('_', ' ')}
                         </span>
                       </div>
-                      <p className="mb-0 small text-truncate" style={{ color: 'var(--color-text-muted)' }}>{task.projectName || 'Unassigned Project'}</p>
+                      <p className="sv-task-project">{task.projectName || 'Unassigned Project'}</p>
                     </div>
                   </div>
                 </div>
@@ -267,9 +287,9 @@ function DashboardPage() {
         </div>
 
         <div className="col-12 col-xl-4">
-          <article className="sv-card p-4 sv-reveal sv-reveal-delay-1" style={{ minHeight: 264, borderRadius: '0.75rem' }}>
-            <h2 className="h5 mb-4 sv-heading">
-              <Icon name="bi-lightning-charge" className="me-2" />
+          <article className="sv-card p-4 sv-reveal sv-reveal-delay-1 sv-active-sprint-card">
+            <h2 className="h5 mb-4 sv-heading sv-section-title">
+              <Zap size={22} />
               Active Sprint
             </h2>
             {activeSprint ? (
@@ -281,27 +301,27 @@ function DashboardPage() {
                     style={{ width: `${activeSprint.total ? Math.round((activeSprint.done / activeSprint.total) * 100) : 0}%`, background: 'linear-gradient(90deg,#6c63ff,#1d9e75)' }}
                   />
                 </div>
-                <p className="small mb-1" style={{ color: 'var(--color-text-muted)' }}>{activeSprint.done}/{activeSprint.total} completed</p>
-                <p className="small mb-0" style={{ color: 'var(--color-text-muted)' }}>{activeSprint.daysLeft != null ? `${activeSprint.daysLeft} days left` : 'No date set'}</p>
+                <p className="sv-muted-text">{activeSprint.done}/{activeSprint.total} completed</p>
+                <p className="sv-muted-text mb-0">{activeSprint.daysLeft != null ? `${activeSprint.daysLeft} days left` : 'No date set'}</p>
               </>
             ) : (
-              <p className="small mb-0" style={{ color: 'var(--color-text-muted)' }}>No active sprint.</p>
+              <p className="sv-muted-text mb-0">No active sprint.</p>
             )}
           </article>
         </div>
       </section>
 
-      <section className="row g-3">
-        <div className="col-12 col-xl-7">
-          <article className="sv-card p-4 sv-reveal sv-reveal-delay-2" style={{ borderRadius: '0.75rem' }}>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="h5 mb-0 sv-heading">
-                <Icon name="bi-clock-history" className="me-2" />
+      <section className="row g-3 align-items-stretch">
+        <div className="col-12 col-xl-7 d-flex">
+          <article className="sv-card sv-dashboard-panel sv-activity-panel sv-reveal sv-reveal-delay-2">
+            <div className="sv-panel-header">
+              <h2 className="h5 mb-0 sv-heading sv-section-title">
+                <Clock3 size={22} />
                 Recent Activity
               </h2>
-              {activityHasMore ? <button type="button" className="btn btn-sm btn-link" style={{ borderRadius: '0.5rem' }} onClick={loadMoreActivity}>Load More</button> : null}
+              {activityHasMore ? <button type="button" className="sv-panel-action" onClick={loadMoreActivity}>Load More</button> : null}
             </div>
-            <div className="d-flex flex-column gap-2 sv-activity-scroll custom-scrollbar">
+            <div className="d-flex flex-column gap-2 sv-activity-scroll">
               {activity.slice(0, 6).map((item) => (
                 <button
                   key={item._id}
@@ -311,15 +331,17 @@ function DashboardPage() {
                     if (item.entity === 'project') navigate(projectRoute('board', item.entityId));
                     if (item.entity === 'lead') navigate(ROUTES.leads);
                   }}
-                  className="btn text-start border rounded-3 p-3"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', borderRadius: '0.5rem' }}
+                  className="sv-activity-item"
                 >
                   <div className="d-flex justify-content-between gap-3">
-                    <div>
-                      <p className="mb-1 fw-semibold">{item.actor?.name || 'User'} {String(item.action || 'updated').replaceAll('_', ' ')}</p>
-                      <p className="mb-0 small" style={{ color: 'var(--color-text-muted)' }}>{item.message || 'Record updated'}</p>
+                    <div className="d-flex gap-3 min-w-0">
+                      <span className="sv-activity-icon"><Activity size={16} /></span>
+                      <div className="min-w-0">
+                        <p className="sv-activity-title">{item.actor?.name || 'User'} {String(item.action || 'updated').replaceAll('_', ' ')}</p>
+                        <p className="sv-activity-message">{item.message || 'Record updated'}</p>
+                      </div>
                     </div>
-                    <span className="small" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="sv-activity-time">
                       {item.occurredAt ? formatDistanceToNow(new Date(item.occurredAt), { addSuffix: true }) : 'just now'}
                     </span>
                   </div>
@@ -330,26 +352,28 @@ function DashboardPage() {
           </article>
         </div>
 
-        <div className="col-12 col-xl-5">
-          <article className="sv-card p-4 sv-reveal sv-reveal-delay-3" style={{ borderRadius: '0.75rem' }}>
-            <h2 className="h5 mb-4 sv-heading">
-              <Icon name="bi-heart-pulse" className="me-2" />
-              Project Health
-            </h2>
-            <div className="d-flex flex-column gap-2">
+        <div className="col-12 col-xl-5 d-flex">
+          <article className="sv-card sv-dashboard-panel sv-health-panel sv-reveal sv-reveal-delay-3">
+            <div className="sv-panel-header">
+              <h2 className="h5 mb-0 sv-heading sv-section-title">
+                <HeartPulse size={22} />
+                Project Health
+              </h2>
+              <span className="sv-panel-count">{projectHealth.length} projects</span>
+            </div>
+            <div className="d-flex flex-column gap-2 sv-health-scroll">
               {projectHealth.slice(0, 5).map((project) => (
                 <button
                   key={project.projectId}
                   type="button"
                   onClick={() => navigate(projectRoute('board', project.projectId))}
-                  className="btn text-start border rounded-3 p-3"
-                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', borderRadius: '0.5rem' }}
+                  className="sv-health-item"
                 >
                   <div className="d-flex justify-content-between align-items-center gap-2">
-                    <p className="mb-0 fw-semibold text-truncate">{project.name}</p>
-                    <span className="badge rounded-pill text-bg-danger">{project.overdueCount} overdue</span>
+                    <p className="sv-health-title">{project.name}</p>
+                    <span className="sv-overdue-chip">{project.overdueCount} overdue</span>
                   </div>
-                  <div className="progress mt-2" role="progressbar" aria-label={`${project.name} completion`}>
+                  <div className="progress sv-health-progress" role="progressbar" aria-label={`${project.name} completion`}>
                     <div className="progress-bar" style={{ width: `${project.completionPct || 0}%`, background: 'linear-gradient(90deg,#6c63ff,#1d9e75)' }} />
                   </div>
                 </button>
@@ -360,15 +384,28 @@ function DashboardPage() {
         </div>
       </section>
 
-      <section className="sv-card p-4 mt-4 sv-reveal" style={{ borderRadius: '0.75rem' }}>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="h5 mb-0 sv-heading">
-            <Icon name="bi-grid-1x2" className="me-2" />
+      <section className="sv-card sv-dashboard-panel sv-heatmap-panel mt-4 sv-reveal">
+        <div className="sv-panel-header">
+          <h2 className="h5 mb-0 sv-heading sv-section-title">
+            <LayoutGrid size={22} />
             Team Heatmap
           </h2>
-          <span className="small" style={{ color: 'var(--color-text-muted)' }}>Last 7 days</span>
+          <div className="sv-heatmap-header-meta">
+            <div className="sv-heatmap-legend" aria-label="Heatmap intensity legend">
+              <span className="sv-heatmap-legend-label">Low</span>
+              <span className="sv-heatmap-legend-swatches" aria-hidden="true">
+                <span className="sv-heatmap-swatch is-low" />
+                <span className="sv-heatmap-swatch is-low-mid" />
+                <span className="sv-heatmap-swatch is-mid" />
+                <span className="sv-heatmap-swatch is-high-mid" />
+                <span className="sv-heatmap-swatch is-high" />
+              </span>
+              <span className="sv-heatmap-legend-label">High intensity</span>
+            </div>
+            <span className="sv-panel-count">Last 7 days</span>
+          </div>
         </div>
-        <div className="table-responsive">
+        <div className="sv-heatmap-scroll table-responsive">
           <table className="table sv-table align-middle mb-0">
             <thead>
               <tr>
@@ -385,7 +422,7 @@ function DashboardPage() {
                   {(teamWorkload.columns || []).map((col, cIdx) => {
                     const cell = heatmapCells.get(`${rIdx}:${cIdx}`);
                     const intensity = Number(cell?.intensity || 0);
-                    const bg = intensity >= 3 ? '#1d9e75' : intensity === 2 ? '#6c63ff' : intensity === 1 ? '#a89dff' : '#e7ebf8';
+                    const bg = intensity >= 3 ? heatmapScale[4] : intensity === 2 ? heatmapScale[3] : intensity === 1 ? heatmapScale[1] : heatmapScale[0];
                     return <td key={`${row.id}-${col}`} className="text-center"><span className="d-inline-block rounded-2" style={{ width: 22, height: 22, background: bg }} /></td>;
                   })}
                 </tr>

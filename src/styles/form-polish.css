@@ -1,0 +1,541 @@
+/*
+  Final form layer: imported last so repeated page-specific forms keep their
+  structure while receiving one consistent field, label, error, and action style.
+*/
+
+:root {
+  --sv-field-height: 2.7rem;
+  --sv-field-radius: 0.86rem;
+  --sv-field-pad-x: 0.9rem;
+  --sv-field-border: color-mix(in srgb, var(--color-border) 82%, white);
+  --sv-field-bg: color-mix(in srgb, var(--color-surface) 96%, white);
+  --sv-field-bg-focus: var(--color-surface);
+  --sv-field-shadow: 0 1px 2px rgba(15, 23, 42, 0.035), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --sv-field-shadow-focus: 0 0 0 0.18rem color-mix(in srgb, var(--color-accent) 15%, transparent), 0 8px 20px rgba(37, 99, 235, 0.08);
+  --sv-form-gap: clamp(0.72rem, 1.3vw, 1rem);
+}
+
+html[data-theme='dark'] {
+  --sv-field-border: color-mix(in srgb, var(--color-border) 72%, #020617);
+  --sv-field-bg: color-mix(in srgb, var(--color-surface) 86%, #020617);
+  --sv-field-bg-focus: color-mix(in srgb, var(--color-surface) 94%, #020617);
+  --sv-field-shadow: 0 1px 2px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --sv-field-shadow-focus: 0 0 0 0.18rem color-mix(in srgb, var(--color-accent) 20%, transparent), 0 10px 24px rgba(2, 6, 23, 0.34);
+}
+
+form,
+.sv-form,
+[class*="-form"] {
+  accent-color: var(--color-accent);
+}
+
+form :where(label),
+:where(
+  .sv-settings-label,
+  .sv-projects-label,
+  .sv-campaigns-label,
+  .sv-campaigndetail-label,
+  .sv-board-form-label,
+  .sv-sprints-field-label,
+  .sv-taskdetail-label,
+  .sv-roadmap-filter-field > span,
+  .sv-userdatas-field-label
+) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin: 0 0 0.34rem;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.035em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+form :where(input, textarea, select),
+:where(
+  .sv-ctl-input,
+  .form-control,
+  .form-select,
+  .sv-settings-input,
+  .sv-newtask-title-input,
+  .sv-newtask-editor-input,
+  .sv-taskdetail-estimate-input,
+  .sv-leads-filter-input,
+  .sv-projects-search-input,
+  .sv-roadmap-search,
+  .sv-saveview-input
+) {
+  min-height: var(--sv-field-height);
+  border: 1px solid var(--sv-field-border) !important;
+  border-radius: var(--sv-field-radius) !important;
+  background-color: var(--sv-field-bg) !important;
+  color: var(--color-text) !important;
+  box-shadow: var(--sv-field-shadow);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+form :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select),
+:where(
+  .sv-ctl-input,
+  .form-control,
+  .form-select,
+  .sv-settings-input,
+  .sv-taskdetail-estimate-input,
+  .sv-leads-filter-input,
+  .sv-projects-search-input,
+  .sv-roadmap-search,
+  .sv-saveview-input
+) {
+  padding: 0.64rem var(--sv-field-pad-x) !important;
+}
+
+form :where(textarea),
+:where(.sv-newtask-editor-input, .sv-campaigns-textarea, .sv-campaigndetail-textarea, .sv-projects-textarea) {
+  min-height: 7rem;
+  padding: 0.78rem var(--sv-field-pad-x) !important;
+  resize: vertical;
+}
+
+form :where(input, textarea, select)::placeholder,
+:where(.sv-ctl-input, .form-control, .sv-settings-input, .sv-saveview-input)::placeholder {
+  color: color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+}
+
+form :where(input, textarea, select):hover,
+:where(
+  .sv-ctl-input,
+  .form-control,
+  .form-select,
+  .sv-settings-input,
+  .sv-newtask-title-input,
+  .sv-newtask-editor-input,
+  .sv-taskdetail-estimate-input,
+  .sv-leads-filter-input,
+  .sv-projects-search-input,
+  .sv-roadmap-search,
+  .sv-saveview-input
+):hover {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border)) !important;
+}
+
+form :where(input, textarea, select):focus,
+form :where(input, textarea, select):focus-visible,
+:where(
+  .sv-ctl-input,
+  .form-control,
+  .form-select,
+  .sv-settings-input,
+  .sv-newtask-title-input,
+  .sv-newtask-editor-input,
+  .sv-taskdetail-estimate-input,
+  .sv-leads-filter-input,
+  .sv-projects-search-input,
+  .sv-roadmap-search,
+  .sv-saveview-input
+):focus,
+:where(
+  .sv-ctl-input,
+  .form-control,
+  .form-select,
+  .sv-settings-input,
+  .sv-newtask-title-input,
+  .sv-newtask-editor-input,
+  .sv-taskdetail-estimate-input,
+  .sv-leads-filter-input,
+  .sv-projects-search-input,
+  .sv-roadmap-search,
+  .sv-saveview-input
+):focus-visible {
+  outline: 0 !important;
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border)) !important;
+  background-color: var(--sv-field-bg-focus) !important;
+  box-shadow: var(--sv-field-shadow-focus) !important;
+}
+
+form :where(input, textarea, select):disabled,
+:where(.sv-ctl-input, .form-control, .form-select, .sv-settings-input):disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  background-color: color-mix(in srgb, var(--color-surface-muted) 86%, var(--color-surface)) !important;
+}
+
+form :where(input[aria-invalid='true'], textarea[aria-invalid='true'], select[aria-invalid='true'], .is-invalid),
+:where(.is-invalid, .sv-field-invalid) {
+  border-color: color-mix(in srgb, var(--color-error) 58%, var(--color-border)) !important;
+  background-color: color-mix(in srgb, var(--color-error) 5%, var(--color-surface)) !important;
+  box-shadow: 0 0 0 0.16rem color-mix(in srgb, var(--color-error) 13%, transparent) !important;
+}
+
+:where(
+  .invalid-feedback,
+  .sv-field-error,
+  .sv-newtask-error,
+  .sv-settings-error,
+  .sv-projects-inline-error,
+  .sv-campaigns-inline-error,
+  .sv-campaigndetail-inline-error,
+  .sv-board-modal-error,
+  .sv-board-add-column-error,
+  .sv-members-field-error,
+  .sv-userdatas-error
+) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.38rem;
+  margin-top: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--color-error) 24%, transparent);
+  border-radius: 0.74rem;
+  padding: 0.52rem 0.68rem;
+  background: color-mix(in srgb, var(--color-error) 7%, var(--color-surface));
+  color: var(--color-error) !important;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+form :where(label .text-error, .text-error),
+:where(
+  .sv-campaigns-label .text-error,
+  .sv-projects-label .text-error,
+  .sv-campaigndetail-label .text-error,
+  .sv-settings-label .text-error,
+  .sv-board-form-label .text-error,
+  .sv-sprints-field-label .text-error
+) {
+  display: inline;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-error) !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: 0.08em;
+}
+
+:where(
+  .sv-page-dropdown,
+  .sv-page-calendar,
+  .sv-projects-dropdown--form,
+  .sv-projects-date--form,
+  .sv-analytics-filter-input
+) {
+  width: 100%;
+}
+
+:where(.sv-page-dropdown__trigger, .sv-page-calendar__trigger) {
+  min-height: var(--sv-field-height);
+  width: 100%;
+  border: 1px solid var(--sv-field-border) !important;
+  border-radius: var(--sv-field-radius) !important;
+  background: var(--sv-field-bg) !important;
+  color: var(--color-text) !important;
+  box-shadow: var(--sv-field-shadow);
+  padding: 0.62rem var(--sv-field-pad-x) !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+:where(.sv-page-dropdown__trigger:hover, .sv-page-calendar__trigger:hover) {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border)) !important;
+}
+
+:where(.sv-page-dropdown__trigger:focus-visible, .sv-page-calendar__trigger:focus-visible, .sv-page-dropdown__trigger.is-open, .sv-page-calendar__trigger.is-open) {
+  outline: 0;
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-border)) !important;
+  box-shadow: var(--sv-field-shadow-focus);
+}
+
+:where(.sv-page-dropdown__value, .sv-page-calendar__value) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.sv-page-dropdown__menu, .sv-page-calendar__menu) {
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), var(--color-surface));
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.18);
+}
+
+:where(
+  .sv-campaigns-form-grid,
+  .sv-campaigndetail-form-grid,
+  .sv-projects-form-grid,
+  .sv-settings-form-grid,
+  .sv-settings-form-grid-3,
+  .sv-employees-modal-form,
+  .sv-contacts-modal-form,
+  .sv-sprints-create-modal-form
+) {
+  gap: var(--sv-form-gap) !important;
+  align-items: start;
+}
+
+:where(
+  .sv-campaigns-form-section,
+  .sv-campaigndetail-edit-form,
+  .sv-projects-form-section,
+  .sv-settings-panel,
+  .sv-members-form,
+  .sv-board-modal,
+  .sv-modal-panel,
+  .sv-modal-panel-lg
+) {
+  border-color: color-mix(in srgb, var(--color-border) 78%, white) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 98%, white), var(--color-surface)),
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 34%);
+}
+
+:where(.sv-campaigns-form-section-title, .sv-projects-form-section-head h3, .sv-members-form-title) {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+:where(.sv-ctl-btn, .btn, button[type='submit'], form button[type='button']) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  min-height: 2.5rem;
+  border-radius: 0.86rem !important;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white) !important;
+  padding: 0.58rem 0.9rem !important;
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.1;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+:where(.sv-ctl-btn .material-symbols-outlined, .btn .material-symbols-outlined, .sv-icon-btn-icon) {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+:where(.btn-light, .btn-outline-secondary, .btn-outline-primary, .sv-ctl-btn.btn-light) {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 100%, white), color-mix(in srgb, var(--color-surface-muted) 74%, white)) !important;
+  border-color: color-mix(in srgb, var(--color-border) 82%, white) !important;
+  color: var(--color-text) !important;
+}
+
+:where(.btn-light, .btn-outline-secondary, .btn-outline-primary, .sv-ctl-btn.btn-light):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border)) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 7%, var(--color-surface)), color-mix(in srgb, var(--color-surface-muted) 86%, white)) !important;
+  color: color-mix(in srgb, var(--color-accent) 82%, var(--color-text)) !important;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+:where(.btn-primary, .sv-btn-primary, .sv-settings-btn-primary, .sv-ctl-btn.btn-primary) {
+  border-color: color-mix(in srgb, var(--color-accent) 90%, #1d4ed8) !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 96%, #3b82f6), color-mix(in srgb, var(--color-accent) 82%, #1d4ed8)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+:where(.btn-primary, .sv-btn-primary, .sv-settings-btn-primary, .sv-ctl-btn.btn-primary):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--color-accent) 96%, #1e40af) !important;
+  box-shadow: 0 16px 30px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  filter: saturate(1.04);
+}
+
+:where(.btn-danger, .sv-settings-btn-danger, .sv-ctl-btn.btn-danger) {
+  border-color: color-mix(in srgb, var(--color-error) 72%, #991b1b) !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-error) 95%, #ef4444), color-mix(in srgb, var(--color-error) 84%, #7f1d1d)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-error) 20%, transparent);
+}
+
+:where(.btn-danger, .sv-settings-btn-danger, .sv-ctl-btn.btn-danger):not(:disabled):hover {
+  box-shadow: 0 16px 30px color-mix(in srgb, var(--color-error) 26%, transparent);
+}
+
+:where(
+  .sv-export-menu-trigger,
+  [class*="filter-toggle"],
+  [class*="-filter-btn"],
+  [class*="-filter-trigger"],
+  [class*="-clear-btn"],
+  [class*="-reset-btn"]
+) {
+  min-height: 2.52rem !important;
+  border-radius: 0.86rem !important;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 100%, white), color-mix(in srgb, var(--color-surface-muted) 76%, white)) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+:where(
+  .sv-export-menu-trigger,
+  [class*="filter-toggle"],
+  [class*="-filter-btn"],
+  [class*="-filter-trigger"],
+  [class*="-clear-btn"],
+  [class*="-reset-btn"]
+):not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border)) !important;
+  color: color-mix(in srgb, var(--color-accent) 84%, var(--color-text)) !important;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+:where(
+  [class*="filter-toggle"].is-active,
+  [class*="-filter-btn"].is-active,
+  [class*="-filter-trigger"].is-active,
+  .sv-export-menu-trigger[aria-expanded='true']
+) {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--color-border)) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 12%, var(--color-surface)), color-mix(in srgb, var(--color-accent) 7%, var(--color-surface-muted))) !important;
+  color: var(--color-accent) !important;
+  box-shadow: 0 0 0 0.16rem color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+:where(.sv-icon-btn, .sv-campaigns-icon-btn) {
+  gap: 0.46rem !important;
+}
+
+form :where(.sv-ctl-btn, .btn, button[type='submit']),
+:where(
+  .sv-campaigns-submit-btn,
+  .sv-projects-form-btn,
+  .sv-settings-form-actions .sv-ctl-btn,
+  .sv-campaigndetail-modal-actions .sv-ctl-btn,
+  .sv-campaigns-modal-actions .sv-ctl-btn
+) {
+  min-height: 2.58rem;
+  border-radius: 0.84rem !important;
+  font-weight: 850;
+}
+
+:where(.sv-ctl-btn, .btn, button[type='submit']):not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+:where(.sv-ctl-btn, .btn, button[type='submit']):focus-visible {
+  outline: 0 !important;
+  box-shadow:
+    0 0 0 0.18rem color-mix(in srgb, var(--color-accent) 18%, transparent),
+    0 10px 22px rgba(15, 23, 42, 0.08) !important;
+}
+
+:where(.sv-ctl-btn, .btn, button[type='submit']):disabled {
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.62;
+}
+
+html[data-theme='dark'] :where(.btn-light, .btn-outline-secondary, .btn-outline-primary, .sv-ctl-btn.btn-light),
+html[data-theme='dark'] :where(
+  .sv-export-menu-trigger,
+  [class*="filter-toggle"],
+  [class*="-filter-btn"],
+  [class*="-filter-trigger"],
+  [class*="-clear-btn"],
+  [class*="-reset-btn"]
+) {
+  border-color: color-mix(in srgb, var(--color-border) 76%, #020617) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, #020617), color-mix(in srgb, var(--color-surface-muted) 80%, #020617)) !important;
+  color: var(--color-text) !important;
+}
+
+:where(
+  .sv-campaigns-modal-actions,
+  .sv-campaigndetail-modal-actions,
+  .sv-projects-form-actions,
+  .sv-settings-form-actions,
+  .sv-members-form-actions
+) {
+  gap: 0.62rem !important;
+  padding-top: 0.75rem;
+}
+
+:where(input[type='checkbox'], input[type='radio'], .form-check-input) {
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  min-height: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white) !important;
+  box-shadow: none;
+}
+
+:where(input[type='checkbox'], input[type='radio'], .form-check-input):focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --sv-field-height: 2.84rem;
+    --sv-field-pad-x: 0.86rem;
+  }
+
+  :where(
+    .sv-campaigns-form-grid,
+    .sv-campaigndetail-form-grid,
+    .sv-projects-form-grid,
+    .sv-settings-form-grid,
+    .sv-settings-form-grid-3,
+    .sv-employees-modal-form,
+    .sv-contacts-modal-form,
+    .sv-sprints-create-modal-form
+  ) {
+    grid-template-columns: 1fr !important;
+  }
+
+  :where(
+    .sv-campaigns-modal-actions,
+    .sv-campaigndetail-modal-actions,
+    .sv-projects-form-actions,
+    .sv-settings-form-actions,
+    .sv-members-form-actions
+  ) {
+    display: grid !important;
+    grid-template-columns: 1fr;
+  }
+
+  :where(
+    .sv-campaigns-modal-actions .sv-ctl-btn,
+    .sv-campaigndetail-modal-actions .sv-ctl-btn,
+    .sv-projects-form-actions .sv-ctl-btn,
+    .sv-settings-form-actions .sv-ctl-btn,
+    .sv-members-form-actions .sv-ctl-btn
+  ) {
+    width: 100%;
+  }
+}

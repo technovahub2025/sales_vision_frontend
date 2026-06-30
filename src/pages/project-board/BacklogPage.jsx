@@ -16,13 +16,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
-import { useQueries } from '@tanstack/react-query';
-import { sprintItemsQueryKey, useBacklog } from '../../hooks/useBacklog';
+import { useBacklog } from '../../hooks/useBacklog';
 import { useSprints } from '../../hooks/useSprints';
 import { useProjectRouteSync } from '../../hooks/useProjectRouteSync';
-import { sprintsApi, tasksApi } from '../../api';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
 import ProjectTabs from './ProjectTabs';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 
 function priorityDotClass(priority) {
   switch (String(priority || '').toLowerCase()) {
@@ -56,7 +54,7 @@ function SortableRow({ task, rowStyle, selected, onToggle, onOpen, showCheckbox,
     <div
       ref={setNodeRef}
       style={style}
-      className={`sv-backlog-row grid min-h-[44px] grid-cols-[32px_12px_1fr_140px_120px_120px] items-center gap-2 px-4 py-2.5 ${isDragging ? 'opacity-60' : ''}`}
+      className={`sv-backlog-row grid min-h-[44px] grid-cols-[32px_12px_1fr_140px_120px_120px] items-center gap-2 px-4 py-2.5 ${isDragging ? 'opacity-60' : ''} ${selected.has(taskId) ? 'is-selected' : ''}`}
       {...attributes}
       {...listeners}
     >
@@ -71,20 +69,32 @@ function SortableRow({ task, rowStyle, selected, onToggle, onOpen, showCheckbox,
         <span />
       )}
       <span className={`h-2.5 w-2.5 rounded-full ${priorityDotClass(task.priority)}`} />
-      <button type="button" onClick={() => onOpen(task)} className="sv-backlog-title-btn truncate text-left text-sm font-semibold text-on-surface hover:text-primary">
-        <span className="sv-backlog-type-chip mr-2 rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-semibold uppercase text-on-surface-variant">
-          {String(task.issueType || 'task')}
-        </span>
-        <span className={`${String(task.issueType || '') === 'subtask' ? 'ml-3' : ''}`}>{task.title}</span>
-        {task.parentTaskId ? (
-          <span className="ml-2 text-[11px] font-normal text-on-surface-variant">
-            / {parentTitleMap.get(String(task.parentTaskId)) || 'Parent'}
+      <button type="button" onClick={() => onOpen(task)} className="sv-backlog-title-btn text-left">
+        <div className="sv-backlog-title-stack">
+          <div className="sv-backlog-title-meta">
+            <span className="sv-backlog-type-chip rounded bg-surface-container px-1.5 py-0.5 text-[10px] font-semibold uppercase text-on-surface-variant">
+              {String(task.issueType || 'task')}
+            </span>
+            {task.parentTaskId ? (
+              <span className="sv-backlog-parent-chip text-[11px] font-medium text-on-surface-variant">
+                Parent: {parentTitleMap.get(String(task.parentTaskId)) || 'Parent'}
+              </span>
+            ) : null}
+          </div>
+          <span className="sv-backlog-title-text truncate text-sm font-semibold text-on-surface hover:text-primary">
+            {task.title}
           </span>
-        ) : null}
+        </div>
       </button>
-      <span className="truncate text-xs text-on-surface-variant">{task.assigneeName || 'Unassigned'}</span>
-      <span className="text-xs text-on-surface-variant">{task.points || 0}</span>
-      <span className="text-xs uppercase text-on-surface-variant">{task.priority || '-'}</span>
+      <span className="sv-backlog-assignee truncate text-xs text-on-surface-variant" data-label="Assignee">
+        {task.assigneeName || 'Unassigned'}
+      </span>
+      <span className="sv-backlog-points text-xs text-on-surface-variant" data-label="Story Points">
+        {task.points || 0}
+      </span>
+      <span className="sv-backlog-priority text-xs uppercase text-on-surface-variant" data-label="Priority">
+        {task.priority || '-'}
+      </span>
     </div>
   );
 }
@@ -98,51 +108,16 @@ function DroppableContainer({ id, children, className }) {
   );
 }
 
-function SprintLane({ sprint, items, onOpenTask }) {
-  return (
-    <div className="sv-card sv-backlog-sprint-lane">
-      <div className="sv-backlog-sprint-head mb-2 flex items-center justify-between">
-        <div>
-          <p className="sv-backlog-sprint-status text-xs font-semibold uppercase text-on-surface-variant">{sprint.status}</p>
-          <h3 className="sv-backlog-sprint-title text-sm font-bold text-on-surface">{sprint.name}</h3>
-        </div>
-        <span className="sv-backlog-sprint-count rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant">
-          {(items || []).length}
-        </span>
-      </div>
-
-      <DroppableContainer id={`sprint:${sprint._id}`} className="sv-backlog-sprint-dropzone min-h-[120px] space-y-2 rounded-lg border border-dashed border-outline-variant/40 p-2">
-        <SortableContext items={(items || []).map((task) => `task:${task._id || task.id}`)} strategy={verticalListSortingStrategy}>
-          {(items || []).map((task) => (
-            <SortableRow
-              key={task._id || task.id}
-              task={task}
-              selected={new Set()}
-              onToggle={() => {}}
-              onOpen={onOpenTask}
-              showCheckbox={false}
-              containerId={`sprint:${sprint._id}`}
-            />
-          ))}
-        </SortableContext>
-        {!items?.length ? <p className="sv-backlog-empty-drop text-center text-xs text-on-surface-variant">Drop tasks here</p> : null}
-      </DroppableContainer>
-    </div>
-  );
-}
-
 function BacklogPage() {
   const navigate = useNavigate();
   const projectId = useProjectRouteSync();
-  const { workspaceId } = useWorkspace();
   const { items, loading, error, addToSprint, reorder } = useBacklog(projectId);
-  const { sprints, refresh: refreshSprints } = useSprints(projectId);
+  const { sprints } = useSprints(projectId);
+
   const [selected, setSelected] = useState(new Set());
-  const [targetSprintId, setTargetSprintId] = useState('');
   const [search, setSearch] = useState('');
   const [issueTypeFilter, setIssueTypeFilter] = useState('all');
   const [epicFilter, setEpicFilter] = useState('all');
-  const [completeModal, setCompleteModal] = useState({ open: false, sprint: null, incomplete: [], action: 'backlog', nextSprintId: '' });
   const [moveModal, setMoveModal] = useState({ open: false, sprintId: '' });
   const [isMoving, setIsMoving] = useState(false);
   const [moveError, setMoveError] = useState('');
@@ -172,25 +147,18 @@ function BacklogPage() {
   );
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
-
   const planningSprints = useMemo(() => (sprints || []).filter((sprint) => ['planning', 'active'].includes(String(sprint.status))), [sprints]);
+  const backlogCount = filteredItems.length;
+  const activeFilterCount = Number(issueTypeFilter !== 'all') + Number(epicFilter !== 'all');
+  const totalBacklogItems = (items || []).length;
+  const hasActiveFilters = Boolean(search.trim()) || activeFilterCount > 0;
 
-  const sprintItemQueries = useQueries({
-    queries: planningSprints.map((sprint) => ({
-      queryKey: sprintItemsQueryKey(workspaceId, sprint._id),
-      queryFn: () => sprintsApi.items(workspaceId, sprint._id).then((response) => response.data || []),
-      enabled: Boolean(workspaceId && sprint._id),
-      staleTime: 30_000,
-    })),
-  });
+  const backlogIds = filteredItems.map((task) => `task:${task._id || task.id}`);
 
-  const sprintItemsMap = useMemo(() => {
-    const map = new Map();
-    planningSprints.forEach((sprint, idx) => {
-      map.set(String(sprint._id), sprintItemQueries[idx]?.data || []);
-    });
-    return map;
-  }, [planningSprints, sprintItemQueries]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const runMoveToSprint = async (sprintId) => {
     if (!selectedIds.length) {
@@ -208,7 +176,6 @@ function BacklogPage() {
       const result = await addToSprint(sprintId, selectedIds, undefined, 'backlog');
       const updatedCount = Number(result?.updated || selectedIds.length || 0);
       setMoveSuccess(`${updatedCount} task${updatedCount === 1 ? '' : 's'} moved to sprint.`);
-      setTargetSprintId(sprintId);
       setMoveModal({ open: false, sprintId: '' });
       setSelected(new Set());
     } catch (err) {
@@ -218,21 +185,20 @@ function BacklogPage() {
     }
   };
 
-  const onMoveToSprint = async () => {
+  const onMoveToSprint = () => {
     if (!selectedIds.length) {
       setMoveError('Select at least one backlog task.');
       return;
     }
-    if (!targetSprintId) {
-      setMoveError('');
-      setMoveModal({ open: true, sprintId: '' });
-      return;
-    }
-    await runMoveToSprint(targetSprintId);
+    setMoveError('');
+    setMoveModal({ open: true, sprintId: '' });
   };
 
-  const onConfirmMoveFromModal = async () => {
-    await runMoveToSprint(moveModal.sprintId);
+  const clearFilters = () => {
+    setSearch('');
+    setIssueTypeFilter('all');
+    setEpicFilter('all');
+    setShowFilters(false);
   };
 
   const toggleSelected = (task, enabled) => {
@@ -247,44 +213,6 @@ function BacklogPage() {
 
   const onOpenTask = (task) => navigate(`/tasks/${task._id || task.id}`);
 
-  const openCompleteModal = async (sprint) => {
-    const response = await sprintsApi.incompleteTasks(workspaceId, sprint._id);
-    setCompleteModal({ open: true, sprint, incomplete: response.data || [], action: 'backlog', nextSprintId: '' });
-  };
-
-  const completeSprint = async () => {
-    const { sprint, action, nextSprintId } = completeModal;
-    await sprintsApi.complete(workspaceId, sprint._id, { incompleteTaskAction: action, nextSprintId: nextSprintId || undefined });
-    setCompleteModal({ open: false, sprint: null, incomplete: [], action: 'backlog', nextSprintId: '' });
-    refreshSprints();
-  };
-
-  const backlogIds = filteredItems.map((task) => `task:${task._id || task.id}`);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  const findContainerForTask = (taskId) => {
-    if (filteredItems.some((item) => String(item._id || item.id) === String(taskId))) return 'backlog';
-    for (const [sprintId, list] of sprintItemsMap.entries()) {
-      if ((list || []).some((item) => String(item._id || item.id) === String(taskId))) {
-        return `sprint:${sprintId}`;
-      }
-    }
-    return null;
-  };
-
-  const getContainerTasks = (containerId) => {
-    if (containerId === 'backlog') return filteredItems;
-    if (containerId?.startsWith('sprint:')) {
-      const sprintId = containerId.split(':')[1];
-      return sprintItemsMap.get(sprintId) || [];
-    }
-    return [];
-  };
-
   const onDragEnd = async (event) => {
     const { active, over } = event;
     if (!over) return;
@@ -292,48 +220,20 @@ function BacklogPage() {
     if (activeData.type !== 'task') return;
 
     const taskId = activeData.taskId;
-    const fromContainer = activeData.containerId || findContainerForTask(taskId);
+    const fromContainer = activeData.containerId || 'backlog';
     const overContainer = over.data?.current?.containerId || null;
 
-    if (!fromContainer || !overContainer) return;
+    if (fromContainer !== 'backlog' || overContainer !== 'backlog') return;
 
-    const toContainer = overContainer;
     const overTaskId = String(over.id || '').startsWith('task:') ? String(over.id).replace('task:', '') : null;
+    const list = filteredItems;
+    const oldIndex = list.findIndex((item) => String(item._id || item.id) === String(taskId));
+    const newIndex = overTaskId
+      ? list.findIndex((item) => String(item._id || item.id) === String(overTaskId))
+      : list.length - 1;
 
-    if (fromContainer === toContainer) {
-      if (fromContainer === 'backlog') {
-        const list = getContainerTasks(fromContainer);
-        const oldIndex = list.findIndex((item) => String(item._id || item.id) === String(taskId));
-        const newIndex = overTaskId
-          ? list.findIndex((item) => String(item._id || item.id) === String(overTaskId))
-          : list.length - 1;
-        if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
-          await reorder(taskId, newIndex);
-        }
-      } else if (fromContainer.startsWith('sprint:')) {
-        const list = getContainerTasks(fromContainer);
-        const ordered = list.map((task) => String(task._id || task.id));
-        const oldIndex = ordered.indexOf(String(taskId));
-        const newIndex = overTaskId ? ordered.indexOf(String(overTaskId)) : ordered.length - 1;
-        if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
-          const [moved] = ordered.splice(oldIndex, 1);
-          ordered.splice(newIndex, 0, moved);
-          const sprintId = fromContainer.split(':')[1];
-          await sprintsApi.reorderItems(workspaceId, sprintId, ordered);
-        }
-      }
-      return;
-    }
-
-    if (toContainer.startsWith('sprint:')) {
-      const sprintId = toContainer.split(':')[1];
-      const list = getContainerTasks(toContainer);
-      const position = overTaskId
-        ? list.findIndex((item) => String(item._id || item.id) === String(overTaskId))
-        : list.length;
-      await addToSprint(sprintId, [taskId], position, fromContainer?.startsWith('sprint:') ? fromContainer.split(':')[1] : 'backlog');
-    } else if (toContainer === 'backlog' && fromContainer.startsWith('sprint:')) {
-      await tasksApi.update(workspaceId, taskId, { sprintId: null });
+    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+      await reorder(taskId, newIndex);
     }
   };
 
@@ -343,8 +243,29 @@ function BacklogPage() {
       <div className="sv-backlog-stack">
         <div className="sv-card sv-backlog-toolbar">
           <div className="sv-backlog-toolbar-head">
-            <h1 className="sv-backlog-title text-2xl font-semibold text-on-surface">Backlog</h1>
+            <div className="sv-backlog-toolbar-copy">
+              <p className="sv-backlog-eyebrow">Planning workspace</p>
+              <h1 className="sv-backlog-title text-2xl font-semibold text-on-surface">Backlog</h1>
+              <p className="sv-backlog-subtitle text-sm text-on-surface-variant">
+                Intake, refine, and reorder work before it moves into execution.
+              </p>
+            </div>
+            <div className="sv-backlog-summary-row">
+              <div className="sv-backlog-summary-chip">
+                <strong>{totalBacklogItems}</strong>
+                <span>Backlog items</span>
+              </div>
+              <div className="sv-backlog-summary-chip">
+                <strong>{selectedIds.length}</strong>
+                <span>Selected</span>
+              </div>
+              <div className="sv-backlog-summary-chip">
+                <strong>{backlogCount}</strong>
+                <span>Visible</span>
+              </div>
+            </div>
           </div>
+
           <div className="sv-backlog-toolbar-controls">
             <input
               value={search}
@@ -358,57 +279,67 @@ function BacklogPage() {
               className={`btn sv-ctl-btn sv-backlog-filter-toggle ${showFilters ? 'btn-primary is-active' : 'btn-light'}`}
             >
               Filters
+              {activeFilterCount ? <span className="sv-backlog-filter-badge">{activeFilterCount}</span> : null}
             </button>
             <button
               type="button"
               onClick={onMoveToSprint}
-              disabled={isMoving || !selectedIds.length}
+              disabled={isMoving || !selectedIds.length || !planningSprints.length}
               className="btn btn-primary sv-ctl-btn sv-backlog-move-btn"
             >
               {isMoving ? 'Moving...' : 'Move to Sprint'}
             </button>
           </div>
+
           {showFilters ? (
             <div className="sv-backlog-filter-panel">
-            <select
-              value={issueTypeFilter}
-              onChange={(event) => setIssueTypeFilter(event.target.value)}
-              className="form-select sv-ctl-select sv-backlog-filter"
-            >
-              <option value="all">All types</option>
-              <option value="epic">Epic</option>
-              <option value="task">Task</option>
-              <option value="subtask">Subtask</option>
-            </select>
-            <select
-              value={epicFilter}
-              onChange={(event) => setEpicFilter(event.target.value)}
-              className="form-select sv-ctl-select sv-backlog-filter"
-            >
-              <option value="all">All epics</option>
-              {epicOptions.map((epic) => (
-                <option key={epic._id} value={epic._id}>
-                  {epic.title}
-                </option>
-              ))}
-            </select>
-            <select
-              value={targetSprintId}
-              onChange={(event) => setTargetSprintId(event.target.value)}
-              className="form-select sv-ctl-select sv-backlog-filter"
-            >
-              <option value="">Assign Sprint</option>
-              {planningSprints.map((sprint) => (
-                <option key={sprint._id} value={sprint._id}>
-                  {sprint.name}
-                </option>
-              ))}
-            </select>
+              <SelectDropdown
+                value={issueTypeFilter}
+                onChange={setIssueTypeFilter}
+                options={[
+                  { value: 'all', label: 'All types' },
+                  { value: 'epic', label: 'Epic' },
+                  { value: 'task', label: 'Task' },
+                  { value: 'subtask', label: 'Subtask' },
+                ]}
+                className="sv-backlog-filter"
+              />
+              <SelectDropdown
+                value={epicFilter}
+                onChange={setEpicFilter}
+                options={[
+                  { value: 'all', label: 'All epics' },
+                  ...epicOptions.map((epic) => ({ value: epic._id, label: epic.title })),
+                ]}
+                className="sv-backlog-filter"
+              />
+              {activeFilterCount ? (
+                <div className="sv-backlog-filter-state">
+                  <span className="sv-backlog-filter-state-label">Active filters</span>
+                  <span className="sv-backlog-filter-state-value">{activeFilterCount} applied</span>
+                </div>
+              ) : (
+                <div className="sv-backlog-filter-state is-empty">
+                  <span className="sv-backlog-filter-state-label">No filters applied</span>
+                  <span className="sv-backlog-filter-state-value">Showing all backlog items</span>
+                </div>
+              )}
             </div>
           ) : null}
+
+          <div className="sv-backlog-hint-row">
+            <div className="sv-backlog-hint-chip">
+              <span className="material-symbols-outlined">drag_indicator</span>
+              <span>Drag rows to reorder</span>
+            </div>
+            <div className="sv-backlog-hint-chip">
+              <span className="material-symbols-outlined">check_box_outline_blank</span>
+              <span>Use checkboxes for bulk move</span>
+            </div>
+          </div>
         </div>
 
-        {loading ? <p className="sv-backlog-message text-sm text-on-surface-variant">Loading backlog...</p> : null}
+        {loading ? <p className="sv-backlog-message text-sm text-on-surface-variant">Loading backlog items...</p> : null}
         {error ? <p className="sv-backlog-message is-error text-sm text-error">{error}</p> : null}
         {moveError ? <p className="sv-backlog-message is-error text-sm text-error">{moveError}</p> : null}
         {moveSuccess ? <p className="sv-backlog-message is-success text-sm text-emerald-600">{moveSuccess}</p> : null}
@@ -416,7 +347,7 @@ function BacklogPage() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <div className="sv-backlog-layout">
             <DroppableContainer id="backlog" className="sv-card sv-backlog-table overflow-hidden">
-              <div className="sv-backlog-table-head grid grid-cols-[32px_12px_1fr_140px_120px_120px] gap-2 bg-surface-container-low/40 px-4 py-3 text-xs font-semibold uppercase text-on-surface-variant">
+              <div className="sv-backlog-table-head grid grid-cols-[32px_12px_1fr_140px_120px_120px] gap-2 bg-surface-container-low/40 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant">
                 <span>Select</span>
                 <span />
                 <span>Title</span>
@@ -427,7 +358,7 @@ function BacklogPage() {
               <SortableContext items={backlogIds} strategy={verticalListSortingStrategy}>
                 {filteredItems.map((item) => (
                   <SortableRow
-                    key={item._id}
+                    key={item._id || item.id}
                     task={item}
                     selected={selected}
                     onToggle={toggleSelected}
@@ -439,114 +370,55 @@ function BacklogPage() {
                 ))}
               </SortableContext>
               {!filteredItems.length ? (
-                <div className="sv-backlog-empty px-4 py-8 text-center text-sm text-on-surface-variant">No backlog items.</div>
-              ) : null}
-            </DroppableContainer>
-          </div>
-
-          <section className="sv-backlog-sprint-section">
-            <h2 className="sv-backlog-sprint-section-title">Planning & Active Sprints</h2>
-            <div className="sv-backlog-sprint-stack">
-              {planningSprints.map((sprint) => (
-                <div key={sprint._id}>
-                  <SprintLane
-                    sprint={sprint}
-                    items={sprintItemsMap.get(String(sprint._id)) || []}
-                    onOpenTask={onOpenTask}
-                  />
-                  {String(sprint.status) === 'active' ? (
-                    <button
-                      type="button"
-                      onClick={() => openCompleteModal(sprint)}
-                      className="btn btn-light sv-ctl-btn sv-backlog-complete-btn mt-2 w-full"
-                    >
-                      Complete Sprint
+                <div className="sv-backlog-empty px-4 py-10 text-center text-sm text-on-surface-variant">
+                  <div className="sv-backlog-empty-icon">
+                    <span className="material-symbols-outlined">inventory_2</span>
+                  </div>
+                  <p className="sv-backlog-empty-title">No backlog items</p>
+                  <p className="sv-backlog-empty-text">
+                    {hasActiveFilters
+                      ? 'Try clearing the search or filters to see all items.'
+                      : 'Work items will appear here when they are added to the project.'}
+                  </p>
+                  {hasActiveFilters ? (
+                    <button type="button" onClick={clearFilters} className="btn btn-light sv-ctl-btn sv-backlog-empty-action">
+                      Clear filters
                     </button>
                   ) : null}
                 </div>
-              ))}
-            </div>
-          </section>
+              ) : null}
+            </DroppableContainer>
+          </div>
         </DndContext>
       </div>
-
-      {completeModal.open ? (
-        <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="sv-card sv-backlog-modal sv-backlog-complete-modal w-full max-w-lg">
-            <h3 className="sv-backlog-modal-title text-lg font-semibold text-on-surface">Complete {completeModal.sprint?.name}</h3>
-            <p className="sv-backlog-modal-subtitle mt-2 text-sm text-on-surface-variant">
-              {completeModal.incomplete.length} incomplete tasks found.
-            </p>
-            <div className="sv-backlog-modal-list mt-4 space-y-2 text-xs text-on-surface-variant">
-              {completeModal.incomplete.map((item) => (
-                <div key={item._id} className="sv-backlog-modal-list-item flex items-center justify-between rounded-md border border-outline-variant/10 px-2 py-1">
-                  <span className="truncate">{item.title}</span>
-                  <span className="uppercase">{item.status}</span>
-                </div>
-              ))}
-              {!completeModal.incomplete.length ? <p className="text-xs">All tasks are complete.</p> : null}
-            </div>
-            <div className="sv-backlog-modal-controls mt-4">
-              <select
-                value={completeModal.action}
-                onChange={(event) => setCompleteModal((current) => ({ ...current, action: event.target.value }))}
-                className="form-select sv-ctl-select w-full"
-              >
-                <option value="backlog">Move incomplete tasks to backlog</option>
-                <option value="move_to_sprint">Move incomplete tasks to another sprint</option>
-              </select>
-              {completeModal.action === 'move_to_sprint' ? (
-                <select
-                  value={completeModal.nextSprintId}
-                  onChange={(event) => setCompleteModal((current) => ({ ...current, nextSprintId: event.target.value }))}
-                  className="form-select sv-ctl-select mt-2 w-full"
-                >
-                  <option value="">Select next sprint</option>
-                  {planningSprints.filter((item) => String(item._id) !== String(completeModal.sprint?._id)).map((sprint) => (
-                    <option key={sprint._id} value={sprint._id}>{sprint.name}</option>
-                  ))}
-                </select>
-              ) : null}
-            </div>
-            <div className="sv-backlog-modal-actions mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCompleteModal({ open: false, sprint: null, incomplete: [], action: 'backlog', nextSprintId: '' })}
-                className="btn btn-light sv-ctl-btn"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={completeSprint}
-                className="btn btn-primary sv-ctl-btn"
-              >
-                Complete Sprint
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {moveModal.open ? (
         <div className="sv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="sv-card sv-backlog-modal w-full max-w-md">
-            <h3 className="sv-backlog-modal-title text-lg font-semibold text-on-surface">Choose Sprint</h3>
-            <p className="sv-backlog-modal-subtitle mt-2 text-sm text-on-surface-variant">
-              Select target sprint for {selectedIds.length} selected task{selectedIds.length === 1 ? '' : 's'}.
-            </p>
-            <select
-              value={moveModal.sprintId}
-              onChange={(event) => setMoveModal((current) => ({ ...current, sprintId: event.target.value }))}
-              className="form-select sv-ctl-select mt-4 w-full"
-            >
-              <option value="">Select sprint</option>
-              {planningSprints.map((sprint) => (
-                <option key={sprint._id} value={sprint._id}>
-                  {sprint.name} ({sprint.status})
-                </option>
-              ))}
-            </select>
+            <div className="sv-backlog-modal-head">
+              <div>
+                <p className="sv-backlog-modal-eyebrow">Bulk move</p>
+                <h3 className="sv-backlog-modal-title text-lg font-semibold text-on-surface">Choose Sprint</h3>
+                <p className="sv-backlog-modal-subtitle mt-2 text-sm text-on-surface-variant">
+                  Select target sprint for {selectedIds.length} selected task{selectedIds.length === 1 ? '' : 's'}.
+                </p>
+              </div>
+            </div>
+            {planningSprints.length ? (
+              <SelectDropdown
+                value={moveModal.sprintId}
+                onChange={(nextValue) => setMoveModal((current) => ({ ...current, sprintId: nextValue }))}
+                options={[
+                  { value: '', label: 'Select sprint' },
+                  ...planningSprints.map((sprint) => ({ value: sprint._id, label: `${sprint.name} (${sprint.status})` })),
+                ]}
+                className="mt-4 w-full"
+              />
+            ) : (
+              <div className="sv-backlog-modal-empty mt-4 rounded-md border border-dashed border-outline-variant/40 px-3 py-4 text-sm text-on-surface-variant">
+                No planning or active sprints are available. Open the Sprints page to create one first.
+              </div>
+            )}
             <div className="sv-backlog-modal-actions mt-5 flex justify-end gap-2">
               <button
                 type="button"
@@ -558,9 +430,9 @@ function BacklogPage() {
               </button>
               <button
                 type="button"
-                onClick={onConfirmMoveFromModal}
+                onClick={() => runMoveToSprint(moveModal.sprintId)}
                 className="btn btn-primary sv-ctl-btn"
-                disabled={isMoving || !moveModal.sprintId}
+                disabled={isMoving || !moveModal.sprintId || !planningSprints.length}
               >
                 {isMoving ? 'Moving...' : 'Move'}
               </button>

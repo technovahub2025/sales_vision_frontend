@@ -1,12 +1,14 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useContacts } from '../../hooks/useContacts';
 import { useEmployees } from '../../hooks/useEmployees';
 import { ROUTES } from '../../routes/routePaths';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import ExportMenu from '../../components/ui/ExportMenu';
 import Icon from '../../components/ui/Icon';
-
-const DEFAULT_PAGE_SIZE = 8;
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
+import { compareByRecencyAsc, compareByRecencyDesc } from '../../lib/listSort';
+import { exportRows } from '../../lib/exportData';
 
 const EMPTY_FORM = {
   name: '',
@@ -81,17 +83,28 @@ function ContactModal({ open, mode, form, onChange, onClose, onSubmit, busy, emp
           <input value={form.department} onChange={(e) => onChange('department', e.target.value)} placeholder="Department" className="sv-ctl-input sv-contacts-field" />
           <input value={form.project} onChange={(e) => onChange('project', e.target.value)} placeholder="Project" className="sv-ctl-input sv-contacts-field" />
 
-          <select value={form.status} onChange={(e) => onChange('status', e.target.value)} className="sv-ctl-select sv-contacts-field">
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          <SelectDropdown
+            value={form.status}
+            onChange={(nextValue) => onChange('status', nextValue)}
+            options={[
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+            ]}
+            className="sv-contacts-field"
+          />
 
-          <select value={form.employeeId} onChange={(e) => onChange('employeeId', e.target.value)} className="sv-ctl-select sv-contacts-field">
-            <option value="">No linked employee</option>
-            {employees.map((employee) => (
-              <option key={employee._id} value={employee._id}>{employee.name || 'Unnamed'}{employee.email ? ` (${employee.email})` : ''}</option>
-            ))}
-          </select>
+          <SelectDropdown
+            value={form.employeeId}
+            onChange={(nextValue) => onChange('employeeId', nextValue)}
+            options={[
+              { value: '', label: 'No linked employee' },
+              ...employees.map((employee) => ({
+                value: employee._id,
+                label: `${employee.name || 'Unnamed'}${employee.email ? ` (${employee.email})` : ''}`,
+              })),
+            ]}
+            className="sv-contacts-field"
+          />
 
           <input value={form.avatarUrl} onChange={(e) => onChange('avatarUrl', e.target.value)} placeholder="Avatar URL" className="md:col-span-2 sv-ctl-input sv-contacts-field" />
 
@@ -113,76 +126,16 @@ function ContactModal({ open, mode, form, onChange, onClose, onSubmit, busy, emp
   );
 }
 
-function ContactsPagination({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) {
-  if (totalItems <= 0) return null;
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const startItem = (safePage - 1) * pageSize + 1;
-  const endItem = Math.min(totalItems, safePage * pageSize);
-  const pages = Array.from({ length: totalPages }, (_, idx) => idx + 1);
-
-  return (
-    <div className="sv-leads-pagination">
-      <div className="sv-leads-pagination-meta">
-        <span className="sv-leads-pagination-text">Showing {startItem}-{endItem} of {totalItems}</span>
-        <label className="sv-leads-pagination-size">
-          <span>Rows per page</span>
-          <select
-            className="form-select form-select-sm sv-ctl-select sv-leads-page-size"
-            value={pageSize}
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={`contacts-page-size-${size}`} value={size}>{size}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className="sv-leads-pagination-controls">
-        <button
-          type="button"
-          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          disabled={safePage <= 1}
-        >
-          Prev
-        </button>
-        <div className="sv-leads-page-list">
-          {pages.map((nextPage) => (
-            <button
-              key={`contacts-page-${nextPage}`}
-              type="button"
-              className={`btn btn-sm sv-ctl-btn sv-leads-page-btn ${nextPage === safePage ? 'is-active' : ''}`}
-              onClick={() => onPageChange(nextPage)}
-            >
-              {nextPage}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
-          onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
-          disabled={safePage >= totalPages}
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function ContactsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { items: contacts, loading, error, createItem, updateItem, removeItem } = useContacts();
+  const { items: contacts, loading, loadingMore, hasMore, loadMore, error, createItem, updateItem, removeItem } = useContacts();
   const { items: employees } = useEmployees();
 
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('updatedAt');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sortBy, setSortBy] = useState('newest');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -195,6 +148,16 @@ function ContactsPage() {
   const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
   const [openRowMenuContext, setOpenRowMenuContext] = useState(null);
   const rowMenuRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const loadMoreContacts = useCallback(() => {
+    if (!hasMore || loadingMore) return;
+    void loadMore();
+  }, [hasMore, loadingMore, loadMore]);
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: loadMoreContacts,
+    disabled: !hasMore || loadingMore,
+  });
   const linkedEmployeeFilter = useMemo(() => new URLSearchParams(location.search).get('employeeId') || '', [location.search]);
   const filteredEmployee = useMemo(
     () => (linkedEmployeeFilter ? (employees || []).find((item) => String(item._id) === String(linkedEmployeeFilter)) : null),
@@ -284,28 +247,35 @@ function ContactsPage() {
     });
 
     return [...base].sort((a, b) => {
+      if (sortBy === 'newest') return compareByRecencyDesc(a, b);
+      if (sortBy === 'oldest') return compareByRecencyAsc(a, b);
       if (sortBy === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
       if (sortBy === 'department') return String(a.department || '').localeCompare(String(b.department || ''));
-      return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+      return compareByRecencyDesc(a, b);
     });
   }, [contacts, linkedEmployeeFilter, filteredEmployee?.contactId, departmentFilter, search, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  const pagedContacts = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  const handleExportContacts = useCallback((format) => {
+    exportRows({
+      rows: filtered,
+      format,
+      filename: `contacts-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Contacts Export',
+      columns: [
+        { header: 'Name', value: (row) => row.name || '-' },
+        { header: 'Company', value: (row) => row.company || '-' },
+        { header: 'Email', value: (row) => row.email || '-' },
+        { header: 'Phone', value: (row) => row.phone || '-' },
+        { header: 'Department', value: (row) => row.department || '-' },
+        { header: 'Role', value: (row) => row.role || '-' },
+        { header: 'Status', value: (row) => row.status || '-' },
+      ],
+    });
+  }, [filtered]);
 
   useEffect(() => {
-    setPage(1);
-  }, [search, departmentFilter, sortBy, pageSize, linkedEmployeeFilter]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [search, departmentFilter, sortBy, linkedEmployeeFilter]);
 
   const openCreate = () => {
     setModalMode('create');
@@ -405,13 +375,18 @@ function ContactsPage() {
           </NavLink>
         </section>
 
-        <section className="mb-2 flex flex-wrap items-end justify-between gap-4">
+        <section className="sv-card sv-contacts-hero">
           <div>
-            <h2 className="mb-2 text-3xl font-extrabold tracking-tight text-on-surface">Contacts</h2>
-            <p className="max-w-md text-sm text-on-surface-variant">Manage collaborator contacts used across tasks and projects.</p>
+            <span className="sv-employees-eyebrow">
+              <Icon name="contacts" className="sv-icon-btn-icon" />
+              Relationship hub
+            </span>
+            <h1 className="sv-employees-title">Contacts</h1>
+            <p className="sv-employees-subtitle">Manage collaborator contacts used across tasks, projects, and employee profiles.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-outline-variant/10 bg-surface-container-low px-4 py-3 text-sm">{filtered.length} contacts</div>
+          <div className="sv-employees-hero-actions">
+            <div className="sv-employees-result-chip">{filtered.length} contacts</div>
+            <ExportMenu onExport={handleExportContacts} label="Export" disabled={!filtered.length} />
             <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
               <Icon name="person_add" className="sv-icon-btn-icon" />
               <span>New Contact</span>
@@ -440,25 +415,24 @@ function ContactsPage() {
           </div>
           {filtersOpen ? (
             <div className="sv-contacts-filter-panel">
-              <select
+              <SelectDropdown
                 value={departmentFilter}
-                onChange={(event) => setDepartmentFilter(event.target.value)}
-                className="sv-ctl-select"
-              >
-                <option value="all">All departments</option>
-                {departments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-              <select
+                onChange={setDepartmentFilter}
+                options={[
+                  { value: 'all', label: 'All departments' },
+                  ...departments.map((dept) => ({ value: dept, label: dept })),
+                ]}
+              />
+              <SelectDropdown
                 value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-                className="sv-ctl-select"
-              >
-                <option value="updatedAt">Recently updated</option>
-                <option value="name">Name</option>
-                <option value="department">Department</option>
-              </select>
+                onChange={setSortBy}
+                options={[
+                  { value: 'newest', label: 'Newest' },
+                  { value: 'oldest', label: 'Oldest' },
+                  { value: 'name', label: 'Name' },
+                  { value: 'department', label: 'Department' },
+                ]}
+              />
             </div>
           ) : null}
 
@@ -466,7 +440,7 @@ function ContactsPage() {
 
           {!loading ? (
             <>
-              <div className="sv-table-scroll">
+              <div className="sv-table-scroll sv-list-scroll" ref={listScrollRef}>
                 <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
@@ -475,11 +449,11 @@ function ContactsPage() {
                     <th className="px-3 py-2">Email</th>
                     <th className="px-3 py-2">Department</th>
                     <th className="px-3 py-2">Linked Employee</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
+                    <th className="px-3 py-2 sv-row-action-heading">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedContacts.map((contact) => {
+                  {filtered.map((contact) => {
                     const linkedEmployee = employees.find(
                       (employee) =>
                         String(employee._id) === String(contact.employeeId || '') ||
@@ -505,7 +479,7 @@ function ContactsPage() {
                             <span className="text-xs text-on-surface-variant">Not linked</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-right sv-employees-actions-cell">
+                        <td className="px-3 py-3 sv-row-action-cell sv-employees-actions-cell">
                           <div className="sv-row-menu-container">
                             <button
                               type="button"
@@ -522,22 +496,22 @@ function ContactsPage() {
                       </tr>
                     );
                   })}
-                  {!pagedContacts.length ? (
+                  {!filtered.length ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-8 text-center text-sm text-on-surface-variant">No contacts found.</td>
+                    </tr>
+                  ) : null}
+                  {filtered.length ? (
+                    <tr>
+                      <td colSpan={6} className="sv-list-sentinel-cell">
+                        <span ref={loadMoreRef} className="sv-list-sentinel" />
+                        {loadingMore ? 'Loading more contacts...' : hasMore ? 'Scroll for more' : 'End of list'}
+                      </td>
                     </tr>
                   ) : null}
                 </tbody>
                 </table>
               </div>
-              <ContactsPagination
-                page={page}
-                totalPages={totalPages}
-                totalItems={filtered.length}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
             </>
           ) : null}
         </section>

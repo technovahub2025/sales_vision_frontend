@@ -3,37 +3,64 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientsApi } from '../api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useSocket } from '../contexts/SocketContext';
+import { compareByRecencyDesc } from '../lib/listSort';
+
+function mergeClientPages(current, next, replace = false) {
+  const merged = replace ? [] : [...current];
+  const seen = new Set(merged.map((item) => String(item?._id || item?.id || '')));
+  (next || []).forEach((item) => {
+    const id = String(item?._id || item?.id || '');
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    merged.push(item);
+  });
+  return merged.sort(compareByRecencyDesc);
+}
 
 export function useClients(workspaceIdArg) {
   const { workspaceId: workspaceIdFromContext } = useWorkspace();
   const { socket, joinWorkspace } = useSocket();
   const workspaceId = workspaceIdArg || workspaceIdFromContext;
   const [clients, setClients] = useState([]);
-  const [meta, setMeta] = useState({ total: 0, page: 1, limit: 20 });
+  const [meta, setMeta] = useState({ total: 0, page: 1, limit: 100 });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
-  const lastQueryRef = useRef({ page: 1, limit: 20, includeArchived: true });
+  const lastQueryRef = useRef({ page: 1, limit: 100, includeArchived: true, sort: 'newest' });
   const refreshTimerRef = useRef(null);
 
   const list = useCallback(async (params = lastQueryRef.current) => {
     if (!workspaceId) return;
     lastQueryRef.current = { ...lastQueryRef.current, ...params };
-    setLoading(true);
+    const page = Math.max(Number(lastQueryRef.current.page) || 1, 1);
+    const append = page > 1;
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError('');
     try {
       const response = await clientsApi.list(workspaceId, lastQueryRef.current);
-      setClients(response.data || []);
+      setClients((current) => mergeClientPages(current, response.data || [], !append));
       setMeta({
         total: response.meta?.total || 0,
-        page: response.meta?.page || 1,
-        limit: response.meta?.limit || 20,
+        page: response.meta?.page || page,
+        limit: response.meta?.limit || lastQueryRef.current.limit || 100,
       });
     } catch (err) {
       setError(err.message || 'Failed to load clients');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [workspaceId]);
+
+  const loadMore = useCallback(async () => {
+    const total = Number(meta.total) || 0;
+    if (!total || clients.length >= total || loading || loadingMore) return;
+    await list({ ...lastQueryRef.current, page: (Number(meta.page) || 1) + 1 });
+  }, [clients.length, list, loading, loadingMore, meta.page, meta.total]);
 
   useEffect(() => {
     list(lastQueryRef.current);
@@ -78,13 +105,16 @@ export function useClients(workspaceIdArg) {
       clients,
       meta,
       loading,
+      loadingMore,
+      hasMore: clients.length < (Number(meta.total) || 0),
       error,
       list,
+      loadMore,
       createClient,
       updateClient,
       getClient,
     }),
-    [clients, meta, loading, error, list, createClient, updateClient, getClient],
+    [clients, meta, loading, loadingMore, error, list, loadMore, createClient, updateClient, getClient],
   );
 }
 

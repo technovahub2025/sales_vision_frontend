@@ -1,0 +1,826 @@
+/* App-wide theme and responsive hardening. Imported last on purpose. */
+html {
+  background: var(--color-app-bg);
+  color: var(--color-text);
+  text-rendering: optimizeLegibility;
+  --sv-scrollbar-track: color-mix(in srgb, var(--color-surface-muted) 84%, transparent);
+  --sv-scrollbar-thumb: color-mix(in srgb, var(--color-text-muted) 48%, var(--color-border));
+  --sv-scrollbar-thumb-hover: color-mix(in srgb, var(--color-accent) 58%, var(--color-text-muted));
+}
+
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.sv-app-shell,
+.sv-main-content,
+.sv-content-shell,
+.sv-card,
+.container,
+.container-fluid {
+  min-width: 0;
+}
+
+.sv-main-content {
+  margin-left: 15rem;
+}
+
+.sv-main-content.is-collapsed {
+  margin-left: 4rem;
+}
+
+.sv-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  display: none;
+  padding: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.sv-theme-toggle-btn {
+  width: 2.625rem;
+  min-width: 2.625rem;
+  height: 2.625rem;
+  padding: 0 !important;
+  border-radius: 0.86rem !important;
+}
+
+.sv-card,
+.card,
+.modal-content,
+.dropdown-menu,
+.sv-modal-panel,
+.sv-modal-panel-lg {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.text-muted,
+.text-secondary {
+  color: var(--color-text-muted) !important;
+}
+
+.dropdown-menu {
+  z-index: 1200;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, white);
+  border-radius: 0.85rem;
+  background: var(--color-surface);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+}
+
+.dropdown-item,
+.dropdown-item-text {
+  color: var(--color-text);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.table,
+table {
+  color: var(--color-text);
+}
+
+.table-responsive,
+[class*="table-wrap"],
+[class*="list-body"],
+[class*="scroll-area"],
+.overflow-x-auto {
+  max-width: 100%;
+  min-width: 0;
+  overscroll-behavior-x: contain;
+}
+
+.table-responsive,
+.overflow-x-auto,
+.sv-card:has(table),
+.card:has(table),
+.sv-horizontal-scroll,
+.sv-responsive-scroll,
+.sv-list-scroll,
+.sv-settings-scroll-area,
+.sv-userdatas-table-shell,
+.sv-superadmin-table-shell,
+.sv-projects-table-body,
+.sv-campaigns-table-wrap,
+.sv-leads-table-wrap,
+.sv-contacts-table-wrap,
+.sv-employees-table-wrap,
+.sv-task-list-body,
+.sv-kanban-board,
+.sv-kanban-scroll,
+.sv-mytasks-toolbar,
+.sv-mytasks-filterbar,
+.sv-board-toolbar,
+.sv-board-scroll,
+.sv-board-column-scroll,
+.sv-heatmap-scroll,
+.sv-analytics-mini-table,
+.sv-notifications-filters,
+.sv-form-scroll,
+.sv-form-grid-scroll {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--sv-scrollbar-thumb) var(--sv-scrollbar-track) !important;
+  -ms-overflow-style: auto !important;
+}
+
+.table-responsive::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.sv-card:has(table)::-webkit-scrollbar,
+.card:has(table)::-webkit-scrollbar,
+.sv-horizontal-scroll::-webkit-scrollbar,
+.sv-responsive-scroll::-webkit-scrollbar,
+.sv-list-scroll::-webkit-scrollbar,
+.sv-settings-scroll-area::-webkit-scrollbar,
+.sv-userdatas-table-shell::-webkit-scrollbar,
+.sv-superadmin-table-shell::-webkit-scrollbar,
+.sv-projects-table-body::-webkit-scrollbar,
+.sv-campaigns-table-wrap::-webkit-scrollbar,
+.sv-leads-table-wrap::-webkit-scrollbar,
+.sv-contacts-table-wrap::-webkit-scrollbar,
+.sv-employees-table-wrap::-webkit-scrollbar,
+.sv-task-list-body::-webkit-scrollbar,
+.sv-kanban-board::-webkit-scrollbar,
+.sv-kanban-scroll::-webkit-scrollbar,
+.sv-mytasks-toolbar::-webkit-scrollbar,
+.sv-mytasks-filterbar::-webkit-scrollbar,
+.sv-board-toolbar::-webkit-scrollbar,
+.sv-board-scroll::-webkit-scrollbar,
+.sv-board-column-scroll::-webkit-scrollbar,
+.sv-heatmap-scroll::-webkit-scrollbar,
+.sv-analytics-mini-table::-webkit-scrollbar,
+.sv-notifications-filters::-webkit-scrollbar,
+.sv-form-scroll::-webkit-scrollbar,
+.sv-form-grid-scroll::-webkit-scrollbar {
+  display: block !important;
+  width: 10px;
+  height: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track,
+.sv-card:has(table)::-webkit-scrollbar-track,
+.card:has(table)::-webkit-scrollbar-track,
+.sv-horizontal-scroll::-webkit-scrollbar-track,
+.sv-responsive-scroll::-webkit-scrollbar-track,
+.sv-list-scroll::-webkit-scrollbar-track,
+.sv-settings-scroll-area::-webkit-scrollbar-track,
+.sv-userdatas-table-shell::-webkit-scrollbar-track,
+.sv-superadmin-table-shell::-webkit-scrollbar-track,
+.sv-projects-table-body::-webkit-scrollbar-track,
+.sv-campaigns-table-wrap::-webkit-scrollbar-track,
+.sv-leads-table-wrap::-webkit-scrollbar-track,
+.sv-contacts-table-wrap::-webkit-scrollbar-track,
+.sv-employees-table-wrap::-webkit-scrollbar-track,
+.sv-task-list-body::-webkit-scrollbar-track,
+.sv-kanban-board::-webkit-scrollbar-track,
+.sv-kanban-scroll::-webkit-scrollbar-track,
+.sv-mytasks-toolbar::-webkit-scrollbar-track,
+.sv-mytasks-filterbar::-webkit-scrollbar-track,
+.sv-board-toolbar::-webkit-scrollbar-track,
+.sv-board-scroll::-webkit-scrollbar-track,
+.sv-board-column-scroll::-webkit-scrollbar-track,
+.sv-heatmap-scroll::-webkit-scrollbar-track,
+.sv-analytics-mini-table::-webkit-scrollbar-track,
+.sv-notifications-filters::-webkit-scrollbar-track,
+.sv-form-scroll::-webkit-scrollbar-track,
+.sv-form-grid-scroll::-webkit-scrollbar-track {
+  background: var(--sv-scrollbar-track);
+  border-radius: 999px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.sv-card:has(table)::-webkit-scrollbar-thumb,
+.card:has(table)::-webkit-scrollbar-thumb,
+.sv-horizontal-scroll::-webkit-scrollbar-thumb,
+.sv-responsive-scroll::-webkit-scrollbar-thumb,
+.sv-list-scroll::-webkit-scrollbar-thumb,
+.sv-settings-scroll-area::-webkit-scrollbar-thumb,
+.sv-userdatas-table-shell::-webkit-scrollbar-thumb,
+.sv-superadmin-table-shell::-webkit-scrollbar-thumb,
+.sv-projects-table-body::-webkit-scrollbar-thumb,
+.sv-campaigns-table-wrap::-webkit-scrollbar-thumb,
+.sv-leads-table-wrap::-webkit-scrollbar-thumb,
+.sv-contacts-table-wrap::-webkit-scrollbar-thumb,
+.sv-employees-table-wrap::-webkit-scrollbar-thumb,
+.sv-task-list-body::-webkit-scrollbar-thumb,
+.sv-kanban-board::-webkit-scrollbar-thumb,
+.sv-kanban-scroll::-webkit-scrollbar-thumb,
+.sv-mytasks-toolbar::-webkit-scrollbar-thumb,
+.sv-mytasks-filterbar::-webkit-scrollbar-thumb,
+.sv-board-toolbar::-webkit-scrollbar-thumb,
+.sv-board-scroll::-webkit-scrollbar-thumb,
+.sv-board-column-scroll::-webkit-scrollbar-thumb,
+.sv-heatmap-scroll::-webkit-scrollbar-thumb,
+.sv-analytics-mini-table::-webkit-scrollbar-thumb,
+.sv-notifications-filters::-webkit-scrollbar-thumb,
+.sv-form-scroll::-webkit-scrollbar-thumb,
+.sv-form-grid-scroll::-webkit-scrollbar-thumb {
+  background: var(--sv-scrollbar-thumb);
+  border: 2px solid var(--sv-scrollbar-track);
+  border-radius: 999px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.sv-card:has(table)::-webkit-scrollbar-thumb:hover,
+.card:has(table)::-webkit-scrollbar-thumb:hover,
+.sv-horizontal-scroll::-webkit-scrollbar-thumb:hover,
+.sv-responsive-scroll::-webkit-scrollbar-thumb:hover,
+.sv-list-scroll::-webkit-scrollbar-thumb:hover,
+.sv-settings-scroll-area::-webkit-scrollbar-thumb:hover,
+.sv-userdatas-table-shell::-webkit-scrollbar-thumb:hover,
+.sv-superadmin-table-shell::-webkit-scrollbar-thumb:hover,
+.sv-projects-table-body::-webkit-scrollbar-thumb:hover,
+.sv-campaigns-table-wrap::-webkit-scrollbar-thumb:hover,
+.sv-leads-table-wrap::-webkit-scrollbar-thumb:hover,
+.sv-contacts-table-wrap::-webkit-scrollbar-thumb:hover,
+.sv-employees-table-wrap::-webkit-scrollbar-thumb:hover,
+.sv-task-list-body::-webkit-scrollbar-thumb:hover,
+.sv-kanban-board::-webkit-scrollbar-thumb:hover,
+.sv-kanban-scroll::-webkit-scrollbar-thumb:hover,
+.sv-mytasks-toolbar::-webkit-scrollbar-thumb:hover,
+.sv-mytasks-filterbar::-webkit-scrollbar-thumb:hover,
+.sv-board-toolbar::-webkit-scrollbar-thumb:hover,
+.sv-board-scroll::-webkit-scrollbar-thumb:hover,
+.sv-board-column-scroll::-webkit-scrollbar-thumb:hover,
+.sv-heatmap-scroll::-webkit-scrollbar-thumb:hover,
+.sv-analytics-mini-table::-webkit-scrollbar-thumb:hover,
+.sv-notifications-filters::-webkit-scrollbar-thumb:hover,
+.sv-form-scroll::-webkit-scrollbar-thumb:hover,
+.sv-form-grid-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--sv-scrollbar-thumb-hover);
+}
+
+.table-responsive > table,
+.overflow-x-auto > table,
+.sv-analytics-mini-table > table,
+.sv-heatmap-scroll > table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.sv-modal-backdrop,
+[class*="modal-backdrop"] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(10px);
+}
+
+.sv-modal-panel,
+.sv-modal-panel-lg,
+[class*="modal-panel"] {
+  max-width: min(100%, var(--sv-modal-max-width, 44rem));
+}
+
+.sv-modal-panel,
+.sv-modal-panel-lg {
+  max-height: min(90dvh, 760px);
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.sv-modal-panel::-webkit-scrollbar,
+.sv-modal-panel-lg::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+input,
+textarea,
+select,
+.form-control,
+.form-select,
+.sv-ctl-input,
+.sv-ctl-select {
+  min-width: 0;
+}
+
+html[data-theme='dark'] .dropdown-menu {
+  border-color: color-mix(in srgb, var(--color-border) 72%, #020617);
+  background: color-mix(in srgb, var(--color-surface) 94%, #020617);
+  box-shadow: 0 18px 38px rgba(2, 6, 23, 0.44);
+}
+
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-light {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+}
+
+html[data-theme='dark'] .border,
+html[data-theme='dark'] .border-top,
+html[data-theme='dark'] .border-bottom,
+html[data-theme='dark'] .border-start,
+html[data-theme='dark'] .border-end {
+  border-color: var(--color-border) !important;
+}
+
+@media (max-width: 1199.98px) {
+  .sv-content-shell,
+  .sv-main-content > .flex-grow-1 {
+    padding-inline: 1rem !important;
+  }
+
+  .sv-card {
+    border-radius: 1rem;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .sv-main-content,
+  .sv-main-content.is-collapsed,
+  .sv-main-content.is-expanded {
+    margin-left: 0 !important;
+  }
+
+  .sv-app-shell {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .sv-sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 1050 !important;
+    width: min(18.5rem, 86vw) !important;
+    height: 100dvh !important;
+    min-height: 0;
+    border-right: 1px solid var(--color-border) !important;
+    border-bottom: 0 !important;
+    border-radius: 0 1.25rem 1.25rem 0;
+    box-shadow: 24px 0 64px rgba(15, 23, 42, 0.26);
+    overflow: hidden;
+    transform: translateX(0);
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 220ms ease,
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .sv-sidebar.is-collapsed {
+    width: min(18.5rem, 86vw) !important;
+    align-items: stretch;
+    pointer-events: none;
+    transform: translateX(calc(-100% - 1rem));
+    box-shadow: none;
+  }
+
+  .sv-sidebar-body,
+  .sv-sidebar-footer {
+    display: flex !important;
+  }
+
+  .sv-sidebar-header {
+    margin: 0.5rem !important;
+  }
+
+  .sv-sidebar.is-collapsed .sv-sidebar-header {
+    margin: 0.5rem !important;
+    padding: 0.58rem 0.45rem 0.5rem !important;
+  }
+
+  .sv-sidebar.is-collapsed .sv-sidebar-body {
+    align-items: stretch;
+    padding: 0.55rem 0.55rem 0.6rem;
+  }
+
+  .sv-sidebar.is-collapsed .sv-sidebar-nav {
+    align-items: stretch;
+  }
+
+  .sv-sidebar-backdrop.is-open {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sv-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sv-content-shell,
+  .sv-main-content > .flex-grow-1,
+  .container-fluid {
+    padding-inline: 0.75rem !important;
+  }
+
+  .sv-topbar-shell,
+  .sv-topbar {
+    min-height: auto;
+  }
+
+  .sv-topbar-group--right {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sv-topbar-group--right::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sv-card,
+  .card {
+    border-radius: 0.95rem !important;
+  }
+
+  .sv-modal-backdrop,
+  [class*="modal-backdrop"] {
+    align-items: flex-start !important;
+    padding: 0.7rem !important;
+    overflow-y: auto;
+  }
+
+  .sv-modal-panel,
+  .sv-modal-panel-lg,
+  [class*="modal-panel"] {
+    width: 100% !important;
+    max-height: calc(100dvh - 1.4rem);
+  }
+
+  .btn,
+  .sv-ctl-btn {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 575.98px) {
+  html {
+    font-size: 15px;
+  }
+
+  .sv-content-shell,
+  .sv-main-content > .flex-grow-1,
+  .container-fluid {
+    padding-inline: 0.58rem !important;
+  }
+
+  h1,
+  .h1 {
+    font-size: clamp(1.65rem, 9vw, 2.2rem);
+  }
+
+  h2,
+  .h2 {
+    font-size: clamp(1.35rem, 7vw, 1.8rem);
+  }
+
+  .sv-theme-toggle-btn,
+  .sv-topbar .sv-topbar-icon-btn,
+  .sv-topbar-theme-toggle .btn {
+    width: 2.45rem;
+    min-width: 2.45rem;
+    height: 2.45rem;
+  }
+}
+
+/* Global responsive/theme hardening. Keep this last so page-level CSS cannot
+   accidentally reintroduce clipping on smaller screens. */
+html,
+body,
+#root,
+.sv-app-shell,
+.sv-main-content,
+.sv-content-shell {
+  max-width: 100%;
+}
+
+.sv-content-shell,
+.sv-content-shell > *,
+main,
+main > *,
+section,
+article,
+.row,
+[class*="grid"],
+[class*="layout"],
+[class*="shell"],
+[class*="panel"],
+[class*="card"],
+[class*="toolbar"],
+[class*="actions"],
+[class*="filters"],
+[class*="list"],
+[class*="table"] {
+  min-width: 0;
+}
+
+.row {
+  max-width: calc(100% + var(--bs-gutter-x, 1.5rem));
+}
+
+:where(.card, .sv-card, [class*="-card"], [class*="-panel"], [class*="-header"], [class*="-hero"], [class*="-toolbar"]) {
+  max-width: 100%;
+}
+
+:where(.card, .sv-card, [class*="-card"], [class*="-panel"]) {
+  overflow-wrap: anywhere;
+}
+
+:where(.card, .sv-card, [class*="-card"], [class*="-panel"]):has(> table),
+:where(.card, .sv-card, [class*="-card"], [class*="-panel"]):has(table) {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sv-scrollbar-thumb) var(--sv-scrollbar-track);
+}
+
+:where(table) {
+  max-width: 100%;
+  border-color: var(--color-border);
+}
+
+:where(table th, table td) {
+  border-color: color-mix(in srgb, var(--color-border) 82%, transparent);
+}
+
+:where(.table-responsive, [class*="table-wrap"], [class*="table-shell"], [class*="table-card"], [class*="table-panel"]) {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+:where(.table-responsive, [class*="table-wrap"], [class*="table-shell"], [class*="table-card"], [class*="table-panel"]) > table,
+:where(.table-responsive, [class*="table-wrap"], [class*="table-shell"], [class*="table-card"], [class*="table-panel"]) table {
+  min-width: max(100%, 46rem);
+}
+
+:where(input, select, textarea, button, .btn, .form-control, .form-select) {
+  max-width: 100%;
+}
+
+:where(textarea) {
+  overflow: auto;
+}
+
+:where(.modal, .modal-dialog, .modal-content, .offcanvas, [role="dialog"], [class*="drawer"], [class*="modal"]) {
+  max-width: 100%;
+}
+
+:where(.modal-content, .offcanvas, [role="dialog"], [class*="drawer"], [class*="modal"]) {
+  color: var(--color-text);
+}
+
+:where(.dropdown-menu, .popover, .tooltip, [class*="menu"], [class*="popover"]) {
+  max-width: min(100vw - 1rem, var(--sv-popover-max-width, 28rem));
+}
+
+html[data-theme='dark'] :where(
+  .card,
+  .sv-card,
+  .modal-content,
+  .modal-header,
+  .modal-footer,
+  .offcanvas,
+  .popover,
+  .list-group-item,
+  .accordion-item,
+  .accordion-button,
+  [class*="-card"],
+  [class*="-panel"],
+  [class*="-toolbar"],
+  [class*="-header"],
+  [class*="-drawer"],
+  [class*="-modal"],
+  [class*="-menu"],
+  [class*="-popover"]
+) {
+  border-color: color-mix(in srgb, var(--color-border) 74%, #020617) !important;
+  background-color: color-mix(in srgb, var(--color-surface) 94%, #020617);
+  color: var(--color-text);
+}
+
+html[data-theme='dark'] :where(
+  .table,
+  table,
+  .table th,
+  .table td,
+  table th,
+  table td
+) {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-border) 78%, #020617);
+}
+
+html[data-theme='dark'] :where(.table thead, table thead, [class*="table-head"], [class*="head-row"]) {
+  background-color: color-mix(in srgb, var(--color-surface-muted) 88%, #020617);
+  color: var(--color-text-muted);
+}
+
+html[data-theme='dark'] :where(.btn-close) {
+  filter: invert(1) grayscale(100%);
+}
+
+html[data-theme='dark'] :where(.shadow, .shadow-sm, .shadow-lg) {
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.38) !important;
+}
+
+@media (max-width: 1199.98px) {
+  :where([class*="metrics"], [class*="summary"], [class*="stats"], [class*="kpi"], [class*="cards"]) {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .sv-topbar-shell {
+    padding-inline: 0.75rem !important;
+  }
+
+  .sv-topbar-group--left,
+  .sv-topbar-group--right {
+    min-width: 0;
+  }
+
+  :where([class*="hero"], [class*="header"], [class*="toolbar"], [class*="actions"], [class*="filters"]) {
+    gap: 0.75rem;
+  }
+
+  :where([class*="modal"], [class*="drawer"], [role="dialog"]) {
+    max-height: calc(100dvh - 1rem);
+  }
+}
+
+@media (max-width: 767.98px) {
+  :where([class*="hero"], [class*="header"], [class*="toolbar"], [class*="actions"], [class*="filters"]) {
+    flex-wrap: wrap !important;
+  }
+
+  :where([class*="hero"] > *, [class*="header"] > *, [class*="toolbar"] > *, [class*="actions"] > *, [class*="filters"] > *) {
+    min-width: 0;
+  }
+
+  :where([class*="toolbar"], [class*="actions"], [class*="filters"]) :where(.btn, button, .sv-ctl-btn, .sv-export-menu, .sv-export-menu-trigger) {
+    flex: 1 1 auto;
+  }
+
+  :where(.form-row, .row, [class*="form-grid"], [class*="filter-grid"], [class*="settings-grid"]) {
+    --bs-gutter-x: 0.75rem;
+    grid-template-columns: 1fr !important;
+  }
+
+  :where(form, .sv-form, [class*="-form"]) {
+    overflow-x: visible !important;
+  }
+
+  :where(table) {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sv-scrollbar-thumb) var(--sv-scrollbar-track);
+  }
+
+  :where(table thead, table tbody, table tr) {
+    min-width: max-content;
+  }
+
+  :where(.modal-dialog) {
+    width: calc(100vw - 1rem);
+    margin: 0.5rem auto;
+  }
+
+  :where(.modal-content, .sv-modal-panel, .sv-modal-panel-lg, [role="dialog"], [class*="modal-panel"]) {
+    border-radius: 1rem !important;
+  }
+
+  :where(.dropdown-menu, .popover, [class*="menu"], [class*="popover"]) {
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .sv-topbar-shell {
+    gap: 0.55rem;
+    padding-inline: 0.55rem !important;
+  }
+
+  .sv-topbar-search {
+    height: 2.65rem;
+  }
+
+  .sv-topbar-group--right {
+    display: grid;
+    grid-template-columns: 2.45rem minmax(7rem, 1fr) 2.45rem 2.45rem 2.45rem 2.45rem;
+    align-items: center;
+    justify-content: stretch;
+    flex-wrap: nowrap !important;
+    gap: 0.38rem;
+    width: 100%;
+    padding: 0.32rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sv-topbar-group--right::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sv-topbar-group--right > * {
+    min-width: 0;
+    width: auto !important;
+  }
+
+  .sv-topbar-group--right .sv-workspace-dropdown {
+    width: 100% !important;
+  }
+
+  .sv-topbar-group--right > .d-flex {
+    display: contents !important;
+  }
+
+  .sv-topbar-group--right .sv-topbar-icon-btn,
+  .sv-topbar-group--right .sv-theme-toggle-btn,
+  .sv-topbar-group--right .sv-topbar-user-btn {
+    width: 2.45rem !important;
+    min-width: 2.45rem !important;
+    height: 2.45rem !important;
+    min-height: 2.45rem !important;
+    padding: 0 !important;
+  }
+
+  .sv-topbar-group--right .sv-topbar-user-btn img {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+
+  .sv-topbar-group--right .sv-workspace-trigger {
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: 0.55rem;
+  }
+
+  .sv-topbar-user-btn {
+    padding-inline: 0.25rem !important;
+  }
+
+  :where(.btn, button, .sv-ctl-btn) {
+    min-height: 2.55rem;
+  }
+
+  :where([class*="toolbar"], [class*="actions"], [class*="filters"]) :where(.btn, button, .sv-ctl-btn) {
+    width: 100%;
+  }
+
+  :where(.card, .sv-card, [class*="-card"], [class*="-panel"], [class*="-hero"], [class*="-header"]) {
+    border-radius: 0.9rem !important;
+  }
+
+  :where(.table-responsive, [class*="table-wrap"], [class*="table-shell"], [class*="table-card"], [class*="table-panel"]) {
+    margin-inline: -0.15rem;
+    padding-bottom: 0.2rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .sv-topbar-group--right {
+    grid-template-columns: 2.35rem minmax(6.6rem, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem;
+    gap: 0.32rem;
+  }
+
+  .sv-workspace-trigger {
+    min-width: 0;
+  }
+}

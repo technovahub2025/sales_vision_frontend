@@ -1,66 +1,74 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useSocket } from './SocketContext';
 import { EVENTS } from '../socket/events';
 import { toRealtimeEvent } from '../socket/realtime';
-
-function isAbortError(error) {
-  return error?.code === 'ERR_CANCELED' || /canceled|aborted/i.test(String(error?.message || ''));
-}
+import { compareByRecencyDesc } from '../lib/listSort';
 
 export function createRealtimeCollectionContext({ contextName, moduleName, entityName, listFn, createFn, updateFn, removeFn }) {
   const Context = createContext(null);
 
   function Provider({ workspaceId, enabled = true, children }) {
+    const queryClient = useQueryClient();
     const { socket, joinWorkspace, leaveWorkspace, onReconnect } = useSocket();
-    const [items, setItems] = useState([]);
-    const [meta, setMeta] = useState({ page: 1, limit: 20, total: 0, version: 0 });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const refreshTimerRef = useRef(null);
+    const listKey = useMemo(() => [contextName, workspaceId, 'collection'], [workspaceId]);
 
-    const refresh = useCallback(
-      async ({ silent = false } = {}) => {
-        if (!workspaceId || !enabled) return;
-        if (!silent) {
-          setLoading(true);
-        }
-        setError('');
-        try {
-          const response = await listFn(workspaceId);
-          setItems(response.data || []);
-          setMeta((prev) => ({ ...prev, ...(response.meta || {}) }));
-        } catch (err) {
-          if (!isAbortError(err)) {
-            setError(err.message || 'Failed to load data');
-          }
-        } finally {
-          if (!silent) {
-            setLoading(false);
-          }
-        }
+    const collectionQuery = useInfiniteQuery({
+      queryKey: listKey,
+      enabled: Boolean(workspaceId) && enabled,
+      initialPageParam: 1,
+      queryFn: ({ pageParam, signal }) => listFn(workspaceId, { page: pageParam, limit: 50 }, signal),
+      getNextPageParam: (lastPage, allPages) => {
+        const meta = lastPage?.meta || {};
+        const page = Number(meta.page || allPages.length || 1);
+        const limit = Number(meta.limit || 50);
+        const total = Number(meta.total || 0);
+        const rows = Array.isArray(lastPage?.data) ? lastPage.data : [];
+        if (total > 0) return page * limit < total ? page + 1 : undefined;
+        return rows.length >= limit ? page + 1 : undefined;
       },
-      [workspaceId, enabled, listFn],
-    );
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+    });
+
+    const items = useMemo(() => {
+      const merged = (collectionQuery.data?.pages || []).flatMap((page) => page?.data || []);
+      const unique = new Map();
+      merged.forEach((item) => {
+        const id = String(item?._id || item?.id || '');
+        if (id) unique.set(id, item);
+      });
+      return [...unique.values()].sort(compareByRecencyDesc);
+    }, [collectionQuery.data?.pages]);
+
+    const meta = useMemo(() => {
+      const pages = collectionQuery.data?.pages || [];
+      const lastPage = pages[pages.length - 1] || {};
+      const lastMeta = lastPage.meta || {};
+      return {
+        page: Number(lastMeta.page || pages.length || 1),
+        limit: Number(lastMeta.limit || 50),
+        total: Number(lastMeta.total || items.length),
+        hasNextPage: Boolean(collectionQuery.hasNextPage),
+      };
+    }, [collectionQuery.data?.pages, collectionQuery.hasNextPage, items.length]);
 
     const scheduleSilentRefresh = useCallback(() => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        refresh({ silent: true });
+        void collectionQuery.refetch();
       }, 120);
-    }, [refresh]);
+    }, [collectionQuery]);
 
     useEffect(() => {
       if (!enabled) {
-        setItems([]);
-        setMeta({ page: 1, limit: 20, total: 0, version: Date.now() });
-        setLoading(false);
-        setError('');
+        queryClient.removeQueries({ queryKey: listKey, exact: true });
         return;
       }
-      refresh();
-    }, [enabled, refresh]);
+    }, [enabled, listKey, queryClient]);
 
     useEffect(() => {
       if (!socket || !workspaceId || !enabled) return undefined;
@@ -72,28 +80,7 @@ export function createRealtimeCollectionContext({ contextName, moduleName, entit
         const evt = toRealtimeEvent(raw);
         if (String(evt.workspaceId || '') !== String(workspaceId)) return;
         if (evt.entity !== entityName) return;
-
-        if (evt.event.endsWith(':deleted')) {
-          setItems((current) =>
-            current.filter((item) => String(item?._id || item?.id) !== String(evt.entityId || evt.payload?._id || evt.payload?.id)),
-          );
-          return;
-        }
-
-        if (evt.payload && typeof evt.payload === 'object') {
-          setItems((current) => {
-            const incomingId = String(evt.payload._id || evt.payload.id || evt.entityId || '');
-            if (!incomingId) {
-              onUpdate();
-              return current;
-            }
-            const exists = current.some((item) => String(item?._id || item?.id) === incomingId);
-            if (!exists) return [evt.payload, ...current];
-            return current.map((item) => (String(item?._id || item?.id) === incomingId ? { ...item, ...evt.payload } : item));
-          });
-        } else {
-          onUpdate();
-        }
+        onUpdate();
       };
 
       socket.on(`${moduleName}:updated`, onUpdate);
@@ -112,7 +99,7 @@ export function createRealtimeCollectionContext({ contextName, moduleName, entit
         socket.off(EVENTS.REALTIME_EVENT, onRealtimeEvent);
         unsubscribeReconnect();
       };
-    }, [socket, workspaceId, enabled, joinWorkspace, leaveWorkspace, scheduleSilentRefresh, moduleName, entityName, onReconnect]);
+    }, [socket, workspaceId, enabled, joinWorkspace, leaveWorkspace, scheduleSilentRefresh, onReconnect]);
 
     useEffect(
       () => () => {
@@ -127,38 +114,46 @@ export function createRealtimeCollectionContext({ contextName, moduleName, entit
       async (payload) => {
         if (!enabled) return null;
         const response = await createFn(workspaceId, payload);
-        if (response?.data) {
-          setItems((current) => [response.data, ...current]);
-        }
+        await collectionQuery.refetch();
         return response?.data ?? null;
       },
-      [workspaceId, enabled, createFn],
+      [workspaceId, enabled, collectionQuery],
     );
 
     const updateItem = useCallback(
       async (id, payload) => {
         if (!enabled) return null;
         const response = await updateFn(workspaceId, id, payload);
-        if (response?.data) {
-          setItems((current) => current.map((item) => (String(item._id) === String(id) ? response.data : item)));
-        }
+        await collectionQuery.refetch();
         return response?.data ?? null;
       },
-      [workspaceId, enabled, updateFn],
+      [workspaceId, enabled, collectionQuery],
     );
 
     const removeItem = useCallback(
       async (id) => {
         if (!enabled) return null;
         await removeFn(workspaceId, id);
-        setItems((current) => current.filter((item) => String(item._id) !== String(id)));
+        await collectionQuery.refetch();
       },
-      [workspaceId, enabled, removeFn],
+      [workspaceId, enabled, collectionQuery],
     );
 
     const value = useMemo(
-      () => ({ items, meta, loading, error, refresh, createItem, updateItem, removeItem }),
-      [items, meta, loading, error, refresh, createItem, updateItem, removeItem],
+      () => ({
+        items,
+        meta,
+        loading: collectionQuery.isLoading,
+        loadingMore: collectionQuery.isFetchingNextPage,
+        error: collectionQuery.error?.message || '',
+        hasMore: Boolean(collectionQuery.hasNextPage),
+        refresh: collectionQuery.refetch,
+        loadMore: collectionQuery.fetchNextPage,
+        createItem,
+        updateItem,
+        removeItem,
+      }),
+      [items, meta, collectionQuery, createItem, updateItem, removeItem],
     );
     return <Context.Provider value={value}>{children}</Context.Provider>;
   }

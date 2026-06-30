@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth.api';
@@ -225,7 +225,7 @@ export function WorkspaceProvider({ children }) {
     };
   }, [bootstrapStatus]);
 
-  const switchWorkspace = (nextWorkspaceId) => {
+  const switchWorkspace = useCallback((nextWorkspaceId) => {
     const safe = String(nextWorkspaceId || '').trim();
     if (!safe || safe === workspaceId) return;
     const isAllowed = memberships.some((item) => String(item.workspaceId) === safe);
@@ -246,7 +246,7 @@ export function WorkspaceProvider({ children }) {
       predicate: (query) => Array.isArray(query.queryKey) && ['workspace', 'dashboard', 'task-board'].includes(String(query.queryKey[0] || '')),
     });
     navigate(ROUTES.dashboard);
-  };
+  }, [memberships, navigate, queryClient, workspaceId]);
 
   const setProjectId = (nextProjectId) => {
     const safe = String(nextProjectId || '').trim();
@@ -367,6 +367,7 @@ export function WorkspaceProvider({ children }) {
       membershipsQuery.isFetching,
       isOnboarding,
       projectId,
+      switchWorkspace,
     ],
   );
 

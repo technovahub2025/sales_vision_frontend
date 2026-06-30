@@ -1,16 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../components/ui/Icon';
+import DatePicker from '../../components/ui/DatePicker';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import ExportMenu from '../../components/ui/ExportMenu';
 import { useCampaigns } from '../../hooks/useCampaigns';
 import { useLeads } from '../../hooks/useLeads';
 import { useClients } from '../../hooks/useClients';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { campaignsApi, usersApi } from '../../api';
 import { ROUTES } from '../../routes/routePaths';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
+import { compareByRecencyAsc, compareByRecencyDesc } from '../../lib/listSort';
+import { exportRows } from '../../lib/exportData';
 
 const STATUS_OPTIONS = ['draft', 'active', 'paused', 'completed'];
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
-
+const CAMPAIGN_STATUS_OPTIONS = STATUS_OPTIONS.map((status) => ({ value: status, label: status }));
+const CAMPAIGN_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'start_date', label: 'Start date' },
+  { value: 'spend', label: 'Spend' },
+  { value: 'conversion', label: 'Conversion' },
+];
 const EMPTY_FORM = {
   name: '',
   subtitle: '',
@@ -44,111 +56,17 @@ function formatINR(value) {
   }).format(Number(value || 0));
 }
 
-function downloadJson(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
-function PaginationControls({
-  totalItems,
-  currentPage,
-  totalPages,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-}) {
-  const start = totalItems ? (currentPage - 1) * pageSize + 1 : 0;
-  const end = totalItems ? Math.min(currentPage * pageSize, totalItems) : 0;
-
-  const buildPageNumbers = () => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-    if (currentPage <= 3) {
-      pages.add(2);
-      pages.add(3);
-      pages.add(4);
-    }
-    if (currentPage >= totalPages - 2) {
-      pages.add(totalPages - 1);
-      pages.add(totalPages - 2);
-      pages.add(totalPages - 3);
-    }
-
-    return [...pages].filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
-  };
-
-  const pages = buildPageNumbers();
-
-  return (
-    <div className="sv-campaigns-pagination">
-      <div className="sv-campaigns-pagination-meta">
-        <span className="sv-campaigns-pagination-text">Showing {start}-{end} of {totalItems}</span>
-        <label className="sv-campaigns-pagination-size" htmlFor="campaignRowsPerPage">
-          <span>Rows per page</span>
-          <select
-            id="campaignRowsPerPage"
-            className="sv-ctl-select sv-campaigns-page-size"
-            value={pageSize}
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="sv-campaigns-pagination-controls">
-        <button
-          type="button"
-          className="sv-ctl-btn btn-light"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage <= 1}
-        >
-          Prev
-        </button>
-
-        <div className="sv-campaigns-page-list">
-          {pages.map((page, index) => {
-            const previous = pages[index - 1];
-            const showGap = previous && page - previous > 1;
-
-            return (
-              <span key={page} className="sv-campaigns-page-item">
-                {showGap ? <span className="sv-campaigns-page-ellipsis">...</span> : null}
-                <button
-                  type="button"
-                  className={`sv-campaigns-page-btn ${page === currentPage ? 'is-active' : ''}`}
-                  onClick={() => onPageChange(page)}
-                >
-                  {page}
-                </button>
-              </span>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          className="sv-ctl-btn btn-light"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages}
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  );
+function formatCompactMetric(value, suffix = '') {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return `0${suffix}`;
+  if (Math.abs(number) >= 1000) {
+    return `${new Intl.NumberFormat('en-IN', {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(number)}${suffix}`;
+  }
+  const decimals = Math.abs(number) >= 100 ? 0 : 1;
+  return `${number.toFixed(decimals)}${suffix}`;
 }
 
 function CreateCampaignModal({
@@ -226,38 +144,33 @@ function CreateCampaignModal({
                 <label className="sv-campaigns-label">
                   Owner / Lead <span className="text-error">*</span>
                 </label>
-                <select
-                  required
+                <SelectDropdown
                   value={form.ownerId}
-                  onChange={(event) => {
-                    const selectedId = event.target.value;
+                  onChange={(selectedId) => {
                     const selected = users.find((user) => String(user._id) === String(selectedId));
                     onChange('ownerId', selectedId);
                     onChange('owner', selected?.displayName || selected?.name || selected?.email || '');
                     onChange('lead', selected?.displayName || selected?.name || selected?.email || '');
                   }}
-                  className="sv-ctl-select sv-campaigns-field"
-                >
-                  <option value="">Select owner/lead</option>
-                  {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.displayName || user.name || user.email || 'Unknown'}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'Select owner/lead' },
+                    ...users.map((user) => ({
+                      value: user._id,
+                      label: user.displayName || user.name || user.email || 'Unknown',
+                    })),
+                  ]}
+                  triggerClassName="sv-campaigns-field"
+                />
               </div>
 
               <div>
                 <label className="sv-campaigns-label">Status</label>
-                <select
+                <SelectDropdown
                   value={form.status}
-                  onChange={(event) => onChange('status', event.target.value)}
-                  className="sv-ctl-select sv-campaigns-field"
-                >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
+                  onChange={(nextValue) => onChange('status', nextValue)}
+                  options={CAMPAIGN_STATUS_OPTIONS}
+                  triggerClassName="sv-campaigns-field"
+                />
               </div>
             </div>
           </section>
@@ -269,22 +182,23 @@ function CreateCampaignModal({
                 <label className="sv-campaigns-label">
                   Start Date <span className="text-error">*</span>
                 </label>
-                <input
-                  type="date"
-                  required
+                <DatePicker
                   value={form.startDate}
-                  onChange={(event) => onChange('startDate', event.target.value)}
-                  className="sv-ctl-input sv-campaigns-field"
+                  onChange={(nextValue) => onChange('startDate', nextValue)}
+                  className="sv-campaigns-field"
+                  triggerClassName="sv-ctl-input"
+                  placeholder="Start date"
                 />
               </div>
 
               <div>
                 <label className="sv-campaigns-label">End Date</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={form.endDate}
-                  onChange={(event) => onChange('endDate', event.target.value)}
-                  className="sv-ctl-input sv-campaigns-field"
+                  onChange={(nextValue) => onChange('endDate', nextValue)}
+                  className="sv-campaigns-field"
+                  triggerClassName="sv-ctl-input"
+                  placeholder="End date"
                 />
               </div>
 
@@ -476,7 +390,7 @@ function CreateCampaignModal({
 function CampaignsPage() {
   const navigate = useNavigate();
   const { workspaceId } = useWorkspace();
-  const { items: campaignItems, loading, error, createItem, refresh } = useCampaigns();
+  const { items: campaignItems, loading, loadingMore, hasMore, loadMore, error, createItem, refresh } = useCampaigns();
   const { items: leadItems } = useLeads();
   const { clients, list: listClients } = useClients();
 
@@ -485,9 +399,7 @@ function CampaignsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [archiveScope, setArchiveScope] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [sortBy, setSortBy] = useState('newest');
   const [createOpen, setCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -498,6 +410,14 @@ function CampaignsPage() {
   const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
   const [openRowMenuCampaign, setOpenRowMenuCampaign] = useState(null);
   const rowMenuRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const loadMoreCampaignsRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (hasMore && !loadingMore) void loadMore();
+    },
+    disabled: !hasMore || loadingMore,
+  });
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -528,6 +448,8 @@ function CampaignsPage() {
     });
 
     return [...rows].sort((a, b) => {
+      if (sortBy === 'newest') return compareByRecencyDesc(a, b);
+      if (sortBy === 'oldest') return compareByRecencyAsc(a, b);
       if (sortBy === 'start_date') {
         return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
       }
@@ -537,27 +459,13 @@ function CampaignsPage() {
       if (sortBy === 'conversion') {
         return Number(b.conversionRate || 0) - Number(a.conversionRate || 0);
       }
-      return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+      return compareByRecencyDesc(a, b);
     });
   }, [campaignItems, search, statusFilter, sortBy, archiveScope]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter, archiveScope, sortBy, pageSize]);
-
-  const totalItems = campaigns.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-  const pagedCampaigns = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return campaigns.slice(start, start + pageSize);
-  }, [campaigns, safeCurrentPage, pageSize]);
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage);
-    }
-  }, [currentPage, safeCurrentPage]);
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [search, statusFilter, archiveScope, sortBy]);
 
   const metrics = useMemo(() => {
     const total = campaigns.length;
@@ -574,6 +482,8 @@ function CampaignsPage() {
       spend,
       avgRoi: Number(avgRoi.toFixed(2)),
       avgConversion: Number(avgConversion.toFixed(1)),
+      completed: campaigns.filter((item) => String(item.status || '').toLowerCase() === 'completed').length,
+      linked: campaigns.reduce((sum, item) => sum + Number(item.linkedLeadsCount || 0) + Number(item.linkedClientsCount || 0), 0),
     };
   }, [campaigns]);
 
@@ -694,17 +604,23 @@ function CampaignsPage() {
     }
   };
 
-  const handleExportAll = async () => {
-    if (!workspaceId) return;
-    try {
-      const report = await campaignsApi.exportReport(workspaceId, null, undefined, {
-        includeArchived: 'true',
-      });
-      downloadJson(`campaign-report-${new Date().toISOString().slice(0, 10)}.json`, report.data || report);
-      setToast({ tone: 'success', message: 'Report exported' });
-    } catch (nextError) {
-      setToast({ tone: 'error', message: nextError.message || 'Failed to export report' });
-    }
+  const handleExportAll = (format) => {
+    exportRows({
+      rows: campaigns,
+      format,
+      filename: `campaign-report-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Campaign Report',
+      columns: [
+        { header: 'Campaign', value: (row) => row.name || 'Untitled Campaign' },
+        { header: 'Channel', value: (row) => row.channel || row.subtitle || '-' },
+        { header: 'Status', value: (row) => row.status || 'draft' },
+        { header: 'Owner', value: (row) => row.owner || row.lead || '-' },
+        { header: 'Spend', value: (row) => Number(row.spend || 0) },
+        { header: 'Conversion', value: (row) => `${Number(row.conversionRate || 0).toFixed(1)}%` },
+        { header: 'ROI', value: (row) => `${Number(row.roi || 0).toFixed(2)}x` },
+      ],
+    });
+    setToast({ tone: 'success', message: `${String(format).toUpperCase()} export ready` });
   };
 
   const closeRowMenu = useCallback(() => {
@@ -768,14 +684,14 @@ function CampaignsPage() {
       <div className="sv-campaigns-stack">
         <header className="sv-campaigns-header sv-card">
           <div className="sv-campaigns-header-main">
+            <span className="sv-campaigns-eyebrow"><Icon name="campaign" className="text-base" /> Growth workspace</span>
             <h1 className="sv-campaigns-title">Campaign Overview</h1>
-            <p className="sv-campaigns-subtitle">Lead generation campaigns with actionable detail workflows.</p>
+            <p className="sv-campaigns-subtitle">
+              {campaigns.length} visible campaign{campaigns.length === 1 ? '' : 's'} across {metrics.linked} linked relationship{metrics.linked === 1 ? '' : 's'}.
+            </p>
           </div>
           <div className="sv-campaigns-header-actions">
-            <button type="button" onClick={handleExportAll} className="sv-ctl-btn btn-light sv-campaigns-icon-btn">
-              <Icon name="download" className="sv-campaigns-btn-icon" />
-              <span>Export Report</span>
-            </button>
+            <ExportMenu onExport={handleExportAll} label="Export Report" disabled={!campaigns.length} />
             <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-campaigns-new-btn">
               <Icon name="add_circle" className="sv-campaigns-new-icon" />
               <span>New Campaign</span>
@@ -784,21 +700,25 @@ function CampaignsPage() {
         </header>
 
         <section className="sv-campaigns-metrics">
-          <article className="sv-card sv-campaigns-metric-card">
+          <article className="sv-card sv-campaigns-metric-card is-blue">
             <p className="sv-campaigns-metric-label">Total Active Campaigns</p>
             <p className="sv-campaigns-metric-value">{metrics.active}</p>
+            <p className="sv-campaigns-metric-hint">{metrics.total} total visible</p>
           </article>
-          <article className="sv-card sv-campaigns-metric-card">
+          <article className="sv-card sv-campaigns-metric-card is-green">
             <p className="sv-campaigns-metric-label">Conversion Rate</p>
-            <p className="sv-campaigns-metric-value">{metrics.avgConversion}%</p>
+            <p className="sv-campaigns-metric-value" title={`${metrics.avgConversion}%`}>{formatCompactMetric(metrics.avgConversion, '%')}</p>
+            <p className="sv-campaigns-metric-hint">Average across filtered campaigns</p>
           </article>
-          <article className="sv-card sv-campaigns-metric-card">
+          <article className="sv-card sv-campaigns-metric-card is-amber">
             <p className="sv-campaigns-metric-label">Average ROI</p>
-            <p className="sv-campaigns-metric-value">{metrics.avgRoi}x</p>
+            <p className="sv-campaigns-metric-value" title={`${metrics.avgRoi}x`}>{formatCompactMetric(metrics.avgRoi, 'x')}</p>
+            <p className="sv-campaigns-metric-hint">{metrics.completed} completed</p>
           </article>
-          <article className="sv-card sv-campaigns-metric-card">
+          <article className="sv-card sv-campaigns-metric-card is-red">
             <p className="sv-campaigns-metric-label">Total Spend</p>
             <p className="sv-campaigns-metric-value">{formatINR(metrics.spend)}</p>
+            <p className="sv-campaigns-metric-hint">Current filtered spend</p>
           </article>
         </section>
 
@@ -823,37 +743,16 @@ function CampaignsPage() {
             </div>
             {filtersOpen ? (
               <div className="sv-campaigns-filter-panel">
-                <select
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                  className="sv-ctl-select"
-                >
-                  <option value="all">All status</option>
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-                <select
-                  value={archiveScope}
-                  onChange={(event) => setArchiveScope(event.target.value)}
-                  className="sv-ctl-select"
-                >
-                  <option value="all">All (Active)</option>
-                  <option value="archived">Archived only</option>
-                </select>
-                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="sv-ctl-select">
-                  <option value="recent">Recently updated</option>
-                  <option value="start_date">Start date</option>
-                  <option value="spend">Spend</option>
-                  <option value="conversion">Conversion</option>
-                </select>
+                <SelectDropdown value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'All status' }, ...CAMPAIGN_STATUS_OPTIONS]} triggerClassName="sv-ctl-select" />
+                <SelectDropdown value={archiveScope} onChange={setArchiveScope} options={[{ value: 'all', label: 'All (Active)' }, { value: 'archived', label: 'Archived only' }]} triggerClassName="sv-ctl-select" />
+                <SelectDropdown value={sortBy} onChange={setSortBy} options={CAMPAIGN_SORT_OPTIONS} triggerClassName="sv-ctl-select" />
               </div>
             ) : null}
           </div>
 
           {error ? <p className="sv-campaigns-alert is-error">{error}</p> : null}
 
-          <div className="sv-campaigns-table-wrap">
+          <div className="sv-campaigns-table-wrap sv-list-scroll" ref={listScrollRef}>
             <table className="sv-campaigns-table">
               <thead>
                 <tr>
@@ -862,17 +761,23 @@ function CampaignsPage() {
                   <th>Owner</th>
                   <th>Spend</th>
                   <th>Conversion</th>
-                  <th className="is-right">Actions</th>
+                  <th className="sv-row-action-heading">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {pagedCampaigns.map((campaign) => {
+                {campaigns.map((campaign) => {
                   const status = String(campaign.status || 'draft').toLowerCase();
                   return (
                     <tr key={campaign._id}>
                       <td>
                         <div className="sv-campaigns-campaign-cell">
-                          <p className="sv-campaigns-campaign-title">{campaign.name || 'Untitled Campaign'}</p>
+                          <button
+                            type="button"
+                            className="sv-campaigns-campaign-title sv-name-open-btn"
+                            onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign._id))}
+                          >
+                            {campaign.name || 'Untitled Campaign'}
+                          </button>
                           {campaign?.isArchived ? (
                             <span className="sv-campaigns-archive-chip">Archived</span>
                           ) : null}
@@ -884,8 +789,8 @@ function CampaignsPage() {
                       </td>
                       <td>{campaign.owner || campaign.lead || '-'}</td>
                       <td>{formatINR(campaign.spend || 0)}</td>
-                      <td>{Number(campaign.conversionRate || 0).toFixed(1)}%</td>
-                      <td className="is-right">
+                      <td title={`${Number(campaign.conversionRate || 0).toFixed(1)}%`}>{formatCompactMetric(campaign.conversionRate, '%')}</td>
+                      <td className="sv-row-action-cell">
                         <div className="sv-row-menu-container">
                           <button
                             type="button"
@@ -903,25 +808,24 @@ function CampaignsPage() {
                   );
                 })}
 
-                {!pagedCampaigns.length && !loading ? (
+                {!campaigns.length && !loading ? (
                   <tr>
                     <td colSpan={6} className="sv-campaigns-empty-cell">
                       No campaigns available.
                     </td>
                   </tr>
                 ) : null}
+                {campaigns.length ? (
+                  <tr>
+                    <td colSpan={6} className="sv-list-sentinel-cell">
+                      <span ref={loadMoreCampaignsRef} className="sv-list-sentinel" />
+                      {loadingMore ? 'Loading more campaigns...' : hasMore ? 'Scroll for more' : 'End of list'}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
-
-          <PaginationControls
-            totalItems={totalItems}
-            currentPage={safeCurrentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
-          />
         </section>
       </div>
 

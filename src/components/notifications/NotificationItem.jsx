@@ -1,53 +1,67 @@
 import { formatDistanceToNow } from 'date-fns';
-import Icon from '../ui/Icon';
+import {
+  Bell,
+  CheckSquare2,
+  CircleAlert,
+  CircleDashed,
+  CircleUserRound,
+  Clock3,
+  MessageSquareMore,
+  Rocket,
+  X,
+} from 'lucide-react';
 
 function iconByType(type) {
   switch (type) {
     case 'mention':
-      return 'alternate_email';
+      return CircleUserRound;
     case 'task_assigned':
-      return 'task';
+      return CheckSquare2;
     case 'task_due_soon':
-      return 'schedule';
+      return Clock3;
     case 'lead_assigned':
-      return 'account_circle';
+      return Bell;
     case 'sprint_started':
-      return 'rocket_launch';
+      return Rocket;
+    case 'comment':
+      return MessageSquareMore;
+    case 'system':
+      return CircleAlert;
     default:
-      return 'notifications';
+      return CircleDashed;
   }
 }
 
-function NotificationItem({ item, onRead, onDelete }) {
+function NotificationItem({ item, onDelete }) {
   const isRead = Boolean(item.read ?? item.isRead);
+  const TypeIcon = iconByType(item.type);
   const relativeTime = item.createdAt
     ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })
     : 'just now';
 
   return (
-    <article className="flex h-full items-start gap-3 border-b border-outline-variant/10 px-4 py-3">
-      <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-        <Icon name={iconByType(item.type)} className="text-sm" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-on-surface">{item.title || 'Notification'}</p>
-        <p className="truncate text-xs text-on-surface-variant">{item.body || ''}</p>
-        <p className="mt-1 text-[11px] text-on-surface-variant">{relativeTime}</p>
+    <article className={`sv-notification-item ${isRead ? '' : 'is-unread'}`}>
+      <div className="sv-notification-icon">
+        <TypeIcon size={16} strokeWidth={2.2} />
       </div>
-      {!isRead ? <span aria-label="Unread" className="mt-1 h-2 w-2 rounded-full bg-error" /> : null}
-      {!isRead ? (
-        <button type="button" onClick={() => onRead(item._id)} className="text-xs font-semibold text-primary">
-          Read
-        </button>
-      ) : null}
+      <div className="sv-notification-content">
+        <div className="sv-notification-title-row">
+          <p className="sv-notification-title">{item.title || 'Notification'}</p>
+          {!isRead ? <span aria-label="Unread" className="sv-notification-dot" /> : null}
+        </div>
+        <p className="sv-notification-body">{item.body || ''}</p>
+        <div className="sv-notification-meta">
+          <span className="sv-notification-time">{relativeTime}</span>
+        </div>
+      </div>
       <button
         type="button"
         onClick={() => onDelete(item._id)}
         className="sv-notification-remove-btn"
-        aria-label="Remove notification"
-        title="Remove"
+        aria-label="Dismiss notification"
+        title="Dismiss"
       >
-        <Icon name="close" className="text-sm" />
+        <X size={14} />
       </button>
     </article>
   );

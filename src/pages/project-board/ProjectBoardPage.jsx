@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import Icon from '../../components/ui/Icon';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -91,12 +92,28 @@ const TaskCard = memo(function TaskCard({
   };
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const openTask = useCallback(() => onOpen(task), [onOpen, task]);
+  const handleCardClick = useCallback((event) => {
+    if (event.target.closest('button, a, input, textarea, select, option, [role="menuitem"]')) return;
+    openTask();
+  }, [openTask]);
+  const handleCardKeyDown = useCallback((event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openTask();
+    }
+  }, [openTask]);
 
   return (
     <article
       ref={setNodeRef}
       style={{ ...dndStyle, ...animationStyle }}
       className={`group sv-card sv-board-task-card overflow-hidden ${isDragging ? 'sv-board-task-card-dragging' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open task ${task.title}`}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       {...attributes}
       {...listeners}
     >
@@ -288,16 +305,6 @@ const TaskCard = memo(function TaskCard({
           <Icon name="chat_bubble_outline" className="text-[12px]" />
           {task.commentsCount || 0}
         </span>
-      </div>
-
-      <div className="sv-board-task-footer mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={() => onOpen(task)}
-          className="sv-board-open-btn"
-        >
-          Open
-        </button>
       </div>
     </article>
   );
@@ -544,8 +551,11 @@ function ProjectBoardPage() {
     };
   }, [menuOpenColumn]);
 
-  const columns = board.columns || [];
-  const swimlanes = boardGroupBy && boardGroupBy !== 'none' ? board.swimlanes || [] : [];
+  const columns = useMemo(() => board.columns || [], [board.columns]);
+  const swimlanes = useMemo(
+    () => (boardGroupBy && boardGroupBy !== 'none' ? board.swimlanes || [] : []),
+    [board.swimlanes, boardGroupBy],
+  );
 
   const labelOptions = useMemo(() => {
     const map = new Map();
@@ -826,15 +836,16 @@ function ProjectBoardPage() {
             </h1>
           </div>
           <div className="sv-board-hero-actions">
-            <select
+            <SelectDropdown
               value={boardGroupBy}
-              onChange={(event) => setBoardGroupBy(event.target.value)}
-              className="form-select sv-ctl-select sv-board-group-select"
-            >
-              <option value="none">No swimlanes</option>
-              <option value="assignee">Swimlane: Assignee</option>
-              <option value="epic">Swimlane: Epic</option>
-            </select>
+              onChange={setBoardGroupBy}
+              options={[
+                { value: 'none', label: 'No swimlanes' },
+                { value: 'assignee', label: 'Swimlane: Assignee' },
+                { value: 'epic', label: 'Swimlane: Epic' },
+              ]}
+              className="sv-board-group-select"
+            />
           </div>
         {error ? <p className="sv-board-error">{error}</p> : null}
         {blockedActionMessage ? <p className="sv-board-error">{blockedActionMessage}</p> : null}
@@ -872,49 +883,47 @@ function ProjectBoardPage() {
         </button>
         {showAdvancedFilters ? (
           <div className="sv-board-filter-panel">
-            <select
+            <SelectDropdown
               value={filters.priority}
-              onChange={(event) => handleFilterChange('priority', event.target.value)}
-              className="form-select sv-ctl-select sv-board-filter-select"
-            >
-              <option value="all">Priority</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            <select
+              onChange={(nextValue) => handleFilterChange('priority', nextValue)}
+              options={[
+                { value: 'all', label: 'Priority' },
+                { value: 'critical', label: 'Critical' },
+                { value: 'high', label: 'High' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'low', label: 'Low' },
+              ]}
+              className="sv-board-filter-select"
+            />
+            <SelectDropdown
               value={filters.label}
-              onChange={(event) => handleFilterChange('label', event.target.value)}
-              className="form-select sv-ctl-select sv-board-filter-select"
-            >
-              <option value="all">Label</option>
-              {labelOptions.map((label) => (
-                <option key={label._id} value={label._id}>{label.name}</option>
-              ))}
-            </select>
-            <select
+              onChange={(nextValue) => handleFilterChange('label', nextValue)}
+              options={[
+                { value: 'all', label: 'Label' },
+                ...labelOptions.map((label) => ({ value: label._id, label: label.name })),
+              ]}
+              className="sv-board-filter-select"
+            />
+            <SelectDropdown
               value={filters.issueType}
-              onChange={(event) => handleFilterChange('issueType', event.target.value)}
-              className="form-select sv-ctl-select sv-board-filter-select"
-            >
-              <option value="all">Issue Type</option>
-              <option value="epic">Epic</option>
-              <option value="task">Task</option>
-              <option value="subtask">Subtask</option>
-            </select>
-            <select
+              onChange={(nextValue) => handleFilterChange('issueType', nextValue)}
+              options={[
+                { value: 'all', label: 'Issue Type' },
+                { value: 'epic', label: 'Epic' },
+                { value: 'task', label: 'Task' },
+                { value: 'subtask', label: 'Subtask' },
+              ]}
+              className="sv-board-filter-select"
+            />
+            <SelectDropdown
               value={filters.epic}
-              onChange={(event) => handleFilterChange('epic', event.target.value)}
-              className="form-select sv-ctl-select sv-board-filter-select"
-            >
-              <option value="all">Epic</option>
-              {epicOptions.map((epic) => (
-                <option key={epic._id || epic.id} value={epic._id || epic.id}>
-                  {epic.title}
-                </option>
-              ))}
-            </select>
+              onChange={(nextValue) => handleFilterChange('epic', nextValue)}
+              options={[
+                { value: 'all', label: 'Epic' },
+                ...epicOptions.map((epic) => ({ value: epic._id || epic.id, label: epic.title })),
+              ]}
+              className="sv-board-filter-select"
+            />
           </div>
         ) : null}
       </section>
@@ -1060,21 +1069,22 @@ function ProjectBoardPage() {
               </div>
               <div>
                 <label className="sv-board-form-label">Color</label>
-                <select
-                  value={editColumnData.colorMeta}
-                  onChange={(e) => setEditColumnData((current) => ({ ...current, colorMeta: e.target.value }))}
-                  className="form-select sv-ctl-select sv-board-form-control"
-                >
-                  <option value="">Default</option>
-                  <option value="slate">Slate (Gray)</option>
-                  <option value="red">Red</option>
-                  <option value="orange">Orange</option>
-                  <option value="amber">Amber</option>
-                  <option value="green">Green</option>
-                  <option value="blue">Blue</option>
-                  <option value="purple">Purple</option>
-                  <option value="pink">Pink</option>
-                </select>
+                <SelectDropdown
+                  value={editColumnData.colorMeta || ''}
+                  onChange={(nextValue) => setEditColumnData((current) => ({ ...current, colorMeta: nextValue }))}
+                  options={[
+                    { value: '', label: 'Default' },
+                    { value: 'slate', label: 'Slate (Gray)' },
+                    { value: 'red', label: 'Red' },
+                    { value: 'orange', label: 'Orange' },
+                    { value: 'amber', label: 'Amber' },
+                    { value: 'green', label: 'Green' },
+                    { value: 'blue', label: 'Blue' },
+                    { value: 'purple', label: 'Purple' },
+                    { value: 'pink', label: 'Pink' },
+                  ]}
+                  className="sv-board-form-control"
+                />
               </div>
               <div>
                 <label className="sv-board-form-label">WIP Limit (Optional)</label>

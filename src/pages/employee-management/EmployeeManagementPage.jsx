@@ -1,13 +1,15 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../routes/routePaths';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useContacts } from '../../hooks/useContacts';
 import { useTeams } from '../../hooks/useTeams';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import ExportMenu from '../../components/ui/ExportMenu';
 import Icon from '../../components/ui/Icon';
-
-const DEFAULT_PAGE_SIZE = 8;
-const PAGE_SIZE_OPTIONS = [8, 15, 25];
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
+import { compareByRecencyAsc, compareByRecencyDesc } from '../../lib/listSort';
+import { exportRows } from '../../lib/exportData';
 
 const EMPTY_EMPLOYEE = {
   name: '',
@@ -111,12 +113,15 @@ function EmployeeFormModal({
           <input className="sv-ctl-input sv-employees-field" placeholder="Phone" value={form.phone} onChange={(e) => onChange('phone', e.target.value)} />
 
           <div className="sv-employees-team-row">
-            <select className="sv-ctl-select sv-employees-field" value={form.team} onChange={(e) => onChange('team', e.target.value)}>
-              <option value="">Select team</option>
-              {teams.map((team) => (
-                <option key={team._id} value={team.name || ''}>{team.name || 'Unnamed team'}</option>
-              ))}
-            </select>
+            <SelectDropdown
+              value={form.team}
+              onChange={(nextValue) => onChange('team', nextValue)}
+              options={[
+                { value: '', label: 'Select team' },
+                ...teams.map((team) => ({ value: team.name || '', label: team.name || 'Unnamed team' })),
+              ]}
+              triggerClassName="sv-employees-field"
+            />
             <button
               type="button"
               onClick={onCreateTeam}
@@ -129,44 +134,58 @@ function EmployeeFormModal({
 
           <input className="sv-ctl-input sv-employees-field" placeholder="Employee Code" value={form.employeeCode} onChange={(e) => onChange('employeeCode', e.target.value)} />
 
-          <select className="sv-ctl-select sv-employees-field" value={form.status} onChange={(e) => onChange('status', e.target.value)}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
-          </select>
+          <SelectDropdown
+            value={form.status}
+            onChange={(nextValue) => onChange('status', nextValue)}
+            options={[
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+              { value: 'archived', label: 'Archived' },
+            ]}
+            className="sv-employees-field"
+          />
 
-          <select className="sv-ctl-select sv-employees-field" value={form.availabilityStatus} onChange={(e) => onChange('availabilityStatus', e.target.value)}>
-            <option value="available">Available</option>
-            <option value="busy">Busy</option>
-            <option value="ooo">Out Of Office</option>
-            <option value="leave">On Leave</option>
-          </select>
+          <SelectDropdown
+            value={form.availabilityStatus}
+            onChange={(nextValue) => onChange('availabilityStatus', nextValue)}
+            options={[
+              { value: 'available', label: 'Available' },
+              { value: 'busy', label: 'Busy' },
+              { value: 'ooo', label: 'Out Of Office' },
+              { value: 'leave', label: 'On Leave' },
+            ]}
+            className="sv-employees-field"
+          />
 
           <input type="number" min="1" className="sv-ctl-input sv-employees-field" placeholder="Hours / week" value={form.hoursPerWeek} onChange={(e) => onChange('hoursPerWeek', e.target.value)} />
           <input type="number" min="0" className="sv-ctl-input sv-employees-field" placeholder="Velocity" value={form.velocity} onChange={(e) => onChange('velocity', e.target.value)} />
 
-          <select
-            className="sv-ctl-select sv-employees-field"
+          <SelectDropdown
             value={form.managerId}
-            onChange={(e) => {
-              const managerId = e.target.value;
-              const manager = managerOptions.find((item) => String(item._id) === String(managerId));
-              onChange('managerId', managerId);
+            onChange={(nextValue) => {
+              const manager = managerOptions.find((item) => String(item._id) === String(nextValue));
+              onChange('managerId', nextValue);
               onChange('managerName', manager?.name || '');
             }}
-          >
-            <option value="">No manager</option>
-            {managerOptions.map((employee) => (
-              <option key={employee._id} value={employee._id}>{employee.name || 'Unnamed'}</option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'No manager' },
+              ...managerOptions.map((employee) => ({ value: employee._id, label: employee.name || 'Unnamed' })),
+            ]}
+            className="sv-employees-field"
+          />
 
-          <select className="sv-ctl-select sv-employees-field" value={form.contactId} onChange={(e) => onChange('contactId', e.target.value)}>
-            <option value="">No linked contact</option>
-            {contacts.map((contact) => (
-              <option key={contact._id} value={contact._id}>{contact.name || 'Unnamed'}{contact.email ? ` (${contact.email})` : ''}</option>
-            ))}
-          </select>
+          <SelectDropdown
+            value={form.contactId}
+            onChange={(nextValue) => onChange('contactId', nextValue)}
+            options={[
+              { value: '', label: 'No linked contact' },
+              ...contacts.map((contact) => ({
+                value: contact._id,
+                label: `${contact.name || 'Unnamed'}${contact.email ? ` (${contact.email})` : ''}`,
+              })),
+            ]}
+            className="sv-employees-field"
+          />
 
           <div className="sv-employees-modal-actions">
             <button type="button" onClick={onClose} className="sv-ctl-btn btn-light sv-icon-btn">
@@ -184,67 +203,9 @@ function EmployeeFormModal({
   );
 }
 
-function EmployeePagination({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) {
-  if (totalItems <= 0) return null;
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const startItem = (safePage - 1) * pageSize + 1;
-  const endItem = Math.min(totalItems, safePage * pageSize);
-  const pages = Array.from({ length: totalPages }, (_, idx) => idx + 1);
-
-  return (
-    <div className="sv-leads-pagination">
-      <div className="sv-leads-pagination-meta">
-        <span className="sv-leads-pagination-text">Showing {startItem}-{endItem} of {totalItems}</span>
-        <label className="sv-leads-pagination-size">
-          <span>Rows per page</span>
-          <select
-            className="form-select form-select-sm sv-ctl-select sv-leads-page-size"
-            value={pageSize}
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={`employees-page-size-${size}`} value={size}>{size}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className="sv-leads-pagination-controls">
-        <button
-          type="button"
-          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          disabled={safePage <= 1}
-        >
-          Prev
-        </button>
-        <div className="sv-leads-page-list">
-          {pages.map((nextPage) => (
-            <button
-              key={`employees-page-${nextPage}`}
-              type="button"
-              className={`btn btn-sm sv-ctl-btn sv-leads-page-btn ${nextPage === safePage ? 'is-active' : ''}`}
-              onClick={() => onPageChange(nextPage)}
-            >
-              {nextPage}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="btn btn-light btn-sm sv-ctl-btn sv-leads-page-btn"
-          onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
-          disabled={safePage >= totalPages}
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function EmployeeManagementPage() {
   const navigate = useNavigate();
-  const { items: employees, loading, error, createItem, updateItem, removeItem } = useEmployees();
+  const { items: employees, loading, loadingMore, hasMore, loadMore, error, createItem, updateItem, removeItem } = useEmployees();
   const { items: contacts } = useContacts();
   const { teams, createTeam } = useTeams();
 
@@ -253,9 +214,7 @@ function EmployeeManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [teamFilter, setTeamFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sortBy, setSortBy] = useState('newest');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -268,6 +227,16 @@ function EmployeeManagementPage() {
   const [openRowMenuPos, setOpenRowMenuPos] = useState({ top: 0, left: 0 });
   const [openRowMenuContext, setOpenRowMenuContext] = useState(null);
   const rowMenuRef = useRef(null);
+  const listScrollRef = useRef(null);
+  const loadMoreEmployees = useCallback(() => {
+    if (!hasMore || loadingMore) return;
+    void loadMore();
+  }, [hasMore, loadingMore, loadMore]);
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: loadMoreEmployees,
+    disabled: !hasMore || loadingMore,
+  });
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -355,12 +324,34 @@ function EmployeeManagementPage() {
     });
 
     return [...base].sort((a, b) => {
+      if (sortBy === 'newest') return compareByRecencyDesc(a, b);
+      if (sortBy === 'oldest') return compareByRecencyAsc(a, b);
       if (sortBy === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
       if (sortBy === 'velocity') return Number(b.velocity || 0) - Number(a.velocity || 0);
       if (sortBy === 'capacity') return Number(b.capacity?.hoursPerWeek || 0) - Number(a.capacity?.hoursPerWeek || 0);
-      return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+      return compareByRecencyDesc(a, b);
     });
   }, [employees, search, statusFilter, departmentFilter, teamFilter, sortBy]);
+
+  const handleExportEmployees = useCallback((format) => {
+    exportRows({
+      rows: filtered,
+      format,
+      filename: `employees-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Employees Export',
+      columns: [
+        { header: 'Name', value: (row) => row.name || '-' },
+        { header: 'Email', value: (row) => row.email || '-' },
+        { header: 'Role', value: (row) => row.role || '-' },
+        { header: 'Department', value: (row) => row.department || '-' },
+        { header: 'Team', value: (row) => row.team || '-' },
+        { header: 'Status', value: (row) => row.status || '-' },
+        { header: 'Availability', value: (row) => row.availability?.status || '-' },
+        { header: 'Capacity', value: (row) => row.capacity?.hoursPerWeek || 0 },
+        { header: 'Velocity', value: (row) => row.velocity || 0 },
+      ],
+    });
+  }, [filtered]);
 
   const metrics = useMemo(() => {
     const total = filtered.length;
@@ -379,22 +370,9 @@ function EmployeeManagementPage() {
     };
   }, [filtered]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  const pagedEmployees = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
-
   useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter, departmentFilter, teamFilter, sortBy, pageSize]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [search, statusFilter, departmentFilter, teamFilter, sortBy]);
 
   const openCreate = () => {
     setModalMode('create');
@@ -507,22 +485,50 @@ function EmployeeManagementPage() {
           </NavLink>
         </section>
 
+        <section className="sv-card sv-employees-hero">
+          <div>
+            <span className="sv-employees-eyebrow">
+              <Icon name="workspaces" className="sv-icon-btn-icon" />
+              Workforce hub
+            </span>
+            <h1 className="sv-employees-title">Employee Management</h1>
+            <p className="sv-employees-subtitle">
+              Track capacity, availability, contact links, and team ownership from one focused workspace.
+            </p>
+          </div>
+          <div className="sv-employees-hero-actions">
+            <ExportMenu onExport={handleExportEmployees} label="Export" disabled={!filtered.length} />
+            <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
+              <Icon name="person_add" className="sv-icon-btn-icon" />
+              <span>New Employee</span>
+            </button>
+          </div>
+        </section>
+
         <section className="sv-employees-kpis grid grid-cols-1 gap-4 md:grid-cols-4">
-          <article className="sv-card sv-employees-kpi">
-            <p className="text-xs uppercase text-on-surface-variant">Headcount</p>
-            <p className="mt-2 text-3xl font-bold text-on-surface">{metrics.total}</p>
+          <article className="sv-card sv-employees-kpi is-blue">
+            <span className="sv-employees-kpi-icon"><Icon name="groups" /></span>
+            <p className="sv-employees-kpi-label">Headcount</p>
+            <p className="sv-employees-kpi-value">{metrics.total}</p>
+            <small>Filtered employees</small>
           </article>
-          <article className="sv-card sv-employees-kpi">
-            <p className="text-xs uppercase text-on-surface-variant">Active</p>
-            <p className="mt-2 text-3xl font-bold text-on-surface">{metrics.active}</p>
+          <article className="sv-card sv-employees-kpi is-green">
+            <span className="sv-employees-kpi-icon"><Icon name="verified_user" /></span>
+            <p className="sv-employees-kpi-label">Active</p>
+            <p className="sv-employees-kpi-value">{metrics.active}</p>
+            <small>Available records</small>
           </article>
-          <article className="sv-card sv-employees-kpi">
-            <p className="text-xs uppercase text-on-surface-variant">Avg Velocity</p>
-            <p className="mt-2 text-3xl font-bold text-on-surface">{metrics.avgVelocity}%</p>
+          <article className="sv-card sv-employees-kpi is-amber">
+            <span className="sv-employees-kpi-icon"><Icon name="speed" /></span>
+            <p className="sv-employees-kpi-label">Avg Velocity</p>
+            <p className="sv-employees-kpi-value">{metrics.avgVelocity}%</p>
+            <small>Delivery signal</small>
           </article>
-          <article className="sv-card sv-employees-kpi">
-            <p className="text-xs uppercase text-on-surface-variant">Avg Capacity</p>
-            <p className="mt-2 text-3xl font-bold text-on-surface">{metrics.avgCapacity}h</p>
+          <article className="sv-card sv-employees-kpi is-purple">
+            <span className="sv-employees-kpi-icon"><Icon name="schedule" /></span>
+            <p className="sv-employees-kpi-label">Avg Capacity</p>
+            <p className="sv-employees-kpi-value">{metrics.avgCapacity}h</p>
+            <small>Weekly capacity</small>
           </article>
         </section>
 
@@ -546,39 +552,53 @@ function EmployeeManagementPage() {
             </div>
 
             <div className="sv-employees-filter-actions">
-              <button type="button" onClick={openCreate} className="sv-ctl-btn btn-primary sv-icon-btn">
-                <Icon name="person_add" className="sv-icon-btn-icon" />
-                <span>New Employee</span>
-              </button>
+              <span className="sv-employees-result-chip">{filtered.length} shown</span>
             </div>
           </div>
           {filtersOpen ? (
             <div className="sv-employees-filter-panel">
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="sv-ctl-select">
-                <option value="all">All availability</option>
-                <option value="available">Available</option>
-                <option value="busy">Busy</option>
-                <option value="ooo">Out of office</option>
-                <option value="leave">Leave</option>
-              </select>
-              <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="sv-ctl-select">
-                <option value="all">All departments</option>
-                {departments.map((department) => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-              <select value={teamFilter} onChange={(event) => setTeamFilter(event.target.value)} className="sv-ctl-select">
-                <option value="all">All teams</option>
-                {teamNames.map((teamName) => (
-                  <option key={teamName} value={teamName}>{teamName}</option>
-                ))}
-              </select>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="sv-ctl-select">
-                <option value="recent">Recently updated</option>
-                <option value="name">Name</option>
-                <option value="velocity">Velocity</option>
-                <option value="capacity">Capacity</option>
-              </select>
+              <SelectDropdown
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: 'all', label: 'All availability' },
+                  { value: 'available', label: 'Available' },
+                  { value: 'busy', label: 'Busy' },
+                  { value: 'ooo', label: 'Out of office' },
+                  { value: 'leave', label: 'Leave' },
+                ]}
+                className="sv-employees-field"
+              />
+              <SelectDropdown
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+                options={[
+                  { value: 'all', label: 'All departments' },
+                  ...departments.map((department) => ({ value: department, label: department })),
+                ]}
+                className="sv-employees-field"
+              />
+              <SelectDropdown
+                value={teamFilter}
+                onChange={setTeamFilter}
+                options={[
+                  { value: 'all', label: 'All teams' },
+                  ...teamNames.map((teamName) => ({ value: teamName, label: teamName })),
+                ]}
+                className="sv-employees-field"
+              />
+              <SelectDropdown
+                value={sortBy}
+                onChange={setSortBy}
+                options={[
+                  { value: 'newest', label: 'Newest' },
+                  { value: 'oldest', label: 'Oldest' },
+                  { value: 'name', label: 'Name' },
+                  { value: 'velocity', label: 'Velocity' },
+                  { value: 'capacity', label: 'Capacity' },
+                ]}
+                className="sv-employees-field"
+              />
             </div>
           ) : null}
 
@@ -587,7 +607,7 @@ function EmployeeManagementPage() {
 
           {!loading && !error ? (
             <>
-              <div className="sv-table-scroll">
+              <div className="sv-table-scroll sv-list-scroll" ref={listScrollRef}>
                 <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
@@ -597,16 +617,22 @@ function EmployeeManagementPage() {
                     <th className="px-3 py-2">Team</th>
                     <th className="px-3 py-2">Availability</th>
                     <th className="px-3 py-2">Linked Contact</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
+                    <th className="px-3 py-2 sv-row-action-heading">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedEmployees.map((employee) => {
+                  {filtered.map((employee) => {
                     const linkedContact = contacts.find((contact) => String(contact._id) === String(employee.contactId || ''));
                     return (
                       <tr key={employee._id} className="border-b border-outline-variant/10">
                         <td className="px-3 py-3">
-                          <p className="text-sm font-semibold text-on-surface">{employee.name || 'Unnamed'}</p>
+                          <button
+                            type="button"
+                            className="sv-name-open-btn text-sm font-semibold text-on-surface"
+                            onClick={() => navigate(ROUTES.employeeDetail.replace(':employeeId', employee._id))}
+                          >
+                            {employee.name || 'Unnamed'}
+                          </button>
                           <p className="text-xs text-on-surface-variant">{employee.email || '-'}</p>
                         </td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{employee.role || '-'}</td>
@@ -627,7 +653,7 @@ function EmployeeManagementPage() {
                             <span className="text-on-surface-variant">Not linked</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-right sv-employees-actions-cell">
+                        <td className="px-3 py-3 sv-row-action-cell sv-employees-actions-cell">
                           <div className="sv-row-menu-container">
                             <button
                               type="button"
@@ -645,22 +671,22 @@ function EmployeeManagementPage() {
                     );
                   })}
 
-                  {!pagedEmployees.length ? (
+                  {!filtered.length ? (
                     <tr>
                       <td colSpan={7} className="px-3 py-8 text-center text-sm text-on-surface-variant">No employees found.</td>
+                    </tr>
+                  ) : null}
+                  {filtered.length ? (
+                    <tr>
+                      <td colSpan={7} className="sv-list-sentinel-cell">
+                        <span ref={loadMoreRef} className="sv-list-sentinel" />
+                        {loadingMore ? 'Loading more employees...' : hasMore ? 'Scroll for more' : 'End of list'}
+                      </td>
                     </tr>
                   ) : null}
                 </tbody>
                 </table>
               </div>
-              <EmployeePagination
-                page={page}
-                totalPages={totalPages}
-                totalItems={filtered.length}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
             </>
           ) : null}
         </section>

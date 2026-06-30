@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useLayoutEffect, memo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { contactsApi, employeesApi, tasksApi, usersApi } from '../../api';
@@ -8,6 +9,7 @@ import { useTimeTracker } from '../../hooks/useTimeTracker';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import CommentThread from '../../components/comments/CommentThread';
 import Icon from '../../components/ui/Icon';
+import { ChevronDown } from 'lucide-react';
 
 const DEFAULT_STATUSES = ['todo', 'in_progress', 'in_review', 'completed'];
 const ACTIVITY_PAGE_SIZE = 50;
@@ -37,18 +39,149 @@ function formatClock(seconds) {
   return `${hours}:${mins}:${secs}`;
 }
 
+function formatMinutesLabel(minutes) {
+  const total = Math.max(0, Number(minutes || 0));
+  const hours = Math.floor(total / 60);
+  const mins = Math.round(total % 60);
+  if (hours && mins) return `${hours}h ${mins}m`;
+  if (hours) return `${hours}h`;
+  return `${mins}m`;
+}
+
 function ActivityRow({ item }) {
   const relative = item?.timestamp ? formatDistanceToNow(new Date(item.timestamp), { addSuffix: true }) : 'just now';
   const payload = item?.newValue || {};
 
   return (
     <div className="sv-taskdetail-activity-row">
-      <p className="sv-taskdetail-meta-label">{String(item?.field || 'updated').replace('_', ' ')}</p>
-      <p className="sv-taskdetail-activity-time">{relative}</p>
+      <div className="sv-taskdetail-activity-top">
+        <p className="sv-taskdetail-meta-label">{String(item?.field || 'updated').replace('_', ' ')}</p>
+        <p className="sv-taskdetail-activity-time">{relative}</p>
+      </div>
       <p className="sv-taskdetail-activity-text">{payload?.title || payload?.message || payload?.status || 'Task updated'}</p>
     </div>
   );
 }
+
+const DetailDropdown = memo(function DetailDropdown({
+  value,
+  options,
+  onChange,
+  disabled = false,
+  className = '',
+  triggerClassName = '',
+  menuClassName = '',
+  renderValue,
+}) {
+  const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const selectedOption = useMemo(
+    () => (options || []).find((option) => String(option.value) === String(value)) || null,
+    [options, value],
+  );
+
+  const resolvedValue = selectedOption ? (renderValue ? renderValue(selectedOption) : selectedOption.label) : value;
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 12;
+    const estimatedWidth = Math.max(rect.width, 220);
+    const estimatedHeight = Math.min(280, Math.max(176, (options?.length || 0) * 40));
+    const fitsBelow = rect.bottom + estimatedHeight + 12 <= window.innerHeight;
+    const top = fitsBelow ? rect.bottom + 6 : Math.max(viewportPadding, rect.top - estimatedHeight - 6);
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      window.innerWidth - estimatedWidth - viewportPadding,
+    );
+
+    setMenuStyle({
+      position: 'fixed',
+      top,
+      left,
+      width: Math.min(estimatedWidth, window.innerWidth - viewportPadding * 2),
+      zIndex: 1200,
+    });
+  }, [options?.length]);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    updateMenuPosition();
+    const handleResize = () => updateMenuPosition();
+    const handleScroll = () => updateMenuPosition();
+    const handlePointerDown = (event) => {
+      if (triggerRef.current?.contains(event.target)) return;
+      if (menuRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, true);
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll, true);
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, updateMenuPosition]);
+
+  return (
+    <div className={`sv-detail-dropdown ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={disabled}
+        className={`sv-detail-dropdown__trigger ${triggerClassName} ${open ? 'is-open' : ''}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="sv-detail-dropdown__value">{resolvedValue}</span>
+        <ChevronDown size={14} strokeWidth={2.5} className="sv-detail-dropdown__chevron" />
+      </button>
+
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+          <div
+            ref={menuRef}
+            className={`sv-detail-dropdown__menu ${menuClassName}`}
+            style={menuStyle || undefined}
+            role="listbox"
+          >
+            {(options || []).map((option) => {
+              const selected = String(option.value) === String(value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`sv-detail-dropdown__option ${selected ? 'is-selected' : ''}`}
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="sv-detail-dropdown__option-check">{selected ? <Icon name="check" /> : null}</span>
+                  <span className="sv-detail-dropdown__option-label">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )
+        : null}
+    </div>
+  );
+});
 
 function TaskDetailPage() {
   const { taskId: routeTaskId } = useParams();
@@ -302,25 +435,22 @@ function TaskDetailPage() {
   const paused = isTimerPaused(taskId);
   const elapsed = getTaskElapsedSeconds(taskId);
   const totalTrackedSeconds = Math.max(0, Number(trackedSecondsFromLogs || 0), Number(elapsed || 0));
+  const estimateSeconds = Math.max(0, Number(estimateMinutes || 0) * 60);
+  const trackedProgress = estimateSeconds ? Math.min(100, Math.round((totalTrackedSeconds / estimateSeconds) * 100)) : 0;
+  const activeStatusLabel = String(activeTask.status || 'todo').replace('_', ' ');
+  const primaryAssignee = users.find((user) => String(user._id) === String(editDraft.primaryAssigneeId));
+  const contributorCount = new Set([editDraft.primaryAssigneeId, ...(editDraft.assigneeIds || [])].filter(Boolean)).size;
+  const externalCount = Array.isArray(editDraft.externalCollaborators) ? editDraft.externalCollaborators.length : 0;
 
   return (
     <main className="sv-taskdetail-page min-h-screen">
       <div className="sv-taskdetail-stack">
-        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+        <section className="sv-card sv-taskdetail-card sv-taskdetail-section sv-taskdetail-hero">
           <div className="sv-taskdetail-head">
             <div className="sv-taskdetail-head-main">
+              <span className="sv-taskdetail-eyebrow">{activeTask.projectName || activeTask.project?.name || 'Task detail'}</span>
               <div className="sv-taskdetail-title-row">
                 <h1 className="sv-taskdetail-title sv-heading">{activeTask.title}</h1>
-                <div className="sv-taskdetail-pill-group">
-                  <span className="sv-taskdetail-pill-code">{formatClock(elapsed)}</span>
-                  <span className={`sv-taskdetail-pill ${active ? 'is-running' : paused ? 'is-paused' : 'is-stopped'}`}>
-                    {active ? 'Running' : paused ? 'Paused' : 'Stopped'}
-                  </span>
-                </div>
-                <div className="sv-taskdetail-pill-group">
-                  <span className="sv-taskdetail-pill-label">Total</span>
-                  <span className="sv-taskdetail-pill-code">{formatClock(totalTrackedSeconds)}</span>
-                </div>
               </div>
               <p className="sv-taskdetail-description">{activeTask.description || 'No description'}</p>
             </div>
@@ -331,7 +461,33 @@ function TaskDetailPage() {
             </div>
           </div>
 
-          <div className="sv-taskdetail-status-row">
+          <div className="sv-taskdetail-hero-grid">
+            <article className="sv-taskdetail-time-card">
+              <div>
+                <span className={`sv-taskdetail-live-dot ${active ? 'is-running' : paused ? 'is-paused' : ''}`} />
+                <p>{active ? 'Timer running' : paused ? 'Timer paused' : 'Timer stopped'}</p>
+              </div>
+              <strong>{formatClock(elapsed)}</strong>
+              <span>Total tracked {formatClock(totalTrackedSeconds)}</span>
+              <div className="sv-taskdetail-time-progress">
+                <span style={{ width: `${trackedProgress}%` }} />
+              </div>
+            </article>
+            <article className="sv-taskdetail-summary-card">
+              <span>Status</span>
+              <strong>{activeStatusLabel}</strong>
+            </article>
+            <article className="sv-taskdetail-summary-card">
+              <span>Estimate</span>
+              <strong>{formatMinutesLabel(estimateMinutes)}</strong>
+            </article>
+            <article className="sv-taskdetail-summary-card">
+              <span>People</span>
+              <strong>{contributorCount + externalCount}</strong>
+            </article>
+          </div>
+
+          <div className="sv-taskdetail-status-row" aria-label="Task status">
             {statusKeys.map((status) => {
               const blocked = isCompletedReopenBlocked(activeTaskStatus, status);
               const statusLabel = String(status).replace('_', ' ');
@@ -381,172 +537,176 @@ function TaskDetailPage() {
           {actionMessage ? <p className="sv-taskdetail-message">{actionMessage}</p> : null}
         </section>
 
-        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
-          <h2 className="sv-taskdetail-section-title sv-heading">Comments</h2>
-          <CommentThread entityType="task" entityId={taskId} />
-        </section>
+        <div className="sv-taskdetail-work-grid">
+          <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+            <h2 className="sv-taskdetail-section-title sv-heading">Comments</h2>
+            <CommentThread entityType="task" entityId={taskId} />
+          </section>
 
-        <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
-          <h2 className="sv-taskdetail-section-title sv-heading">Issue + Assignment</h2>
-          <div className="sv-taskdetail-grid">
-            <label className="sv-taskdetail-label">
-              Issue Type
-              <select
-                value={editDraft.issueType}
-                onChange={(event) => {
-                  const nextType = event.target.value;
-                  setEditDraft((current) => ({
-                    ...current,
-                    issueType: nextType,
-                    parentTaskId: nextType === 'epic' ? '' : current.parentTaskId,
-                  }));
-                }}
-                className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
-              >
-                <option value="epic">Epic</option>
-                <option value="task">Task</option>
-                <option value="subtask">Subtask</option>
-              </select>
-            </label>
+          <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
+            <div className="sv-taskdetail-section-head">
+              <div>
+                <h2 className="sv-taskdetail-section-title sv-heading">Issue + Assignment</h2>
+                <p className="sv-taskdetail-subtle">Owner: {primaryAssignee?.displayName || 'Unassigned'}</p>
+              </div>
+            </div>
+            <div className="sv-taskdetail-grid">
+              <label className="sv-taskdetail-label">
+                Issue Type
+                <DetailDropdown
+                  value={editDraft.issueType}
+                  options={[
+                    { value: 'epic', label: 'Epic' },
+                    { value: 'task', label: 'Task' },
+                    { value: 'subtask', label: 'Subtask' },
+                  ]}
+                  onChange={(nextType) => {
+                    setEditDraft((current) => ({
+                      ...current,
+                      issueType: nextType,
+                      parentTaskId: nextType === 'epic' ? '' : current.parentTaskId,
+                    }));
+                  }}
+                  className="sv-taskdetail-field-wrap"
+                  triggerClassName="sv-taskdetail-field sv-taskdetail-dropdown-trigger"
+                />
+              </label>
 
-            <label className="sv-taskdetail-label">
-              Parent
-              <select
-                value={editDraft.parentTaskId}
-                onChange={(event) => setEditDraft((current) => ({ ...current, parentTaskId: event.target.value }))}
-                disabled={editDraft.issueType === 'epic'}
-                className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
-              >
-                <option value="">No parent</option>
-                {parentTasks
-                  .filter((item) => {
-                    const issueType = String(item.issueType || 'task');
-                    if (editDraft.issueType === 'task') return issueType === 'epic';
-                    if (editDraft.issueType === 'subtask') return issueType === 'task';
-                    return false;
-                  })
-                  .map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="sv-taskdetail-block">
-            <p className="sv-taskdetail-label">Primary Assignee</p>
-            <select
-              value={editDraft.primaryAssigneeId}
-              onChange={(event) => setEditDraft((current) => ({ ...current, primaryAssigneeId: event.target.value }))}
-              className="form-select form-select-sm sv-ctl-select sv-taskdetail-field"
-            >
-              <option value="">Unassigned</option>
-              {users.map((user) => (
-                <option key={user._id} value={user._id}>
-                  {user.displayName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="sv-taskdetail-block">
-            <p className="sv-taskdetail-label">Contributors</p>
-            <div className="sv-taskdetail-chip-list">
-              {users.map((user) => {
-                const active = (editDraft.assigneeIds || []).includes(String(user._id));
-                return (
-                  <button
-                    key={user._id}
-                    type="button"
-                    onClick={() =>
-                      setEditDraft((current) => {
-                        const currentIds = Array.isArray(current.assigneeIds) ? current.assigneeIds : [];
-                        const next = active
-                          ? currentIds.filter((id) => String(id) !== String(user._id))
-                          : [...currentIds, String(user._id)];
-                        return { ...current, assigneeIds: next };
+              <label className="sv-taskdetail-label">
+                Parent
+                <DetailDropdown
+                  value={editDraft.parentTaskId}
+                  onChange={(nextValue) => setEditDraft((current) => ({ ...current, parentTaskId: nextValue }))}
+                  disabled={editDraft.issueType === 'epic'}
+                  options={[
+                    { value: '', label: 'No parent' },
+                    ...parentTasks
+                      .filter((item) => {
+                        const issueType = String(item.issueType || 'task');
+                        if (editDraft.issueType === 'task') return issueType === 'epic';
+                        if (editDraft.issueType === 'subtask') return issueType === 'task';
+                        return false;
                       })
-                    }
-                    className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
-                  >
-                    {user.displayName}
-                  </button>
-                );
-              })}
+                      .map((item) => ({ value: item._id, label: item.title })),
+                  ]}
+                  className="sv-taskdetail-field-wrap"
+                  triggerClassName="sv-taskdetail-field sv-taskdetail-dropdown-trigger"
+                />
+              </label>
             </div>
-          </div>
 
-          <div className="sv-taskdetail-block sv-taskdetail-grid">
-            <div>
-              <p className="sv-taskdetail-label">External Contacts</p>
+            <div className="sv-taskdetail-block">
+              <p className="sv-taskdetail-label">Primary Assignee</p>
+              <DetailDropdown
+                value={editDraft.primaryAssigneeId}
+                onChange={(nextValue) => setEditDraft((current) => ({ ...current, primaryAssigneeId: nextValue }))}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...users.map((user) => ({ value: user._id, label: user.displayName })),
+                ]}
+                className="sv-taskdetail-field-wrap"
+                triggerClassName="sv-taskdetail-field sv-taskdetail-dropdown-trigger"
+              />
+            </div>
+
+            <div className="sv-taskdetail-block">
+              <p className="sv-taskdetail-label">Contributors</p>
               <div className="sv-taskdetail-chip-list">
-                {contacts.map((contact) => {
-                  const active = (editDraft.externalCollaborators || []).some(
-                    (item) => item.entityType === 'contact' && String(item.entityId) === String(contact._id),
-                  );
+                {users.map((user) => {
+                  const active = (editDraft.assigneeIds || []).includes(String(user._id));
                   return (
                     <button
-                      key={`contact-${contact._id}`}
+                      key={user._id}
                       type="button"
                       onClick={() =>
                         setEditDraft((current) => {
-                          const curr = Array.isArray(current.externalCollaborators) ? current.externalCollaborators : [];
+                          const currentIds = Array.isArray(current.assigneeIds) ? current.assigneeIds : [];
                           const next = active
-                            ? curr.filter((item) => !(item.entityType === 'contact' && String(item.entityId) === String(contact._id)))
-                            : [...curr, { entityType: 'contact', entityId: String(contact._id) }];
-                          return { ...current, externalCollaborators: next };
+                            ? currentIds.filter((id) => String(id) !== String(user._id))
+                            : [...currentIds, String(user._id)];
+                          return { ...current, assigneeIds: next };
                         })
                       }
                       className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
                     >
-                      {contact.name || 'Contact'}
+                      {user.displayName}
                     </button>
                   );
                 })}
               </div>
             </div>
-            <div>
-              <p className="sv-taskdetail-label">External Employees</p>
-              <div className="sv-taskdetail-chip-list">
-                {employees.map((employee) => {
-                  const active = (editDraft.externalCollaborators || []).some(
-                    (item) => item.entityType === 'employee' && String(item.entityId) === String(employee._id),
-                  );
-                  return (
-                    <button
-                      key={`employee-${employee._id}`}
-                      type="button"
-                      onClick={() =>
-                        setEditDraft((current) => {
-                          const curr = Array.isArray(current.externalCollaborators) ? current.externalCollaborators : [];
-                          const next = active
-                            ? curr.filter((item) => !(item.entityType === 'employee' && String(item.entityId) === String(employee._id)))
-                            : [...curr, { entityType: 'employee', entityId: String(employee._id) }];
-                          return { ...current, externalCollaborators: next };
-                        })
-                      }
-                      className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
-                    >
-                      {employee.name || 'Employee'}
-                    </button>
-                  );
-                })}
+
+            <div className="sv-taskdetail-block sv-taskdetail-grid">
+              <div>
+                <p className="sv-taskdetail-label">External Contacts</p>
+                <div className="sv-taskdetail-chip-list">
+                  {contacts.map((contact) => {
+                    const active = (editDraft.externalCollaborators || []).some(
+                      (item) => item.entityType === 'contact' && String(item.entityId) === String(contact._id),
+                    );
+                    return (
+                      <button
+                        key={`contact-${contact._id}`}
+                        type="button"
+                        onClick={() =>
+                          setEditDraft((current) => {
+                            const curr = Array.isArray(current.externalCollaborators) ? current.externalCollaborators : [];
+                            const next = active
+                              ? curr.filter((item) => !(item.entityType === 'contact' && String(item.entityId) === String(contact._id)))
+                              : [...curr, { entityType: 'contact', entityId: String(contact._id) }];
+                            return { ...current, externalCollaborators: next };
+                          })
+                        }
+                        className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
+                      >
+                        {contact.name || 'Contact'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="sv-taskdetail-label">External Employees</p>
+                <div className="sv-taskdetail-chip-list">
+                  {employees.map((employee) => {
+                    const active = (editDraft.externalCollaborators || []).some(
+                      (item) => item.entityType === 'employee' && String(item.entityId) === String(employee._id),
+                    );
+                    return (
+                      <button
+                        key={`employee-${employee._id}`}
+                        type="button"
+                        onClick={() =>
+                          setEditDraft((current) => {
+                            const curr = Array.isArray(current.externalCollaborators) ? current.externalCollaborators : [];
+                            const next = active
+                              ? curr.filter((item) => !(item.entityType === 'employee' && String(item.entityId) === String(employee._id)))
+                              : [...curr, { entityType: 'employee', entityId: String(employee._id) }];
+                            return { ...current, externalCollaborators: next };
+                          })
+                        }
+                        className={`sv-taskdetail-chip ${active ? 'is-active' : ''}`}
+                      >
+                        {employee.name || 'Employee'}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="sv-taskdetail-block">
-            <button
-              type="button"
-              onClick={saveCollaborators}
-              disabled={savingCollaborators}
-              className="btn btn-sm btn-primary sv-ctl-btn sv-taskdetail-btn"
-            >
-              {savingCollaborators ? 'Saving...' : 'Save Assignment Details'}
-            </button>
-          </div>
-        </section>
+            <div className="sv-taskdetail-block">
+              <button
+                type="button"
+                onClick={saveCollaborators}
+                disabled={savingCollaborators}
+                className="btn btn-sm btn-primary sv-ctl-btn sv-taskdetail-btn"
+              >
+                {savingCollaborators ? 'Saving...' : 'Save Assignment Details'}
+              </button>
+            </div>
+          </section>
+        </div>
 
         <section className="sv-card sv-taskdetail-card sv-taskdetail-section">
           <div className="sv-taskdetail-section-head">

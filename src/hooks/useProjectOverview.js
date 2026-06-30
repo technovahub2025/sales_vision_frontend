@@ -20,7 +20,8 @@ export function useProjectOverview(projectIdArg) {
     queryFn: ({ signal }) => projectsApi.overview(workspaceId, projectId, signal).then((payload) => payload.data || null),
   });
 
-  const refresh = useCallback(() => overviewQuery.refetch(), [overviewQuery.refetch]);
+  const { refetch } = overviewQuery;
+  const refresh = useCallback(() => refetch(), [refetch]);
 
   useEffect(() => {
     if (!socket || !workspaceId || !projectId) return undefined;

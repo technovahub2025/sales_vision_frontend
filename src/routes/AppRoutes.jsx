@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense } from 'react';
+import { Component, createElement, lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import SuperAdminLayout from '../layouts/SuperAdminLayout';
 import { SocketProvider } from '../contexts/SocketContext';
@@ -46,7 +46,21 @@ const SuperAdminActivityPage = lazy(() => import('../pages/super-admin/SuperAdmi
 const SuperAdminSecurityPage = lazy(() => import('../pages/super-admin/SuperAdminSecurityPage'));
 
 function RouteFallback() {
-  return <div className="animate-pulse rounded-xl bg-surface-container-low p-6 text-sm text-on-surface-variant">Loading...</div>;
+  return (
+    <div className="sv-route-fallback" role="status" aria-live="polite" aria-label="Loading page">
+      <div className="sv-route-fallback__header">
+        <span className="sv-route-fallback__pulse" aria-hidden="true" />
+        <span>Loading workspace</span>
+      </div>
+      <div className="sv-route-fallback__grid" aria-hidden="true">
+        <span className="sv-skeleton-line is-wide" />
+        <span className="sv-skeleton-line" />
+        <span className="sv-skeleton-card" />
+        <span className="sv-skeleton-card" />
+        <span className="sv-skeleton-card is-long" />
+      </div>
+    </div>
+  );
 }
 
 class RouteErrorBoundary extends Component {
@@ -80,7 +94,9 @@ function lazyElement(PageComponent) {
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
-        <PageComponent />
+        <div className="sv-page-transition">
+          {createElement(PageComponent)}
+        </div>
       </Suspense>
     </RouteErrorBoundary>
   );

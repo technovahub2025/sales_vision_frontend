@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import Icon from '../../components/ui/Icon';
+import SelectDropdown from '../../components/ui/SelectDropdown';
 import { superAdminApi } from '../../api/superAdmin.api';
+import { useInfiniteScrollTrigger } from '../../hooks/useInfiniteScrollTrigger';
 import {
   AdminState,
   StatusBadge,
@@ -11,11 +13,19 @@ import {
 } from './SuperAdminShared';
 import '../../styles/superadmin.css';
 
+function getNextPageParam(lastPage, allPages) {
+  const meta = lastPage?.meta || {};
+  const page = Number(meta.page) || allPages.length;
+  const total = Number(meta.total) || 0;
+  const limit = Number(meta.limit) || 100;
+  return total > page * limit ? page + 1 : undefined;
+}
+
 export default function SuperAdminActivityPage() {
   const [workspaceId, setWorkspaceId] = useState('');
   const [module, setModule] = useState('');
   const [action, setAction] = useState('');
-  const [page, setPage] = useState(1);
+  const listScrollRef = useRef(null);
 
   const workspacesQuery = useQuery({
     queryKey: ['super-admin', 'activity-workspaces'],
@@ -23,27 +33,35 @@ export default function SuperAdminActivityPage() {
     retry: false,
   });
 
-  const activityQuery = useQuery({
-    queryKey: ['super-admin', 'activity', page, workspaceId, module, action],
-    queryFn: ({ signal }) => superAdminApi.activity({
-      page,
-      limit: 25,
+  const activityQuery = useInfiniteQuery({
+    queryKey: ['super-admin', 'activity', workspaceId, module, action],
+    queryFn: ({ pageParam = 1, signal }) => superAdminApi.activity({
+      page: pageParam,
+      limit: 100,
       workspaceId: workspaceId || undefined,
       module: module || undefined,
       action: action || undefined,
     }, signal),
+    getNextPageParam,
+    initialPageParam: 1,
     retry: false,
   });
 
   const workspaces = workspacesQuery.data?.data || [];
-  const rows = activityQuery.data?.data || [];
-  const meta = activityQuery.data?.meta || {};
-  const pages = Number(meta.pages || 1);
+  const rows = useMemo(() => (activityQuery.data?.pages || []).flatMap((pageItem) => pageItem?.data || []), [activityQuery.data?.pages]);
+  const meta = activityQuery.data?.pages?.at(-1)?.meta || {};
+  const loadMoreRef = useInfiniteScrollTrigger({
+    rootRef: listScrollRef,
+    onIntersect: () => {
+      if (activityQuery.hasNextPage && !activityQuery.isFetchingNextPage) void activityQuery.fetchNextPage();
+    },
+    disabled: !activityQuery.hasNextPage || activityQuery.isFetchingNextPage,
+  });
 
-  function resetPage(setter) {
+  function resetList(setter) {
     return (event) => {
       setter(event.target.value);
-      setPage(1);
+      listScrollRef.current?.scrollTo({ top: 0 });
     };
   }
 
@@ -66,19 +84,26 @@ export default function SuperAdminActivityPage() {
       <section className="sv-userdatas-filters is-always-open" aria-label="Activity filters">
         <label>
           <span className="sv-userdatas-field-label"><Icon name="business" />Workspace</span>
-          <select className="form-select" value={workspaceId} onChange={resetPage(setWorkspaceId)}>
-            <option value="">All workspaces</option>
-            {workspacesQuery.isLoading ? <option value="" disabled>Loading workspaces...</option> : null}
-            {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
-          </select>
+          <SelectDropdown
+            value={workspaceId}
+            onChange={(nextValue) => {
+              setWorkspaceId(nextValue);
+              listScrollRef.current?.scrollTo({ top: 0 });
+            }}
+            options={[
+              { value: '', label: workspacesQuery.isLoading ? 'Loading workspaces...' : 'All workspaces' },
+              ...workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name })),
+            ]}
+            triggerClassName="form-select"
+          />
         </label>
         <label>
           <span className="sv-userdatas-field-label"><Icon name="category" />Module</span>
-          <input className="form-control" value={module} onChange={resetPage(setModule)} placeholder="tasks, projects..." />
+          <input className="form-control" value={module} onChange={resetList(setModule)} placeholder="tasks, projects..." />
         </label>
         <label>
           <span className="sv-userdatas-field-label"><Icon name="bolt" />Action</span>
-          <input className="form-control" value={action} onChange={resetPage(setAction)} placeholder="created, updated..." />
+          <input className="form-control" value={action} onChange={resetList(setAction)} placeholder="created, updated..." />
         </label>
       </section>
 
@@ -87,7 +112,7 @@ export default function SuperAdminActivityPage() {
           <div><h2>Recent Events</h2><p>Read-only events collected across workspaces.</p></div>
           <span>{activityQuery.isLoading ? 'Loading' : `${formatAdminNumber(meta.total || 0)} records`}</span>
         </div>
-        <div className="sv-userdatas-table-wrap">
+        <div className="sv-userdatas-table-wrap sv-list-scroll" ref={listScrollRef}>
           <table className="sv-userdatas-table sv-admin-activity-table">
             <thead>
               <tr>
@@ -112,17 +137,19 @@ export default function SuperAdminActivityPage() {
                   <td>{formatAdminDate(row.occurredAt)}</td>
                 </tr>
               ))}
+              {!activityQuery.isLoading && rows.length ? (
+                <tr>
+                  <td colSpan="6" className="sv-list-sentinel-cell">
+                    <span ref={loadMoreRef} className="sv-list-sentinel" />
+                    {activityQuery.isFetchingNextPage ? 'Loading more activity...' : activityQuery.hasNextPage ? 'Scroll for more' : 'End of list'}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
       </section>
 
-      <div className="sv-userdatas-pagination">
-        <span>{formatAdminNumber(meta.total || 0)} events</span>
-        <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>
-        <span>{page} / {pages}</span>
-        <button type="button" className="btn btn-sm btn-outline-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-      </div>
     </main>
   );
 }

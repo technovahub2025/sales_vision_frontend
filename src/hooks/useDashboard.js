@@ -89,7 +89,7 @@ export function useDashboard() {
   );
 
   const overview = overviewQuery.data || {};
-  const metrics = overview.metrics || {};
+  const metrics = useMemo(() => overview.metrics || {}, [overview.metrics]);
 
   const activityItems = useMemo(() => {
     const pages = activityQuery.data?.pages || [];
@@ -136,9 +136,6 @@ export function useDashboard() {
       workspaceId,
       bootstrapLoading,
       initialDashboardLoading,
-      overviewQuery.isLoading,
-      projectHealthQuery.isLoading,
-      myTasksQuery.isLoading,
       overviewQuery.error,
       projectHealthQuery.error,
       myTasksQuery.error,
@@ -151,7 +148,6 @@ export function useDashboard() {
       activityItems,
       activityQuery.hasNextPage,
       activityQuery.fetchNextPage,
-      exportReport.isPending,
       exportReport,
       updateTaskStatus,
       emptySearchResult,

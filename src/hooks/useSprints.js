@@ -115,17 +115,20 @@ export function useSprints(projectIdArg) {
     },
   });
 
+  const { mutateAsync: createSprintAsync } = createSprintMutation;
+  const { mutateAsync: startSprintAsync } = startSprintMutation;
+  const { mutateAsync: completeSprintAsync } = completeSprintMutation;
   const createSprint = useCallback(
-    (payload) => createSprintMutation.mutateAsync(payload).then((r) => r?.data || null),
-    [createSprintMutation.mutateAsync],
+    (payload) => createSprintAsync(payload).then((r) => r?.data || null),
+    [createSprintAsync],
   );
   const startSprint = useCallback(
-    (sprintId) => startSprintMutation.mutateAsync(sprintId).then((r) => r?.data || null),
-    [startSprintMutation.mutateAsync],
+    (sprintId) => startSprintAsync(sprintId).then((r) => r?.data || null),
+    [startSprintAsync],
   );
   const completeSprint = useCallback(
-    (sprintId) => completeSprintMutation.mutateAsync(sprintId).then((r) => r?.data || null),
-    [completeSprintMutation.mutateAsync],
+    (sprintId) => completeSprintAsync(sprintId).then((r) => r?.data || null),
+    [completeSprintAsync],
   );
   const getBurndownStable = useCallback(
     (sprintId, signal) => sprintsApi.burndown(workspaceId, sprintId, signal).then((response) => response.data || []),

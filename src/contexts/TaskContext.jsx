@@ -305,8 +305,8 @@ export function TaskProvider({ workspaceId, projectId, taskId, children }) {
 
   const tasks = useMemo(() => flattenBoardTasks(board), [board]);
   const task = taskQuery.data || null;
-  const comments = commentsQuery.data || [];
-  const taskStatuses = workflowQuery.data?.statuses || [];
+  const comments = useMemo(() => commentsQuery.data || [], [commentsQuery.data]);
+  const taskStatuses = useMemo(() => workflowQuery.data?.statuses || [], [workflowQuery.data?.statuses]);
   const taskWorkflowId = workflowQuery.data?.workflowId || '';
 
   const boardLoading = boardQuery.isLoading || (boardQuery.isFetching && !boardQuery.data);

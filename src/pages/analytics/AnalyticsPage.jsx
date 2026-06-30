@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,6 +22,11 @@ import { useSocket } from '../../contexts/SocketContext';
 import { EVENTS } from '../../socket/events';
 import { ROUTES, projectRoute } from '../../routes/routePaths';
 import { AnalyticsTooltip, ChartPanel } from '../../components/analytics/ChartPrimitives';
+import RowActionMenu from '../../components/ui/RowActionMenu';
+import SelectDropdown from '../../components/ui/SelectDropdown';
+import DatePicker from '../../components/ui/DatePicker';
+import ExportMenu from '../../components/ui/ExportMenu';
+import Icon from '../../components/ui/Icon';
 
 function toDateInputValue(date) {
   return new Date(date).toISOString().slice(0, 10);
@@ -80,6 +85,7 @@ function AnalyticsPage() {
   const [toast, setToast] = useState(null);
   const [exporting, setExporting] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [openProjectMenuId, setOpenProjectMenuId] = useState('');
 
   const role = String(activeWorkspace?.role || '').toLowerCase();
   const canExport = role === 'owner' || role === 'admin';
@@ -159,12 +165,24 @@ function AnalyticsPage() {
   const workforce = data.workforce || {};
   const topEntities = data.topEntities || {};
 
-  const completionTrend = Array.isArray(delivery.completionTrend) ? delivery.completionTrend : [];
-  const overdueTrend = Array.isArray(delivery.overdueTrend) ? delivery.overdueTrend : [];
-  const leadFunnel = Array.isArray(sales.leadFunnel) ? sales.leadFunnel : [];
-  const topProjects = Array.isArray(topEntities.projects) ? topEntities.projects : [];
-  const topCampaigns = Array.isArray(topEntities.campaigns) ? topEntities.campaigns : [];
-  const assignmentLoad = Array.isArray(workforce.assignmentLoad) ? workforce.assignmentLoad : [];
+  const completionTrend = useMemo(() => (
+    Array.isArray(delivery.completionTrend) ? delivery.completionTrend : []
+  ), [delivery.completionTrend]);
+  const overdueTrend = useMemo(() => (
+    Array.isArray(delivery.overdueTrend) ? delivery.overdueTrend : []
+  ), [delivery.overdueTrend]);
+  const leadFunnel = useMemo(() => (
+    Array.isArray(sales.leadFunnel) ? sales.leadFunnel : []
+  ), [sales.leadFunnel]);
+  const topProjects = useMemo(() => (
+    Array.isArray(topEntities.projects) ? topEntities.projects : []
+  ), [topEntities.projects]);
+  const topCampaigns = useMemo(() => (
+    Array.isArray(topEntities.campaigns) ? topEntities.campaigns : []
+  ), [topEntities.campaigns]);
+  const assignmentLoad = useMemo(() => (
+    Array.isArray(workforce.assignmentLoad) ? workforce.assignmentLoad : []
+  ), [workforce.assignmentLoad]);
 
   const deliveryTrendData = useMemo(() => {
     const rows = new Map();
@@ -225,6 +243,61 @@ function AnalyticsPage() {
     [assignmentLoad],
   );
 
+  const openRouteWithParams = useCallback((route, extraParams = {}) => {
+    const url = new URLSearchParams({
+      dateFrom: customFrom,
+      dateTo: customTo,
+      ...extraParams,
+    });
+    navigate(`${route}?${url.toString()}`);
+  }, [customFrom, customTo, navigate]);
+
+  const kpiCards = useMemo(
+    () => [
+      {
+        key: 'tasks',
+        tone: 'blue',
+        icon: 'task_alt',
+        label: 'Task Completion',
+        value: formatPct(delivery.completionRate),
+        hint: 'Completed work in selected range',
+        action: 'Open My Tasks',
+        onClick: () => openRouteWithParams(ROUTES.myTasks, { status: 'completed' }),
+      },
+      {
+        key: 'leads',
+        tone: 'green',
+        icon: 'trending_up',
+        label: 'Lead Conversion',
+        value: formatPct(sales.leadConversionRate),
+        hint: 'Won leads against visible pipeline',
+        action: 'Open Leads',
+        onClick: () => openRouteWithParams(ROUTES.leads, { status: 'won' }),
+      },
+      {
+        key: 'campaigns',
+        tone: 'amber',
+        icon: 'campaign',
+        label: 'Campaign Avg ROI',
+        value: `${Number(sales?.campaign?.averageRoi || 0).toFixed(2)}x`,
+        hint: 'Average return across campaigns',
+        action: 'Open Campaigns',
+        onClick: () => openRouteWithParams(ROUTES.campaigns, { status: 'active' }),
+      },
+      {
+        key: 'team',
+        tone: 'purple',
+        icon: 'groups',
+        label: 'Team Utilization',
+        value: formatPct(delivery.teamUtilizationPct),
+        hint: 'Delivery load across employees',
+        action: 'Open Employees',
+        onClick: () => openRouteWithParams(ROUTES.employees),
+      },
+    ],
+    [delivery.completionRate, delivery.teamUtilizationPct, sales.leadConversionRate, sales?.campaign?.averageRoi, openRouteWithParams],
+  );
+
   const leadFunnelColors = ['#004ac6', '#1f67dc', '#3b82f6', '#60a5fa', '#93c5fd', '#8b5cf6', '#f97316'];
 
   const onPresetChange = (nextPreset) => {
@@ -233,15 +306,6 @@ function AnalyticsPage() {
     const range = getPresetRange(nextPreset);
     setCustomFrom(range.from);
     setCustomTo(range.to);
-  };
-
-  const openRouteWithParams = (route, extraParams = {}) => {
-    const url = new URLSearchParams({
-      dateFrom: customFrom,
-      dateTo: customTo,
-      ...extraParams,
-    });
-    navigate(`${route}?${url.toString()}`);
   };
 
   const exportReport = async (format) => {
@@ -272,8 +336,12 @@ function AnalyticsPage() {
   return (
     <main className="sv-analytics-page relative min-h-screen bg-surface">
       <div className="sv-analytics-container mx-auto space-y-5">
-        <section className="sv-analytics-header flex flex-wrap items-end justify-between gap-3">
+        <section className="sv-card sv-analytics-header flex flex-wrap items-end justify-between gap-3">
           <div>
+            <span className="sv-analytics-eyebrow">
+              <Icon name="monitoring" className="sv-icon-btn-icon" />
+              Workspace intelligence
+            </span>
             <h1 className="sv-analytics-title text-3xl font-bold tracking-tight text-on-surface">Analytics Overview</h1>
             <p className="sv-analytics-subtitle mt-1 text-on-surface-variant">Workspace 360 for delivery, sales, workforce, and growth.</p>
           </div>
@@ -287,12 +355,7 @@ function AnalyticsPage() {
               <i className="bi bi-sliders2 me-2" />
               Filters
             </button>
-            <button type="button" disabled={!canExport || exporting === 'csv'} onClick={() => exportReport('csv')} className="sv-ctl-btn sv-analytics-export-btn rounded-lg bg-surface-container-low px-4 py-2 font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50">
-              {exporting === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
-            </button>
-            <button type="button" disabled={!canExport || exporting === 'json'} onClick={() => exportReport('json')} className="sv-ctl-btn sv-analytics-export-btn is-primary rounded-lg bg-primary px-4 py-2 font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60">
-              {exporting === 'json' ? 'Exporting JSON...' : 'Export JSON'}
-            </button>
+            <ExportMenu onExport={exportReport} label={exporting ? `Exporting ${exporting.toUpperCase()}...` : 'Export'} disabled={!canExport || Boolean(exporting)} />
           </div>
         </section>
 
@@ -303,65 +366,91 @@ function AnalyticsPage() {
                 {item === 'custom' ? 'Custom' : item.toUpperCase()}
               </button>
             ))}
-            <input type="date" value={customFrom} onChange={(event) => { setPreset('custom'); setCustomFrom(event.target.value); }} className="sv-ctl-input sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
-            <input type="date" value={customTo} onChange={(event) => { setPreset('custom'); setCustomTo(event.target.value); }} className="sv-ctl-input sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm" />
-            <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
-              <option value="all">All modules</option>
-              <option value="delivery">Delivery</option>
-              <option value="sales">Sales</option>
-              <option value="workforce">Workforce</option>
-            </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
-              <option value="">All status</option>
-              <option value="todo">Todo</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="won">Won</option>
-            </select>
-            <select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
-              <option value="">All channels/sources</option>
-              <option value="organic">Organic</option>
-              <option value="referral">Referral</option>
-              <option value="paid">Paid</option>
-              <option value="event">Event</option>
-              <option value="cold">Cold</option>
-            </select>
-            <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="sv-ctl-select sv-analytics-filter-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm">
-              <option value="">All priority</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="hot">Hot</option>
-              <option value="warm">Warm</option>
-              <option value="cold">Cold</option>
-            </select>
+            <DatePicker
+              value={customFrom}
+              onChange={(nextValue) => { setPreset('custom'); setCustomFrom(nextValue); }}
+              className="sv-analytics-filter-input"
+              triggerClassName="sv-ctl-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm"
+              placeholder="From"
+            />
+            <DatePicker
+              value={customTo}
+              onChange={(nextValue) => { setPreset('custom'); setCustomTo(nextValue); }}
+              className="sv-analytics-filter-input"
+              triggerClassName="sv-ctl-input rounded-md border border-outline-variant/25 bg-surface px-3 py-1.5 text-sm"
+              placeholder="To"
+            />
+            <SelectDropdown
+              value={moduleFilter}
+              onChange={setModuleFilter}
+              className="sv-analytics-filter-input"
+              options={[
+                { value: 'all', label: 'All modules' },
+                { value: 'delivery', label: 'Delivery' },
+                { value: 'sales', label: 'Sales' },
+                { value: 'workforce', label: 'Workforce' },
+              ]}
+            />
+            <SelectDropdown
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="sv-analytics-filter-input"
+              options={[
+                { value: '', label: 'All status' },
+                { value: 'todo', label: 'Todo' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'active', label: 'Active' },
+                { value: 'paused', label: 'Paused' },
+                { value: 'won', label: 'Won' },
+              ]}
+            />
+            <SelectDropdown
+              value={channelFilter}
+              onChange={setChannelFilter}
+              className="sv-analytics-filter-input"
+              options={[
+                { value: '', label: 'All channels/sources' },
+                { value: 'organic', label: 'Organic' },
+                { value: 'referral', label: 'Referral' },
+                { value: 'paid', label: 'Paid' },
+                { value: 'event', label: 'Event' },
+                { value: 'cold', label: 'Cold' },
+              ]}
+            />
+            <SelectDropdown
+              value={priorityFilter}
+              onChange={setPriorityFilter}
+              className="sv-analytics-filter-input"
+              options={[
+                { value: '', label: 'All priority' },
+                { value: 'critical', label: 'Critical' },
+                { value: 'high', label: 'High' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'low', label: 'Low' },
+                { value: 'hot', label: 'Hot' },
+                { value: 'warm', label: 'Warm' },
+                { value: 'cold', label: 'Cold' },
+              ]}
+            />
           </div>
         </section>
 
         <section className="sv-analytics-kpis grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Task Completion</p>
-            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.completionRate)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.myTasks, { status: 'completed' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open My Tasks</button>
-          </article>
-          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Lead Conversion</p>
-            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(sales.leadConversionRate)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.leads, { status: 'won' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Leads</button>
-          </article>
-          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Campaign Avg ROI</p>
-            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{Number(sales?.campaign?.averageRoi || 0).toFixed(2)}x</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.campaigns, { status: 'active' })} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Campaigns</button>
-          </article>
-          <article className="sv-card sv-analytics-kpi rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-            <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">Team Utilization</p>
-            <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface">{formatPct(delivery.teamUtilizationPct)}</h2>
-            <button type="button" onClick={() => openRouteWithParams(ROUTES.employees)} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">Open Employees</button>
-          </article>
+          {kpiCards.map((card) => (
+            <article key={card.key} className={`sv-card sv-analytics-kpi is-${card.tone} rounded-lg border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm`}>
+              <span className="sv-analytics-kpi-icon">
+                <Icon name={card.icon} />
+              </span>
+              <p className="sv-analytics-kpi-label text-sm text-on-surface-variant">{card.label}</p>
+              <h2 className="sv-analytics-kpi-value mt-1 text-3xl font-black text-on-surface" title={card.value}>{card.value}</h2>
+              <p className="sv-analytics-kpi-hint">{card.hint}</p>
+              <button type="button" onClick={card.onClick} className="sv-analytics-kpi-link mt-3 text-xs font-semibold text-primary hover:underline">
+                {card.action}
+                <Icon name="arrow_forward" />
+              </button>
+            </article>
+          ))}
         </section>
 
         <section className="sv-analytics-grid grid grid-cols-12 gap-4">
@@ -452,19 +541,36 @@ function AnalyticsPage() {
                       <th className="px-3 py-2">Project</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Progress</th>
-                      <th className="px-3 py-2 text-right">Action</th>
+                      <th className="px-3 py-2 sv-row-action-heading">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {topProjects.slice(0, 5).map((project) => (
                       <tr key={project.projectId} className="border-t border-outline-variant/10">
-                        <td className="px-3 py-2">{project.name}</td>
+                        <td className="px-3 py-2">
+                          <button type="button" className="sv-name-open-btn" onClick={() => navigate(projectRoute('overview', project.projectId))}>
+                            {project.name}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 capitalize">{project.status}</td>
                         <td className="px-3 py-2">{Number(project.progress || 0).toFixed(1)}%</td>
-                        <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={() => navigate(projectRoute('overview', project.projectId))} className="sv-ctl-btn sv-analytics-mini-btn rounded bg-surface-container px-2 py-1 font-semibold">
-                            Open
-                          </button>
+                        <td className="px-3 py-2 sv-row-action-cell">
+                          <RowActionMenu
+                            open={openProjectMenuId === project.projectId}
+                            onTrigger={() => setOpenProjectMenuId((current) => (current === project.projectId ? '' : project.projectId))}
+                            onClose={() => setOpenProjectMenuId('')}
+                            ariaLabel={`Actions for ${project.name || 'project'}`}
+                            items={[
+                              {
+                                key: 'open',
+                                label: 'Open',
+                                icon: 'open_in_new',
+                                onClick: () => navigate(projectRoute('overview', project.projectId)),
+                              },
+                            ]}
+                            triggerClassName="sv-analytics-mini-trigger"
+                            menuClassName="sv-analytics-mini-menu"
+                          />
                         </td>
                       </tr>
                     ))}
@@ -524,8 +630,8 @@ function AnalyticsPage() {
           <div className="sv-analytics-campaigns-grid grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {topCampaigns.map((campaign) => (
               <button key={campaign.campaignId} type="button" onClick={() => navigate(ROUTES.campaignDetail.replace(':campaignId', campaign.campaignId))} className="sv-analytics-campaign-card rounded-md border border-outline-variant/20 bg-surface p-3 text-left transition hover:bg-surface-container-low">
+                <span className="sv-analytics-campaign-status">{campaign.status || 'draft'}</span>
                 <p className="sv-analytics-campaign-title font-semibold">{campaign.name}</p>
-                <p className="sv-analytics-campaign-meta mt-1 text-xs capitalize text-on-surface-variant">{campaign.status}</p>
                 <div className="sv-analytics-campaign-stats mt-2 flex items-center justify-between text-xs">
                   <span>ROI: {Number(campaign.roi || 0).toFixed(2)}x</span>
                   <span>Spend: {formatINR(campaign.spend || 0)}</span>

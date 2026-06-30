@@ -1,6 +1,7 @@
 import { EVENTS } from '../socket/events';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { contactsApi, employeesApi, projectsApi, tasksApi, usersApi, workflowApi } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 
@@ -76,6 +77,7 @@ const DEFAULT_DRAFT = {
 };
 
 export function NewTaskProvider({ children }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { workspaceId, projectId: defaultProjectId } = useWorkspace();
   const { socket, joinWorkspace } = useSocket();
   const [projects, setProjects] = useState([]);
@@ -103,12 +105,15 @@ export function NewTaskProvider({ children }) {
 
   const listDirectory = useCallback(
     async (entity, page = 1, query = '') => {
+      if (!isAuthenticated || !workspaceId) {
+        return { data: [], meta: { hasMore: false } };
+      }
       const params = createDirectoryParams(page, query);
       if (entity === 'users') return usersApi.list(workspaceId, params);
       if (entity === 'contacts') return contactsApi.list(workspaceId, params);
       return employeesApi.list(workspaceId, params);
     },
-    [workspaceId],
+    [isAuthenticated, workspaceId],
   );
 
   const applyDirectoryRows = useCallback((entity, rows, append) => {
@@ -125,7 +130,7 @@ export function NewTaskProvider({ children }) {
 
   const loadDirectory = useCallback(
     async (entity, options = {}) => {
-      if (!workspaceId) return;
+      if (!isAuthenticated || !workspaceId) return { rows: [], hasMore: false };
       const nextQuery = String(options.query ?? '').trim();
       const nextPage = Number(options.page || 1);
       const append = Boolean(options.append && nextPage > 1);
@@ -178,7 +183,7 @@ export function NewTaskProvider({ children }) {
         return { rows: [], hasMore: false };
       }
     },
-    [workspaceId, listDirectory, applyDirectoryRows],
+    [isAuthenticated, workspaceId, listDirectory, applyDirectoryRows],
   );
 
   const setDirectoryQuery = useCallback(
@@ -198,7 +203,18 @@ export function NewTaskProvider({ children }) {
   );
 
   const hydrate = useCallback(async () => {
-    if (!workspaceId) return;
+    if (authLoading) return;
+    if (!isAuthenticated || !workspaceId) {
+      setProjects([]);
+      setUsers([]);
+      setContacts([]);
+      setEmployees([]);
+      setParentTasks([]);
+      setWorkflowStatuses([]);
+      setError('');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     const projectController = new AbortController();
@@ -275,7 +291,7 @@ export function NewTaskProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, defaultProjectId, loadDirectory]);
+  }, [authLoading, isAuthenticated, workspaceId, defaultProjectId, loadDirectory]);
 
   useEffect(() => {
     hydrate();

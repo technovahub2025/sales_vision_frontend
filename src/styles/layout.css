@@ -69,7 +69,16 @@
   will-change: width;
   contain: layout paint style;
   transform: translateZ(0);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sv-sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .sv-sidebar.is-collapsed {
@@ -874,21 +883,13 @@ html[data-theme='dark'] .sv-sidebar-brand .sv-logo-dark {
 
 .sv-sidebar-body {
   display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: auto;
   flex-direction: column;
   padding: 0.55rem 0.55rem 0.6rem;
   gap: 0.45rem;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: visible;
   transition: opacity 120ms ease;
-}
-
-.sv-sidebar-body::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 .sv-sidebar.is-collapsed .sv-sidebar-body {
@@ -1052,6 +1053,7 @@ html[data-theme='dark'] .sv-sidebar-brand .sv-logo-dark {
   display: flex;
   flex-direction: column;
   gap: 0.32rem;
+  margin-top: auto;
   padding: 0.55rem 0.55rem 0.65rem;
   border-top: 1px solid color-mix(in srgb, var(--color-border) 84%, white);
   background: color-mix(in srgb, var(--sidebar-bg) 95%, white);

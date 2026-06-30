@@ -68,6 +68,58 @@ function readFileName(contentDisposition, fallback) {
   return match?.[1] || fallback;
 }
 
+function ChartViewport({ className = '', children }) {
+  const ref = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+
+    let frameId = 0;
+    const updateReady = () => {
+      frameId = 0;
+      const rect = element.getBoundingClientRect();
+      setReady(rect.width > 1 && rect.height > 1);
+    };
+    const scheduleUpdate = () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(updateReady);
+    };
+
+    scheduleUpdate();
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(element);
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  return (
+    <div ref={ref} className={`sv-analytics-chart-wrap ${className}`}>
+      <div className="sv-analytics-chart-frame">
+        {ready ? children : null}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsResponsiveContainer({ children }) {
+  return (
+    <ResponsiveContainer
+      width="100%"
+      height="100%"
+      minWidth={1}
+      minHeight={1}
+      initialDimension={{ width: 1, height: 1 }}
+    >
+      {children}
+    </ResponsiveContainer>
+  );
+}
+
 function AnalyticsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -461,8 +513,8 @@ function AnalyticsPage() {
               loading={analyticsQuery.isLoading}
               hasData={deliveryTrendData.length > 0}
             >
-              <div className="sv-analytics-chart-wrap h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartViewport className="h-72">
+                <AnalyticsResponsiveContainer>
                   <LineChart data={deliveryTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -473,15 +525,15 @@ function AnalyticsPage() {
                     <Area yAxisId="left" type="monotone" dataKey="completionRate" name="Completion Rate" stroke="#004ac6" fill="#004ac622" strokeWidth={2} />
                     <Line yAxisId="right" type="monotone" dataKey="overdue" name="Overdue" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 2 }} />
                   </LineChart>
-                </ResponsiveContainer>
-              </div>
+                </AnalyticsResponsiveContainer>
+              </ChartViewport>
             </ChartPanel>
           </div>
 
           <div className="sv-analytics-grid-side col-span-12 lg:col-span-4">
             <ChartPanel title="Lead Funnel" subtitle="Stage-wise lead distribution" loading={analyticsQuery.isLoading} hasData={leadFunnelChartData.some((item) => item.value > 0)}>
-              <div className="sv-analytics-chart-wrap h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartViewport className="h-72">
+                <AnalyticsResponsiveContainer>
                   <PieChart>
                     <Pie data={leadFunnelChartData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={94} paddingAngle={2}>
                       {leadFunnelChartData.map((entry, index) => (
@@ -491,8 +543,8 @@ function AnalyticsPage() {
                     <Tooltip content={<AnalyticsTooltip />} />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
                   </PieChart>
-                </ResponsiveContainer>
-              </div>
+                </AnalyticsResponsiveContainer>
+              </ChartViewport>
             </ChartPanel>
           </div>
         </section>
@@ -510,8 +562,8 @@ function AnalyticsPage() {
                 </button>
               }
             >
-              <div className="sv-analytics-chart-wrap h-64">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartViewport className="h-64">
+                <AnalyticsResponsiveContainer>
                   <AreaChart data={topPerformanceData} margin={{ top: 8, right: 16, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" />
@@ -532,8 +584,8 @@ function AnalyticsPage() {
                     <Line type="monotone" dataKey="campaignConversion" name="Campaign Conversion %" stroke="#f97316" strokeWidth={2.2} dot={{ r: 2 }} />
                     <Area type="monotone" dataKey="campaignConversion" name="Campaign Conversion Area" stroke="transparent" fill="url(#svTopPerfCamp)" />
                   </AreaChart>
-                </ResponsiveContainer>
-              </div>
+                </AnalyticsResponsiveContainer>
+              </ChartViewport>
               <div className="sv-analytics-mini-table mt-3 overflow-x-auto rounded-md border border-outline-variant/10">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-container-low text-on-surface-variant">
@@ -589,8 +641,8 @@ function AnalyticsPage() {
 
           <div className="sv-analytics-grid-side col-span-12 xl:col-span-4">
             <ChartPanel title="Workforce Capacity" subtitle="Availability and utilization view" loading={analyticsQuery.isLoading} hasData={workforceChartData.length > 0}>
-              <div className="sv-analytics-chart-wrap h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <ChartViewport className="h-72">
+                <AnalyticsResponsiveContainer>
                   <AreaChart data={workforceChartData} margin={{ top: 8, right: 10, left: 0, bottom: 6 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ef" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
@@ -612,8 +664,8 @@ function AnalyticsPage() {
                     <Line yAxisId="left" type="monotone" dataKey="utilizationPct" name="Utilization %" stroke="#14b8a6" strokeWidth={2.3} dot={{ r: 2 }} />
                     <Area yAxisId="left" type="monotone" dataKey="utilizationPct" name="Utilization Area" stroke="transparent" fill="url(#svWorkUtil)" />
                   </AreaChart>
-                </ResponsiveContainer>
-              </div>
+                </AnalyticsResponsiveContainer>
+              </ChartViewport>
               <div className="sv-analytics-mini-stats mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="sv-analytics-mini-stat rounded-md bg-surface-container-low px-2 py-2">Headcount: <span className="font-semibold">{formatInt(workforce.headcount)}</span></div>
                 <div className="sv-analytics-mini-stat rounded-md bg-surface-container-low px-2 py-2">Avg Capacity: <span className="font-semibold">{Number(workforce.avgCapacityHours || 0).toFixed(1)}h</span></div>

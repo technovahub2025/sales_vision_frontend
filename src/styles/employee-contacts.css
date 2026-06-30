@@ -1272,8 +1272,11 @@ html[data-theme='dark'] .sv-client-link-status.is-neutral {
 .sv-contacts-modal-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
   padding-top: 0.25rem;
+  width: 100%;
+  margin-left: auto;
 }
 
 .sv-employees-table-card .sv-leads-pagination,
@@ -1401,6 +1404,7 @@ html[data-theme='dark'] .sv-client-link-status.is-neutral {
 
   .sv-employees-modal-actions,
   .sv-contacts-modal-actions {
+    align-items: stretch;
     flex-direction: column-reverse;
   }
 

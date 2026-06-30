@@ -726,7 +726,7 @@ function LeadManagementPage() {
             {leadsError ? <div className="sv-leads-alert rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{leadsError}</div> : null}
 
             <section className="sv-card sv-leads-table-card sv-list-scroll rounded-xl border border-outline-variant/10 bg-surface-container-lowest" ref={leadsScrollRef}>
-              <table className="sv-leads-table w-full min-w-[1150px] text-left">
+              <table className="sv-leads-table sv-leads-table--pipeline text-left">
                 <thead>
                   <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
                     <th className="px-3 py-3">Lead</th>
@@ -826,7 +826,7 @@ function LeadManagementPage() {
               </section>
             ) : null}
             <section className="sv-card sv-leads-table-card sv-list-scroll rounded-xl border border-outline-variant/10 bg-surface-container-lowest" ref={clientsScrollRef}>
-              <table className="sv-leads-table w-full min-w-[700px] text-left">
+              <table className="sv-leads-table sv-leads-table--clients text-left">
                 <thead>
                   <tr className="sv-leads-head-row border-b border-outline-variant/20 text-xs uppercase tracking-wider text-on-surface-variant">
                     <th className="px-3 py-3">Client</th>

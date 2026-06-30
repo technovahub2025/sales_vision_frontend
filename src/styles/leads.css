@@ -329,12 +329,37 @@
   background: color-mix(in srgb, var(--color-surface) 98%, transparent);
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07);
   min-height: clamp(18rem, 44vh, 34rem);
+  width: 100%;
+  max-width: 100%;
   padding: 0.35rem;
+  overflow-x: auto !important;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sv-leads-table {
   border-collapse: separate;
   border-spacing: 0;
+  width: max-content;
+  max-width: none;
+  table-layout: auto;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.sv-leads-table.sv-leads-table--pipeline {
+  min-width: 1150px;
+}
+
+.sv-leads-table.sv-leads-table--clients {
+  min-width: 700px;
+}
+
+.sv-leads-table th,
+.sv-leads-table td {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .sv-leads-head-row {

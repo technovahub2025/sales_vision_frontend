@@ -2,10 +2,10 @@
   position: relative;
   isolation: isolate;
   display: flex;
-  height: 100dvh;
-  min-height: 0;
+  min-height: 100dvh;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.12), transparent 18rem),
     radial-gradient(circle at 72% 18%, rgba(96, 165, 250, 0.26), transparent 24rem),
@@ -56,17 +56,28 @@
   z-index: 1;
   display: flex;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: calc(100dvh - 2.4rem);
   align-items: center;
   justify-content: center;
   width: 100%;
   padding: clamp(0.75rem, 2vh, 1.25rem) clamp(1rem, 3vw, 2.5rem);
 }
 
+.sv-auth-theme {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 4;
+}
+
 .sv-auth-inner {
   width: 100%;
   max-width: min(1160px, calc(100vw - 2rem));
   min-height: 0;
+}
+
+.sv-auth-inner.is-compact {
+  max-width: min(34rem, calc(100vw - 2rem));
 }
 
 .sv-auth-grid {
@@ -76,6 +87,14 @@
   justify-content: center;
   gap: clamp(1.25rem, 3vw, 2.75rem);
   min-height: 0;
+}
+
+.sv-auth-inner.is-compact .sv-auth-grid {
+  grid-template-columns: minmax(0, 34rem);
+}
+
+.sv-auth-inner.is-compact .sv-auth-marketing-column {
+  display: none;
 }
 
 .sv-auth-form-column,
@@ -93,8 +112,8 @@
 .sv-auth-card {
   position: relative;
   display: flex;
+  width: 100%;
   min-height: 0;
-  max-height: calc(100dvh - 4.4rem);
   flex-direction: column;
   justify-content: center;
   padding: clamp(1.35rem, 2.4vw, 2.2rem);
@@ -126,6 +145,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
   margin-bottom: clamp(0.9rem, 1.7vh, 1.25rem);
 }
 
@@ -136,6 +156,7 @@
   justify-content: center;
   gap: 0.18rem;
   min-width: 9.2rem;
+  max-width: 100%;
   padding: 0.52rem 0.82rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 72%, white);
   border-radius: 1.15rem;
@@ -198,10 +219,11 @@
 .sv-auth-title {
   margin: 0;
   color: var(--color-text);
-  font-size: clamp(2rem, 2.55vw, 2.55rem);
+  font-size: clamp(2rem, 2.35rem, 2.55rem);
   font-weight: 900;
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  line-height: 1.02;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .sv-auth-subtitle {
@@ -245,7 +267,6 @@
   position: relative;
   display: flex;
   min-height: 0;
-  max-height: calc(100dvh - 4.4rem);
   flex-direction: column;
   justify-content: space-between;
   gap: clamp(0.85rem, 1.8vh, 1.1rem);
@@ -304,17 +325,17 @@
 .sv-auth-panel-title {
   max-width: 36rem;
   margin: 0;
-  font-size: clamp(2.25rem, 3.45vw, 3.55rem);
+  font-size: clamp(2.25rem, 3rem, 3.55rem);
   font-weight: 950;
-  line-height: 0.95;
-  letter-spacing: -0.065em;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .sv-auth-panel-subtitle {
   max-width: 42rem;
   margin: clamp(0.75rem, 1.8vh, 1rem) 0 clamp(0.8rem, 1.8vh, 1.05rem);
   color: rgba(255, 255, 255, 0.86);
-  font-size: clamp(1rem, 1.45vw, 1.2rem);
+  font-size: clamp(1rem, 1.1rem, 1.2rem);
   font-weight: 650;
   line-height: 1.55;
 }
@@ -474,6 +495,21 @@
   height: 3.05rem;
 }
 
+.sv-auth-form-slot form,
+.sv-auth-form-slot .d-grid,
+.sv-auth-form-slot .space-y-4 {
+  min-width: 0;
+}
+
+.sv-auth-form-slot .space-y-4 {
+  display: grid;
+  gap: 1rem;
+}
+
+.sv-auth-form-slot .mb-4 {
+  margin-bottom: 1rem !important;
+}
+
 .sv-field-control.has-password-toggle .form-control {
   padding-right: 3.35rem !important;
 }
@@ -584,6 +620,12 @@
   min-height: 2.85rem;
   border-radius: 0.95rem;
   font-weight: 850;
+  white-space: normal;
+}
+
+.sv-auth-form-slot button.w-full,
+.sv-auth-form-slot button[class*="w-full"] {
+  width: 100%;
 }
 
 .sv-auth-form-slot .sv-password-toggle {
@@ -672,12 +714,12 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-grid {
-    grid-template-columns: minmax(410px, 490px) minmax(430px, 520px);
+    grid-template-columns: minmax(0, 490px) minmax(0, 520px);
     gap: 1.35rem;
   }
 
   .sv-auth-panel-title {
-    font-size: clamp(2.1rem, 3.3vw, 3rem);
+    font-size: clamp(2.1rem, 2.65rem, 3rem);
   }
 }
 
@@ -688,7 +730,6 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
 
   .sv-auth-card,
   .sv-auth-panel {
-    max-height: calc(100dvh - 3.6rem);
     padding: 1.35rem;
   }
 
@@ -697,7 +738,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-title {
-    font-size: clamp(1.9rem, 2.35vw, 2.35rem);
+    font-size: clamp(1.9rem, 2.15rem, 2.35rem);
   }
 
   .sv-auth-subtitle {
@@ -706,7 +747,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-panel-title {
-    font-size: clamp(2rem, 3vw, 2.85rem);
+    font-size: clamp(2rem, 2.45rem, 2.85rem);
   }
 
   .sv-auth-panel-subtitle {
@@ -729,7 +770,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
 
 @media (max-height: 760px) and (min-width: 992px) {
   .sv-auth-grid {
-    grid-template-columns: minmax(430px, 520px) minmax(400px, 470px);
+    grid-template-columns: minmax(0, 520px) minmax(0, 470px);
   }
 
   .sv-auth-panel-eyebrow,
@@ -757,17 +798,21 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-grid {
-    grid-template-columns: minmax(430px, 540px);
+    grid-template-columns: minmax(0, 540px);
   }
 }
 
 @media (max-width: 991.98px) {
   .sv-auth-shell {
-    overflow: hidden;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .sv-auth-container {
-    padding: 0.8rem;
+    min-height: auto;
+    align-items: flex-start;
+    padding: 1rem 0.8rem;
   }
 
   .sv-auth-grid {
@@ -783,17 +828,22 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-card {
-    max-height: calc(100dvh - 3.35rem);
     min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
+    overflow: hidden;
   }
 }
 
 @media (max-width: 575.98px) {
   .sv-auth-shell {
     justify-content: flex-start !important;
-    padding-block: 0.75rem !important;
+  }
+
+  .sv-auth-container {
+    padding: calc(0.75rem + env(safe-area-inset-top)) 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  .sv-auth-inner {
+    max-width: 100%;
   }
 
   .sv-auth-card {
@@ -803,6 +853,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
 
   .sv-auth-brand-row {
     align-items: flex-start;
+    flex-wrap: wrap;
     margin-bottom: 1.15rem;
   }
 
@@ -826,7 +877,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-title {
-    font-size: clamp(1.85rem, 9vw, 2.25rem);
+    font-size: clamp(1.85rem, 2rem, 2.25rem);
   }
 
   .sv-auth-subtitle {
@@ -849,6 +900,12 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   .sv-auth-form-slot .btn {
     min-height: 2.75rem;
   }
+
+  .sv-auth-footer-note,
+  .sv-auth-form-slot .mt-4,
+  .sv-auth-form-slot p.text-end {
+    text-align: left !important;
+  }
 }
 
 @media (max-width: 575.98px) and (max-height: 720px) {
@@ -861,7 +918,7 @@ html[data-theme='dark'] .sv-auth-logo-wrap .sv-logo {
   }
 
   .sv-auth-title {
-    font-size: clamp(1.65rem, 8vw, 2rem);
+    font-size: clamp(1.65rem, 1.85rem, 2rem);
   }
 
   .sv-auth-subtitle {

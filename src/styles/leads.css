@@ -340,24 +340,80 @@
 .sv-leads-table {
   border-collapse: separate;
   border-spacing: 0;
-  width: max-content;
-  max-width: none;
-  table-layout: auto;
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
   overflow-wrap: normal;
   word-break: normal;
 }
 
 .sv-leads-table.sv-leads-table--pipeline {
-  min-width: 1150px;
+  min-width: 1080px;
 }
 
 .sv-leads-table.sv-leads-table--clients {
-  min-width: 700px;
+  min-width: 760px;
+}
+
+.sv-leads-table--pipeline th:nth-child(1),
+.sv-leads-table--pipeline td:nth-child(1) {
+  width: 25%;
+}
+
+.sv-leads-table--pipeline th:nth-child(2),
+.sv-leads-table--pipeline td:nth-child(2) {
+  width: 12%;
+}
+
+.sv-leads-table--pipeline th:nth-child(3),
+.sv-leads-table--pipeline td:nth-child(3) {
+  width: 18%;
+}
+
+.sv-leads-table--pipeline th:nth-child(4),
+.sv-leads-table--pipeline td:nth-child(4),
+.sv-leads-table--pipeline th:nth-child(5),
+.sv-leads-table--pipeline td:nth-child(5) {
+  width: 10%;
+}
+
+.sv-leads-table--pipeline th:nth-child(6),
+.sv-leads-table--pipeline td:nth-child(6) {
+  width: 15%;
+}
+
+.sv-leads-table--pipeline th:nth-child(7),
+.sv-leads-table--pipeline td:nth-child(7) {
+  width: 10%;
+}
+
+.sv-leads-table--clients th:nth-child(1),
+.sv-leads-table--clients td:nth-child(1),
+.sv-leads-table--clients th:nth-child(2),
+.sv-leads-table--clients td:nth-child(2) {
+  width: 25%;
+}
+
+.sv-leads-table--clients th:nth-child(3),
+.sv-leads-table--clients td:nth-child(3) {
+  width: 28%;
+}
+
+.sv-leads-table--clients th:nth-child(4),
+.sv-leads-table--clients td:nth-child(4) {
+  width: 14%;
+}
+
+.sv-leads-table--clients th:nth-child(5),
+.sv-leads-table--clients td:nth-child(5) {
+  width: 8%;
 }
 
 .sv-leads-table th,
 .sv-leads-table td {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   overflow-wrap: normal;
   word-break: normal;
 }
@@ -393,7 +449,17 @@
 .sv-leads-move-select {
   min-height: 2rem;
   min-width: 124px;
+  width: 100%;
   border-radius: 0.62rem !important;
+}
+
+.sv-leads-actions-cell {
+  text-align: center;
+}
+
+.sv-leads-actions-cell .sv-row-menu-container {
+  display: inline-flex;
+  justify-content: center;
 }
 
 .sv-leads-actions {

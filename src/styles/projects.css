@@ -139,6 +139,8 @@
 }
 
 .sv-projects-toolbar {
+  position: relative;
+  z-index: 40;
   padding: 0.62rem 0.75rem;
   display: flex;
   flex-wrap: wrap;
@@ -196,7 +198,7 @@
 
 .sv-projects-dropdown > .sv-page-dropdown__menu {
   position: absolute;
-  z-index: 45;
+  z-index: 80;
   top: calc(100% + 0.35rem);
   left: 0;
   right: 0;
@@ -204,7 +206,10 @@
 
 .sv-projects-dropdown--filter > .sv-page-dropdown__menu {
   left: auto;
+  right: 0;
   min-width: 12rem;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 1.5rem));
 }
 
 .sv-projects-page .sv-page-dropdown__trigger,
@@ -572,6 +577,8 @@
 }
 
 .sv-projects-table-panel {
+  position: relative;
+  z-index: 1;
   overflow: hidden;
 }
 

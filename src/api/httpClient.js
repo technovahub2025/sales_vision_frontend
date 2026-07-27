@@ -1,7 +1,14 @@
-const apiBaseUrl =
+function normalizeApiBaseUrl(value) {
+  const base = String(value || '').trim().replace(/\/*$/, '');
+  if (!base) return 'http://localhost:3001/api';
+  return base.endsWith('/api') ? base : `${base}/api`;
+}
+
+const apiBaseUrl = normalizeApiBaseUrl(
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  'http://localhost:3001/api';
+  'http://localhost:3001',
+);
 
 function joinUrl(path) {
   return `${apiBaseUrl}${path}`;

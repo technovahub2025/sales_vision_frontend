@@ -24,7 +24,7 @@ npm run dev
 
 ## Runtime Config
 
-- `VITE_API_BASE_URL`: backend API base (default `http://localhost:5000/api`)
+- `VITE_API_BASE_URL`: backend host or API base; `/api` is appended automatically if missing
 - `VITE_SOCKET_URL`: socket server base (default `http://localhost:5000`)
 - `VITE_DEFAULT_WORKSPACE_ID`: workspace key/slug used for API and room join
 - `VITE_DEFAULT_PROJECT_ID`: optional project fallback (auto-set by seed bootstrap)

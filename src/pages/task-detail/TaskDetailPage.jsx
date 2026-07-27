@@ -445,6 +445,7 @@ function TaskDetailPage() {
   }, [
     completionCompleting,
     completionFiles,
+    completionError,
     completionUploadDone,
     completionUploading,
     hydrate,

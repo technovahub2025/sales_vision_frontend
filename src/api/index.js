@@ -114,6 +114,13 @@ export const tasksApi = {
     apiRequest({ method: 'get', url: wsV1(workspaceId, `/tasks/${taskId}/attachments`), signal }),
   createAttachment: (workspaceId, taskId, data) =>
     apiRequest({ method: 'post', url: wsV1(workspaceId, `/tasks/${taskId}/attachments`), data }),
+  uploadAttachments: (workspaceId, taskId, files = []) => {
+    const formData = new FormData();
+    for (const file of Array.from(files || []).filter(Boolean)) {
+      formData.append('files', file);
+    }
+    return apiRequest({ method: 'post', url: wsV1(workspaceId, `/tasks/${taskId}/attachments`), data: formData });
+  },
   startTimer: (workspaceId, taskId, data) =>
     apiRequest({ method: 'post', url: wsV1(workspaceId, `/tasks/${taskId}/timer/start`), data }),
   stopTimer: (workspaceId, taskId, data) => apiRequest({ method: 'post', url: wsV1(workspaceId, `/tasks/${taskId}/timer/stop`), data }),

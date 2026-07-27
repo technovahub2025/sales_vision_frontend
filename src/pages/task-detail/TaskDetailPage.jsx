@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useLayoutEffect, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { contactsApi, employeesApi, tasksApi, usersApi } from '../../api';
 import { useTasks } from '../../hooks/useTasks';
@@ -16,6 +17,9 @@ const ACTIVITY_PAGE_SIZE = 50;
 const FINAL_STATUS_KEYS = new Set(['completed', 'done', 'closed']);
 const COMPLETED_STATUS_KEY = 'completed';
 const LOCKED_STATUS_MESSAGE = 'Completed task cannot be moved back';
+const MAX_COMPLETION_IMAGES = 3;
+const ALLOWED_COMPLETION_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const ALLOWED_COMPLETION_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
 function normalizeStatusKey(value) {
   return String(value || '').trim().toLowerCase();
@@ -46,6 +50,38 @@ function formatMinutesLabel(minutes) {
   if (hours && mins) return `${hours}h ${mins}m`;
   if (hours) return `${hours}h`;
   return `${mins}m`;
+}
+
+function isAllowedCompletionImage(file) {
+  const type = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  if (type && ALLOWED_COMPLETION_IMAGE_TYPES.has(type)) return true;
+  return ALLOWED_COMPLETION_IMAGE_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+function formatTaskCompletionError(error) {
+  const primaryMessage = String(error?.message || '').trim();
+  const validationMessages = Array.isArray(error?.errors) ? error.errors : [];
+  const detailMessages = validationMessages
+    .map((item) => {
+      if (!item) return '';
+      if (typeof item === 'string') return item;
+      const segments = [];
+      const path = String(item.path || item.field || '').trim();
+      const message = String(item.message || '').trim();
+      const detail = item.details;
+      if (path) segments.push(path);
+      if (message) segments.push(message);
+      if (!message && detail && typeof detail === 'string') segments.push(detail);
+      if (!message && detail && typeof detail === 'object') {
+        if (detail.message) segments.push(String(detail.message));
+        if (detail.reason) segments.push(String(detail.reason));
+      }
+      return segments.filter(Boolean).join(': ');
+    })
+    .filter(Boolean);
+
+  return [primaryMessage, ...detailMessages].filter(Boolean).join(' ').trim() || 'Failed to complete task';
 }
 
 function ActivityRow({ item }) {
@@ -186,6 +222,7 @@ const DetailDropdown = memo(function DetailDropdown({
 function TaskDetailPage() {
   const { taskId: routeTaskId } = useParams();
   const { workspaceId } = useWorkspace();
+  const queryClient = useQueryClient();
   const { task, loading, error, taskStatuses, updateStatus, hydrate } = useTasks();
   const { isTimerActive, isTimerPaused, getTaskElapsedSeconds } = useMyTasks();
   const [routeTask, setRouteTask] = useState(null);
@@ -202,6 +239,12 @@ function TaskDetailPage() {
   const [employees, setEmployees] = useState([]);
   const [parentTasks, setParentTasks] = useState([]);
   const [savingCollaborators, setSavingCollaborators] = useState(false);
+  const [completionFlowOpen, setCompletionFlowOpen] = useState(false);
+  const [completionFiles, setCompletionFiles] = useState([]);
+  const [completionUploadDone, setCompletionUploadDone] = useState(true);
+  const [completionUploading, setCompletionUploading] = useState(false);
+  const [completionCompleting, setCompletionCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState('');
   const [editDraft, setEditDraft] = useState({
     issueType: 'task',
     parentTaskId: '',
@@ -215,6 +258,7 @@ function TaskDetailPage() {
     () => String(routeTaskId || activeTask?._id || activeTask?.id || ''),
     [routeTaskId, activeTask],
   );
+  const completedImageCount = completionUploadDone ? completionFiles.length : 0;
   const { totalSeconds: trackedSecondsFromLogs = 0 } = useTimeTracker(taskId);
   const statusKeys = useMemo(
     () => (taskStatuses.length ? taskStatuses.map((item) => item.key) : DEFAULT_STATUSES),
@@ -315,6 +359,100 @@ function TaskDetailPage() {
       externalCollaborators: Array.isArray(activeTask.externalCollaborators) ? activeTask.externalCollaborators : [],
     });
   }, [activeTask]);
+
+  useEffect(() => {
+    setCompletionFlowOpen(false);
+    setCompletionFiles([]);
+    setCompletionUploadDone(true);
+    setCompletionUploading(false);
+    setCompletionCompleting(false);
+    setCompletionError('');
+  }, [taskId]);
+
+  const onCompletionFilesChange = useCallback((fileList) => {
+    const incomingFiles = Array.from(fileList || []).filter(Boolean);
+    if (!incomingFiles.length) {
+      setCompletionFiles([]);
+      setCompletionUploadDone(true);
+      setCompletionError('');
+      return;
+    }
+
+    const invalidFiles = incomingFiles.filter((file) => !isAllowedCompletionImage(file));
+    if (invalidFiles.length) {
+      setCompletionFiles([]);
+      setCompletionUploadDone(true);
+      setCompletionError('Only jpg, jpeg, png, gif, and webp files are allowed.');
+      return;
+    }
+
+    if (incomingFiles.length > MAX_COMPLETION_IMAGES) {
+      setCompletionFiles(incomingFiles.slice(0, MAX_COMPLETION_IMAGES));
+      setCompletionUploadDone(false);
+      setCompletionError(`You can upload up to ${MAX_COMPLETION_IMAGES} images.`);
+      return;
+    }
+
+    setCompletionFiles(incomingFiles);
+    setCompletionUploadDone(false);
+    setCompletionError('');
+  }, []);
+
+  const removeCompletionFile = useCallback((index) => {
+    setCompletionFiles((current) => {
+      const next = current.filter((_, currentIndex) => currentIndex !== index);
+      setCompletionUploadDone(next.length === 0 ? true : false);
+      return next;
+    });
+    setCompletionError('');
+  }, []);
+
+  const submitTaskCompletion = useCallback(async () => {
+    if (!workspaceId || !taskId || completionUploading || completionCompleting) return;
+    if (completionError && !completionFiles.length) return;
+
+    setCompletionError('');
+    setActionMessage('');
+    try {
+      if (!completionUploadDone && completionFiles.length) {
+        setCompletionUploading(true);
+        await tasksApi.uploadAttachments(workspaceId, taskId, completionFiles);
+        setCompletionUploadDone(true);
+      }
+
+      setCompletionUploading(false);
+      setCompletionCompleting(true);
+      await tasksApi.updateStatus(workspaceId, taskId, 'completed');
+      setActionMessage(`Task completed${completionFiles.length ? ` with ${completionFiles.length} image${completionFiles.length === 1 ? '' : 's'}` : ''}`);
+      setCompletionFlowOpen(false);
+      setCompletionFiles([]);
+      setCompletionUploadDone(true);
+      await Promise.all([
+        hydrate(),
+        queryClient.invalidateQueries({ queryKey: ['attachments', 'task', taskId] }),
+      ]);
+      if (routeTaskId) {
+        const response = await tasksApi.get(workspaceId, routeTaskId);
+        setRouteTask(response?.data || null);
+      }
+    } catch (err) {
+      setCompletionError(formatTaskCompletionError(err));
+      setActionMessage(err.message || 'Failed to complete task');
+    } finally {
+      setCompletionUploading(false);
+      setCompletionCompleting(false);
+    }
+  }, [
+    completionCompleting,
+    completionFiles,
+    completionUploadDone,
+    completionUploading,
+    hydrate,
+    queryClient,
+    routeTaskId,
+    taskId,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -500,6 +638,12 @@ function TaskDetailPage() {
                     setActionMessage(LOCKED_STATUS_MESSAGE);
                     return;
                   }
+                  if (normalizeStatusKey(status) === COMPLETED_STATUS_KEY) {
+                    setCompletionFlowOpen(true);
+                    setCompletionError('');
+                    setActionMessage('');
+                    return;
+                  }
                   updateStatus(taskId, status);
                 }}
                 className={`sv-taskdetail-status-btn ${activeTask.status === status ? 'is-active' : ''}`}
@@ -512,6 +656,112 @@ function TaskDetailPage() {
               );
             })}
           </div>
+
+          {completionFlowOpen ? (
+            <div className="rounded-3xl border border-outline-variant/10 bg-surface-container-lowest p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-on-surface-variant">Task completion</p>
+                  <h2 className="mt-1 text-base font-semibold text-on-surface">Upload up to 3 images before finishing</h2>
+                  <p className="mt-1 text-sm text-on-surface-variant">
+                    Allowed formats: jpg, jpeg, png, gif, webp.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCompletionFlowOpen(false);
+                    setCompletionError('');
+                  }}
+                  className="rounded-full px-2 py-1 text-sm font-semibold text-on-surface-variant hover:bg-surface-container"
+                >
+                  <X size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-outline-variant/30 px-4 py-6 text-center transition hover:border-primary hover:bg-primary/5">
+                  <Icon name="upload_file" className="text-2xl text-primary" />
+                  <span className="mt-2 text-sm font-semibold text-on-surface">Choose images</span>
+                  <span className="mt-1 text-xs text-on-surface-variant">Select up to {MAX_COMPLETION_IMAGES} image files</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+                    multiple
+                    onChange={(event) => onCompletionFilesChange(event.target.files)}
+                    disabled={completionUploading || completionCompleting}
+                    className="sr-only"
+                  />
+                </label>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl bg-surface-container px-4 py-3">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-on-surface-variant">
+                      {completedImageCount}/{MAX_COMPLETION_IMAGES} images uploaded
+                    </p>
+                    <p className="mt-1 text-sm text-on-surface-variant">
+                      {completionFiles.length
+                        ? `${completionFiles.length} image${completionFiles.length === 1 ? '' : 's'} selected`
+                        : 'No images selected yet'}
+                    </p>
+                  </div>
+
+                  {completionFiles.length ? (
+                    <div className="space-y-2">
+                      {completionFiles.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/10 bg-surface-container-low p-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-on-surface">{file.name}</p>
+                            <p className="text-xs text-on-surface-variant">{file.type || 'image file'}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCompletionFile(index)}
+                            disabled={completionUploading || completionCompleting}
+                            className="text-xs font-semibold text-error"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {completionError ? <p className="text-sm text-error">{completionError}</p> : null}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCompletionFlowOpen(false);
+                    setCompletionError('');
+                  }}
+                  className="btn btn-sm btn-outline-secondary sv-ctl-btn"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitTaskCompletion}
+                  disabled={completionUploading || completionCompleting || (Boolean(completionError) && !completionFiles.length)}
+                  className="btn btn-sm btn-primary sv-ctl-btn"
+                >
+                  {completionUploading
+                    ? 'Uploading images...'
+                    : completionCompleting
+                      ? 'Completing task...'
+                      : completionFiles.length
+                        ? 'Upload & complete task'
+                        : 'Complete task'}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="sv-taskdetail-estimate-row">
             <label className="sv-taskdetail-label">

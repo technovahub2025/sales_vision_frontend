@@ -7,6 +7,7 @@ import SelectDropdown from '../../components/ui/SelectDropdown';
 import ExportMenu from '../../components/ui/ExportMenu';
 import { useLeads } from '../../hooks/useLeads';
 import { useClients } from '../../hooks/useClients';
+import { useEmployees } from '../../hooks/useEmployees';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { clientsApi, leadsApi } from '../../api';
 import { ROUTES } from '../../routes/routePaths';
@@ -23,15 +24,20 @@ const STAGES = [
   { statusId: 'lost', title: 'Lost' },
 ];
 const STAGE_IDS = new Set(STAGES.map((s) => s.statusId));
-const PRIORITY_VALUES = ['cold', 'warm', 'hot'];
+const LEAD_CATEGORY_VALUES = ['hot', 'warm', 'cold'];
 const SOURCE_VALUES = ['organic', 'referral', 'cold', 'paid', 'event'];
 const LEAD_TYPE_OPTIONS = [
   { value: 'company', label: 'Company' },
   { value: 'person', label: 'Person' },
 ];
 const STAGE_OPTIONS = STAGES.map((stage) => ({ value: stage.statusId, label: stage.title }));
-const PRIORITY_OPTIONS = PRIORITY_VALUES.map((priority) => ({ value: priority, label: priority[0].toUpperCase() + priority.slice(1) }));
+const LEAD_CATEGORY_OPTIONS = LEAD_CATEGORY_VALUES.map((category) => ({ value: category, label: category[0].toUpperCase() + category.slice(1) }));
 const SOURCE_OPTIONS = SOURCE_VALUES.map((source) => ({ value: source, label: source[0].toUpperCase() + source.slice(1) }));
+const LEAD_CATEGORY_META = {
+  hot: { label: 'Hot', tone: 'hot', note: '' },
+  warm: { label: 'Warm', tone: 'warm', note: 'Reminder emails are sent every 2 days.' },
+  cold: { label: 'Cold', tone: 'cold', note: 'Reminder emails are sent weekly.' },
+};
 const EMPTY_DETAIL_FIELDS = {
   leadType: 'company',
   contactName: '',
@@ -61,7 +67,40 @@ const fmtDate = (v) => {
 };
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const nSource = (v) => (SOURCE_VALUES.includes(String(v || '').toLowerCase()) ? String(v).toLowerCase() : 'organic');
-const nPriority = (v) => (PRIORITY_VALUES.includes(String(v || '').toLowerCase()) ? String(v).toLowerCase() : 'warm');
+const nPriority = (v) => (LEAD_CATEGORY_VALUES.includes(String(v || '').toLowerCase()) ? String(v).toLowerCase() : 'warm');
+const getLeadCategoryValue = (lead) => nPriority(lead?.category || lead?.priority);
+const leadCategoryMeta = (v) => LEAD_CATEGORY_META[nPriority(v)] || LEAD_CATEGORY_META.warm;
+const leadCategoryLabel = (v) => leadCategoryMeta(v).label;
+const leadCategoryTone = (v) => leadCategoryMeta(v).tone;
+const leadCategoryIsValid = (v) => LEAD_CATEGORY_VALUES.includes(String(v || '').toLowerCase());
+const leadCategoryClassName = (v) => `sv-leads-category-badge is-${leadCategoryTone(v)}`;
+const getLeadAssignedEmployeeId = (lead) =>
+  String(
+    lead?.employeeId ||
+      lead?.assignedEmployeeId ||
+      lead?.assigneeId ||
+      lead?.assignedToId ||
+      lead?.assignedEmployee?._id ||
+      lead?.assignedTo?._id ||
+      '',
+  );
+const getLeadAssignedEmployeeName = (lead, employeeLookup) => {
+  const directName = [
+    lead?.employeeName,
+    lead?.assignedEmployeeName,
+    lead?.assigneeName,
+    lead?.assignedToName,
+    lead?.assignedEmployee?.displayName,
+    lead?.assignedEmployee?.name,
+    lead?.assignedTo?.displayName,
+    lead?.assignedTo?.name,
+  ].find((value) => String(value || '').trim());
+  if (directName) return String(directName).trim();
+  const employeeId = getLeadAssignedEmployeeId(lead);
+  if (!employeeId || !employeeLookup?.has(employeeId)) return '';
+  const employee = employeeLookup.get(employeeId);
+  return String(employee?.displayName || employee?.name || employee?.email || '').trim();
+};
 const extractDetails = (cf) => ({ ...EMPTY_DETAIL_FIELDS, ...obj(cf), leadType: String(obj(cf).leadType || obj(cf).type || 'company') });
 const mapClientToLeadFields = (client) => ({
   contactName: String(client?.name || ''),
@@ -112,7 +151,7 @@ const toEditFormFromLead = (lead) => {
     ...editDefaults(),
     title: String(lead?.title || ''),
     value: String(lead?.value ?? ''),
-    priority: nPriority(lead?.priority),
+    priority: getLeadCategoryValue(lead),
     source: nSource(lead?.source),
     expectedCloseDate: lead?.expectedCloseDate ? String(lead.expectedCloseDate).slice(0, 10) : '',
     clientId: String(lead?.clientId || ''),
@@ -162,6 +201,38 @@ const toClientPayload = (form) => ({
   },
 });
 
+function LeadCategoryBlock({ category, employeeName = '', className = '' }) {
+  const meta = leadCategoryMeta(category);
+  return (
+    <div className={`sv-leads-category-block ${className}`.trim()}>
+      <span className={leadCategoryClassName(category)}>{meta.label}</span>
+      {employeeName ? <span className="sv-leads-category-assignee">Assigned to {employeeName}</span> : null}
+      {meta.note ? <span className="sv-leads-category-note">{meta.note}</span> : null}
+    </div>
+  );
+}
+
+function LeadCategoryField({ value, onChange, error, onErrorClear, ariaLabel = 'Lead Category' }) {
+  const currentMeta = leadCategoryMeta(value);
+  return (
+    <div className="sv-leads-category-field">
+      <label className="sv-leads-field-label">Lead Category *</label>
+      <SelectDropdown
+        value={nPriority(value)}
+        onChange={(nextValue) => {
+          onChange(nPriority(nextValue));
+          if (onErrorClear) onErrorClear();
+        }}
+        options={LEAD_CATEGORY_OPTIONS}
+        triggerClassName="w-full rounded-lg border border-outline-variant/20 px-3 py-2 text-sm"
+        ariaLabel={ariaLabel}
+      />
+      {currentMeta.note ? <p className="sv-leads-category-helper">{currentMeta.note}</p> : null}
+      {error ? <p className="sv-leads-inline-error">{error}</p> : null}
+    </div>
+  );
+}
+
 function DetailFields({ form, setForm }) {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   return (
@@ -204,6 +275,7 @@ function DetailFields({ form, setForm }) {
 function LeadManagementPage() {
   const navigate = useNavigate();
   const { workspaceId } = useWorkspace();
+  const { items: employees } = useEmployees();
   const [tab, setTab] = useState('list');
   const [openCreate, setOpenCreate] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
@@ -215,6 +287,8 @@ function LeadManagementPage() {
   const [editBusy, setEditBusy] = useState(false);
   const [openCreateClient, setOpenCreateClient] = useState(false);
   const [toast, setToast] = useState(null);
+  const [createFormError, setCreateFormError] = useState('');
+  const [editFormError, setEditFormError] = useState('');
   const [filters, setFilters] = useState({ search: '', status: 'all', priority: 'all', source: 'all', archiveScope: 'all' });
   const [clientFilters, setClientFilters] = useState({ search: '', archiveScope: 'all' });
   const [isLeadFilterOpen, setIsLeadFilterOpen] = useState(false);
@@ -282,6 +356,7 @@ function LeadManagementPage() {
     [leads],
   );
   const clientLookup = useMemo(() => new Map((clients || []).map((c) => [String(c._id), c])), [clients]);
+  const employeeLookup = useMemo(() => new Map((employees || []).map((employee) => [String(employee._id), employee])), [employees]);
   const clientOptions = useMemo(
     () => [
       { value: '', label: 'No Client' },
@@ -300,7 +375,7 @@ function LeadManagementPage() {
         const title = String(lead.title || '').toLowerCase();
         if (q && !title.includes(q)) return false;
         if (filters.status !== 'all' && normStage(lead.statusId || lead.stage) !== filters.status) return false;
-        if (filters.priority !== 'all' && String(lead.priority || '').toLowerCase() !== filters.priority) return false;
+        if (filters.priority !== 'all' && getLeadCategoryValue(lead) !== filters.priority) return false;
         if (filters.source !== 'all' && String(lead.source || '').toLowerCase() !== filters.source) return false;
         if (filters.archiveScope === 'all' && lead.isArchived) return false;
         if (filters.archiveScope === 'archived' && !lead.isArchived) return false;
@@ -325,7 +400,7 @@ function LeadManagementPage() {
     const active = (rows || []).filter((lead) => !lead?.isArchived);
     const totalValue = visible.reduce((sum, lead) => sum + Number(lead?.value || 0), 0);
     const won = visible.filter((lead) => normStage(lead?.statusId || lead?.stage) === 'won').length;
-    const hot = visible.filter((lead) => nPriority(lead?.priority) === 'hot').length;
+    const hot = visible.filter((lead) => getLeadCategoryValue(lead) === 'hot').length;
     const archived = (rows || []).filter((lead) => lead?.isArchived).length;
     return {
       activeCount: active.length,
@@ -355,14 +430,23 @@ function LeadManagementPage() {
     const id = leadId(selectedLead);
     return rows.find((x) => leadId(x) === id) || selectedLead;
   }, [selectedLead, rows]);
+  const selectedCategory = selected ? getLeadCategoryValue(selected) : 'warm';
+  const selectedAssignedEmployeeName = selected ? getLeadAssignedEmployeeName(selected, employeeLookup) : '';
 
   const beginCreate = useCallback(() => {
     setCreateForm(createDefaults());
+    setCreateFormError('');
     setOpenCreate(true);
   }, []);
 
-  const closeCreate = useCallback(() => setOpenCreate(false), []);
-  const closeEdit = useCallback(() => setEditingLead(null), []);
+  const closeCreate = useCallback(() => {
+    setOpenCreate(false);
+    setCreateFormError('');
+  }, []);
+  const closeEdit = useCallback(() => {
+    setEditingLead(null);
+    setEditFormError('');
+  }, []);
   const resetFilters = useCallback(() => setFilters({ search: '', status: 'all', priority: 'all', source: 'all', archiveScope: 'all' }), []);
   const resetClientFilters = useCallback(() => setClientFilters({ search: '', archiveScope: 'all' }), []);
 
@@ -402,6 +486,21 @@ function LeadManagementPage() {
     setOpenRowMenuId(id);
   }, [closeRowMenu, openRowMenuId]);
 
+  const openLeadDetails = useCallback(async (lead) => {
+    setSelectedLead(lead);
+    const id = leadId(lead);
+    if (!workspaceId || !id) return;
+    try {
+      const response = await leadsApi.get(workspaceId, id);
+      const fullLead = response?.data || null;
+      if (fullLead) {
+        setSelectedLead((current) => (leadId(current) === id ? fullLead : current));
+      }
+    } catch (e) {
+      err(e.message || 'Failed to load lead details');
+    }
+  }, [workspaceId, err]);
+
   useEffect(() => {
     if (!openRowMenuId) return undefined;
 
@@ -432,6 +531,7 @@ function LeadManagementPage() {
   const openEdit = useCallback(async (lead) => {
     setEditingLead(lead);
     setEditForm(toEditFormFromLead(lead));
+    setEditFormError('');
 
     const id = leadId(lead);
     if (!workspaceId || !id) return;
@@ -461,17 +561,25 @@ function LeadManagementPage() {
   const handleCreate = useCallback(async (event) => {
     event.preventDefault();
     const title = String(createForm.title || '').trim();
+    const category = String(createForm.priority || '').toLowerCase();
     if (!title) {
       err('Lead title is required');
       return;
     }
+    if (!leadCategoryIsValid(category)) {
+      const message = 'Select a valid lead category';
+      setCreateFormError(message);
+      err(message);
+      return;
+    }
+    setCreateFormError('');
     setCreateBusy(true);
     try {
       await createItem({
         title,
         statusId: normStage(createForm.statusId),
         value: Number(createForm.value || 0),
-        priority: nPriority(createForm.priority),
+        priority: nPriority(category),
         source: nSource(createForm.source),
         currency: 'INR',
         expectedCloseDate: createForm.expectedCloseDate || undefined,
@@ -494,13 +602,21 @@ function LeadManagementPage() {
     if (!editingLead) return;
     const id = leadId(editingLead);
     if (!id) return;
+    const category = String(editForm.priority || '').toLowerCase();
+    if (!leadCategoryIsValid(category)) {
+      const message = 'Select a valid lead category';
+      setEditFormError(message);
+      err(message);
+      return;
+    }
+    setEditFormError('');
     setEditBusy(true);
     try {
       const existingCustomFields = obj(editingLead?.customFields);
       await updateItem(id, {
         title: String(editForm.title || '').trim(),
         value: Number(editForm.value || 0),
-        priority: nPriority(editForm.priority),
+        priority: nPriority(category),
         source: nSource(editForm.source),
         currency: 'INR',
         expectedCloseDate: editForm.expectedCloseDate || null,
@@ -618,7 +734,7 @@ function LeadManagementPage() {
   const isLeadTab = tab === 'list';
   const heroTitle = isLeadTab ? 'Lead Pipeline' : 'Client Directory';
   const heroSubtitle = isLeadTab
-    ? 'Track opportunity value, stage movement, and priority from one focused workspace.'
+    ? 'Track opportunity value, stage movement, and lead category from one focused workspace.'
     : 'Manage client records, contact details, and archive state without leaving the list.';
   const statCards = isLeadTab
     ? [
@@ -643,7 +759,7 @@ function LeadManagementPage() {
         columns: [
           { header: 'Lead', value: (row) => row.title || '-' },
           { header: 'Status', value: (row) => stageTitle(row.statusId || row.stage) },
-          { header: 'Priority', value: (row) => nPriority(row.priority) },
+          { header: 'Lead Category', value: (row) => leadCategoryLabel(getLeadCategoryValue(row)) },
           { header: 'Source', value: (row) => nSource(row.source) },
           { header: 'Value', value: (row) => Number(row.value || 0) },
           { header: 'Archived', value: (row) => (row.isArchived ? 'Yes' : 'No') },
@@ -716,7 +832,7 @@ function LeadManagementPage() {
             {isLeadFilterOpen ? (
               <section className="sv-leads-filters sv-leads-filters-panel grid grid-cols-1 gap-2 md:grid-cols-[170px_170px_170px_170px_auto]">
                 <SelectDropdown value={filters.status} onChange={(nextValue) => setFilters((p) => ({ ...p, status: nextValue }))} options={[{ value: 'all', label: 'All Status' }, ...STAGE_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
-                <SelectDropdown value={filters.priority} onChange={(nextValue) => setFilters((p) => ({ ...p, priority: nextValue }))} options={[{ value: 'all', label: 'All Priority' }, ...PRIORITY_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
+                <SelectDropdown value={filters.priority} onChange={(nextValue) => setFilters((p) => ({ ...p, priority: nextValue }))} options={[{ value: 'all', label: 'All Categories' }, ...LEAD_CATEGORY_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
                 <SelectDropdown value={filters.source} onChange={(nextValue) => setFilters((p) => ({ ...p, source: nextValue }))} options={[{ value: 'all', label: 'All Source' }, ...SOURCE_OPTIONS]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
                 <SelectDropdown value={filters.archiveScope} onChange={(nextValue) => setFilters((p) => ({ ...p, archiveScope: nextValue }))} options={[{ value: 'all', label: 'All (Active)' }, { value: 'archived', label: 'Archived Only' }]} triggerClassName="sv-leads-filter-select rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm" />
                 <button type="button" onClick={resetFilters} className="btn btn-light sv-ctl-btn sv-leads-reset-btn rounded-lg border border-outline-variant/20 bg-surface px-3 py-2 text-sm">Reset</button>
@@ -732,7 +848,7 @@ function LeadManagementPage() {
                     <th className="px-3 py-3">Lead</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Move To</th>
-                    <th className="px-3 py-3">Priority</th>
+                    <th className="px-3 py-3">Lead Category</th>
                     <th className="px-3 py-3">Source</th>
                     <th className="px-3 py-3">Value</th>
                     <th className="px-3 py-3 sv-row-action-heading sv-leads-actions-cell">Action</th>
@@ -747,11 +863,13 @@ function LeadManagementPage() {
                   {!leadsLoading && filtered.map((lead) => {
                     const id = leadId(lead);
                     const currentStatus = normStage(lead.statusId || lead.stage);
+                    const currentCategory = getLeadCategoryValue(lead);
+                    const assignedEmployeeName = getLeadAssignedEmployeeName(lead, employeeLookup);
                     return (
                       <tr key={id} className="sv-leads-row border-b border-outline-variant/10">
                         <td className="px-3 py-3 text-sm font-semibold text-on-surface">
                           <div className="inline-flex items-center gap-2">
-                            <button type="button" className="sv-name-open-btn" onClick={() => setSelectedLead(lead)}>{lead.title || '-'}</button>
+                            <button type="button" className="sv-name-open-btn" onClick={() => openLeadDetails(lead)}>{lead.title || '-'}</button>
                             {lead.isArchived ? <span className="sv-leads-archive-pill rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">Archived</span> : null}
                           </div>
                         </td>
@@ -759,7 +877,9 @@ function LeadManagementPage() {
                         <td className="px-3 py-3">
                           <SelectDropdown value={currentStatus} onChange={(nextValue) => openMove(lead, nextValue)} options={STAGE_OPTIONS} triggerClassName="sv-leads-move-select rounded-lg border border-outline-variant/20 bg-surface px-2 py-1 text-sm" />
                         </td>
-                        <td className="px-3 py-3 text-sm text-on-surface-variant">{nPriority(lead.priority)}</td>
+                        <td className="px-3 py-3 text-sm text-on-surface-variant sv-leads-category-cell">
+                          <LeadCategoryBlock category={currentCategory} employeeName={assignedEmployeeName} />
+                        </td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{nSource(lead.source)}</td>
                         <td className="px-3 py-3 text-sm text-on-surface-variant">{fmtInr(lead.value)}</td>
                         <td className="px-3 py-3 sv-row-action-cell sv-leads-actions-cell">
@@ -899,7 +1019,7 @@ function LeadManagementPage() {
             onClick={() => {
               const row = openRowMenuContext.row;
               closeRowMenu();
-              setSelectedLead(row);
+              void openLeadDetails(row);
             }}
           >
             <Icon name="info" className="sv-icon-btn-icon" />
@@ -985,6 +1105,9 @@ function LeadManagementPage() {
             <div className="min-w-0">
               <h3 className="text-3xl font-extrabold text-on-surface">{selected.title || 'Lead'}</h3>
               <p className="text-sm text-on-surface-variant">{stageTitle(selected.statusId || selected.stage)}</p>
+              <div className="mt-2">
+                <LeadCategoryBlock category={selectedCategory} employeeName={selectedAssignedEmployeeName} className="sv-leads-category-block--drawer" />
+              </div>
             </div>
             <button type="button" aria-label="Close details" onClick={() => setSelectedLead(null)} className="sv-modal-close-btn" title="Close">
               <span className="material-symbols-outlined">close</span>
@@ -996,7 +1119,7 @@ function LeadManagementPage() {
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Deal</h4>
               <div className="grid grid-cols-[120px_1fr] gap-y-2">
                 <span className="text-on-surface-variant">Value</span><span className="text-right text-on-surface">{fmtInr(selected.value)}</span>
-                <span className="text-on-surface-variant">Priority</span><span className="text-right text-on-surface">{nPriority(selected.priority)}</span>
+                <span className="text-on-surface-variant">Lead Category</span><span className="text-right text-on-surface">{leadCategoryLabel(selectedCategory)}</span>
                 <span className="text-on-surface-variant">Source</span><span className="text-right text-on-surface">{nSource(selected.source)}</span>
                 <span className="text-on-surface-variant">Expected Close</span><span className="text-right text-on-surface">{fmtDate(selected.expectedCloseDate)}</span>
                 <span className="text-on-surface-variant">Last Updated</span><span className="text-right text-on-surface">{fmtDate(selected.updatedAt || selected.createdAt)}</span>
@@ -1058,12 +1181,19 @@ function LeadManagementPage() {
               <input value={createForm.title} onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
               <SelectDropdown value={createForm.statusId} onChange={(nextValue) => setCreateForm((p) => ({ ...p, statusId: normStage(nextValue) }))} options={STAGE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
+            <div className="mt-2">
+              <LeadCategoryField
+                value={createForm.priority}
+                onChange={(nextValue) => setCreateForm((p) => ({ ...p, priority: nextValue }))}
+                error={createFormError}
+                onErrorClear={() => setCreateFormError('')}
+              />
+            </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <input value={createForm.value} onChange={(e) => setCreateForm((p) => ({ ...p, value: e.target.value }))} type="number" min="0" placeholder="Value (INR)" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
               <DatePicker value={createForm.expectedCloseDate} onChange={(nextValue) => setCreateForm((p) => ({ ...p, expectedCloseDate: nextValue }))} className="w-full" triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" placeholder="Expected close" />
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <SelectDropdown value={createForm.priority} onChange={(nextValue) => setCreateForm((p) => ({ ...p, priority: nPriority(nextValue) }))} options={PRIORITY_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <SelectDropdown value={createForm.source} onChange={(nextValue) => setCreateForm((p) => ({ ...p, source: nSource(nextValue) }))} options={SOURCE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
               <SelectDropdown value={createForm.clientId} onChange={handleCreateClientChange} options={clientOptions} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
@@ -1092,9 +1222,16 @@ function LeadManagementPage() {
               <input value={editForm.title} onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))} placeholder="Lead Title *" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" required />
               <DatePicker value={editForm.expectedCloseDate} onChange={(nextValue) => setEditForm((p) => ({ ...p, expectedCloseDate: nextValue }))} className="w-full" triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" placeholder="Expected close" />
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2">
+              <LeadCategoryField
+                value={editForm.priority}
+                onChange={(nextValue) => setEditForm((p) => ({ ...p, priority: nextValue }))}
+                error={editFormError}
+                onErrorClear={() => setEditFormError('')}
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <input value={editForm.value} onChange={(e) => setEditForm((p) => ({ ...p, value: e.target.value }))} type="number" min="0" placeholder="Value (INR)" className="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
-              <SelectDropdown value={editForm.priority} onChange={(nextValue) => setEditForm((p) => ({ ...p, priority: nPriority(nextValue) }))} options={PRIORITY_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
               <SelectDropdown value={editForm.source} onChange={(nextValue) => setEditForm((p) => ({ ...p, source: nSource(nextValue) }))} options={SOURCE_OPTIONS} triggerClassName="rounded-lg border border-outline-variant/20 px-3 py-2 text-sm" />
             </div>
             <div className="mt-2">

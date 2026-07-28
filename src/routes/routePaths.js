@@ -30,6 +30,7 @@ export const ROUTES = {
   employeeDetail: '/employees/:employeeId',
   employeeManagement: '/employee-management',
   leads: '/leads',
+  leadEdit: '/leads/:leadId/edit',
   clientDetail: '/clients/:clientId',
   leadManagement: '/lead-management',
   contacts: '/contacts',

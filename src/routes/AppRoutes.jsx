@@ -17,6 +17,7 @@ const DashboardPage = lazy(() => import('../pages/dashboard/DashboardPage'));
 const EmployeeManagementPage = lazy(() => import('../pages/employee-management/EmployeeManagementPage'));
 const EmployeeDetailPage = lazy(() => import('../pages/employee-management/EmployeeDetailPage'));
 const LeadManagementPage = lazy(() => import('../pages/lead-management/LeadManagementPage'));
+const LeadEditPage = lazy(() => import('../pages/lead-management/LeadEditPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const ProjectBoardPage = lazy(() => import('../pages/project-board/ProjectBoardRoutePage'));
 const BacklogPage = lazy(() => import('../pages/project-board/BacklogPage'));
@@ -180,6 +181,7 @@ function AppRoutes() {
           <Route path={ROUTES.projectOverview} element={lazyElement(ProjectOverviewPage)} />
 
           <Route path={ROUTES.leads} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(LeadManagementPage)}</RoleGuard>} />
+          <Route path={ROUTES.leadEdit} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(LeadEditPage)}</RoleGuard>} />
           <Route path={ROUTES.clientDetail} element={<RoleGuard allow={['owner', 'admin', 'member']}>{lazyElement(ClientDetailPage)}</RoleGuard>} />
           <Route path={ROUTES.employees} element={lazyElement(EmployeeManagementPage)} />
           <Route path={ROUTES.employeeDetail} element={lazyElement(EmployeeDetailPage)} />

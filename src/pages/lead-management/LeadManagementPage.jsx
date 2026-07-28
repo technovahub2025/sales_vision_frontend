@@ -683,6 +683,12 @@ function LeadManagementPage() {
     navigate(ROUTES.clientDetail.replace(':clientId', clientId));
   }, [err, navigate]);
 
+  const openLeadEditScreen = useCallback((lead) => {
+    const id = leadId(lead);
+    if (!id) return;
+    navigate(ROUTES.leadEdit.replace(':leadId', id));
+  }, [navigate]);
+
   const beginCreateClient = useCallback(() => {
     setClientForm(CLIENT_FORM_DEFAULTS);
     setOpenCreateClient(true);
@@ -1043,6 +1049,18 @@ function LeadManagementPage() {
             onClick={() => {
               const row = openRowMenuContext.row;
               closeRowMenu();
+              openLeadEditScreen(row);
+            }}
+          >
+            <Icon name="open_in_new" className="sv-icon-btn-icon" />
+            <span>Open Edit Screen</span>
+          </button>
+          <button
+            type="button"
+            className="sv-row-menu-item"
+            onClick={() => {
+              const row = openRowMenuContext.row;
+              closeRowMenu();
               openLeadClient(row);
             }}
           >
@@ -1162,6 +1180,7 @@ function LeadManagementPage() {
 
           <div className="sv-leads-drawer-actions mt-4 flex items-center gap-2">
             <button type="button" onClick={() => openEdit(selected)} className="btn btn-primary sv-ctl-btn rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Quick Edit</button>
+            <button type="button" onClick={() => openLeadEditScreen(selected)} className="btn btn-light sv-ctl-btn rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Open Edit Screen</button>
             <button type="button" onClick={() => setSelectedLead(null)} className="btn btn-light sv-ctl-btn rounded-lg border border-outline-variant/20 px-4 py-2 text-sm">Done</button>
           </div>
         </aside>
